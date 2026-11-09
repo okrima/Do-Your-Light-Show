@@ -16,11 +16,11 @@ public:
 private:
     juce::TabbedComponent tabbedComponent;
 
-    VenuePatchTab venueTab;
-    PatternCreatorTab patternTab;
-    ExportEngineTab exportTab;
-
     juce::ValueTree mainState { "DO_YOUR_LIGHT_SHOW_STATE" };
+
+    VenuePatchTab venueTab {mainState};
+    PatternCreatorTab patternTab {mainState};
+    ExportEngineTab exportTab;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (MainComponent)
 };
