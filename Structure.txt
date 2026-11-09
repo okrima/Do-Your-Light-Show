@@ -1,0 +1,30 @@
+DoreMidiShowGenerator/
+├── CMakeLists.txt
+├── Source/
+│   ├── Main.cpp
+│   ├── MainComponent.h
+│   ├── MainComponent.cpp
+│   ├── Model/
+│   │   ├── LogicalParam.h
+│   │   ├── FixtureProfile.h
+│   │   ├── FixtureInstance.h
+│   │   ├── HardwareMidiMapper.h
+│   │   ├── VenuePatch.h
+│   │   └── Scene.h
+│   ├── Engine/
+│   │   ├── MusicalContext.h
+│   │   ├── LfoGenerator.h
+│   │   ├── ColorGenerator.h
+│   │   ├── TriggerGenerator.h
+│   │   └── MidiRenderEngine.h
+│   ├── UI/
+│   │   ├── Tabs/
+│   │   │   ├── VenuePatchTab.h
+│   │   │   ├── PatternCreatorTab.h
+│   │   │   └── ExportEngineTab.h
+│   │   └── Components/
+│   │       ├── PanTiltRangeSlider.h
+│   │       ├── TwoValueSliderAttachment.h
+│   │       └── LfoWaveformPreview.h
+│   └── Utils/
+│       └── PresetManager.h
