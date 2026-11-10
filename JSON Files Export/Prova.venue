@@ -1,0 +1,29 @@
+{
+  "nodeType": "VENUE",
+  "children": [
+    {
+      "nodeType": "FIXTURE",
+      "name": "Back Light",
+      "startAddress": 1,
+      "channelCount": 8,
+      "role": "WASH_BACK",
+      "map_Dimmer": 1,
+      "map_Red": 2,
+      "map_Green": 3,
+      "map_Blue": 4,
+      "map_White": 5
+    },
+    {
+      "nodeType": "FIXTURE",
+      "name": "Floor lights",
+      "startAddress": 11,
+      "channelCount": 8,
+      "role": "WASH_FLOOR",
+      "map_Dimmer": 1,
+      "map_Red": 2,
+      "map_Green": 3,
+      "map_Blue": 4,
+      "map_White": 5
+    }
+  ]
+}

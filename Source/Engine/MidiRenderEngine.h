@@ -1,162 +1,107 @@
 #pragma once
 #include <juce_audio_basics/juce_audio_basics.h>
-#include <unordered_map>
-#include <vector>
-#include <string>
-
-#include "../Model/VenuePatch.h"
-#include "../Model/HardwareMidiMapper.h"
-#include "../Model/Scene.h"
+#include <juce_core/juce_core.h>
+#include <cmath>
 #include "MusicalContext.h"
+#include "../Model/DataStateKeys.h"
 
 class MidiRenderEngine
 {
 public:
-    MidiRenderEngine(MusicalContext ctx, VenuePatch p, HardwareMidiMapper m)
-        : context(ctx), patch(std::move(p)), mapper(m) {}
-
-    // Genera la sequenza MIDI completa per una determinata Scena
-    juce::MidiMessageSequence renderScene(const Scene& scene) const
+    static juce::MidiMessageSequence renderShow(const juce::ValueTree& appState, const MusicalContext& context)
     {
         juce::MidiMessageSequence sequence;
-        
-        long totalTicks = scene.getDurationBars() * context.ppq * context.timeSigNumerator;
-        
-        // Risoluzione di campionamento delle curve LFO: 
-        // 24 ticks (con PPQ=960) = campionamento ogni 1/160 di nota.
-        const int stepTicks = context.ppq / 40; 
+        auto venueNode = appState.getChildWithName(StateKeys::VenueNode);
+        auto showNode = appState.getChildWithName(StateKeys::ShowNode);
 
-        // Cache per la deduplicazione: [MidiChannel][CC_Index] -> LastValue
-        std::unordered_map<int, std::unordered_map<int, uint8_t>> lastCcValues;
-        
-        // Cache per lo stato delle Note: [MidiChannel][Note_Index] -> isActive
-        std::unordered_map<int, std::unordered_map<int, bool>> lastNoteStates;
+        if (!venueNode.isValid() || !showNode.isValid()) return sequence;
 
-        for (long currentTick = 0; currentTick <= totalTicks; currentTick += stepTicks)
+        int ticksPerBar = (context.ppq * 4 * context.timeSigNumerator) / context.timeSigDenominator;
+        int resolutionTicks = context.ppq / 8; // CC ogni 32esimo
+
+        // 1. CICLA SU TUTTE LE SCENE DELLA TIMELINE
+        for (auto scene : showNode)
         {
-            for (const auto& fixture : patch.getFixtures())
+            if (!scene.hasType(StateKeys::Scene)) continue;
+
+            // Legge i quarti decimali invece delle battute intere
+            double sceneStartBeat = scene.getProperty(StateKeys::StartBeat, 1.0);
+            double sceneDurationBeats = scene.getProperty(StateKeys::DurationBeats, 4.0);
+
+            // Calcolo diretto in tick: 1 Quarto = context.ppq (960 tick)
+            long startTick = static_cast<long>((sceneStartBeat - 1.0) * context.ppq);
+            long endTick = startTick + static_cast<long>(sceneDurationBeats * context.ppq);
+
+            // 2. CICLA SUI COMANDI DENTRO LA SCENA
+            for (auto cmd : scene)
             {
-                const auto* instr = scene.getInstructionFor(fixture.getName());
-                if (!instr) continue;
+                if (!cmd.hasType(StateKeys::RoleCommand)) continue;
 
-                // 1. Movimento (Pan & Tilt)
-                if (instr->panAnim)
-                    processCcParam(fixture, LogicalParam::Pan, instr->panAnim->getValueAtTick(currentTick, context), currentTick, sequence, lastCcValues);
-                if (instr->tiltAnim)
-                    processCcParam(fixture, LogicalParam::Tilt, instr->tiltAnim->getValueAtTick(currentTick, context), currentTick, sequence, lastCcValues);
+                juce::String targetRole = cmd.getProperty(StateKeys::TargetRole).toString();
+                juce::String param = cmd.getProperty(StateKeys::TargetParam).toString();
+                int startVal = cmd.getProperty(StateKeys::StartValue, 0);
+                int endVal = cmd.getProperty(StateKeys::EndValue, 127);
+                juce::String curve = cmd.getProperty(StateKeys::CurveType, "Step (Stato Fisso)").toString();
 
-                // 2. Colore (RGBWU)
-                if (instr->colorAnim)
+                // 3. TROVA TUTTE LE MACCHINE NEL LOCALE CHE HANNO QUESTO RUOLO
+                for (auto fix : venueNode)
                 {
-                    DmxColor color = instr->colorAnim->getColorAtTick(currentTick, context);
-                    processCcParam(fixture, LogicalParam::Red, color.r, currentTick, sequence, lastCcValues);
-                    processCcParam(fixture, LogicalParam::Green, color.g, currentTick, sequence, lastCcValues);
-                    processCcParam(fixture, LogicalParam::Blue, color.b, currentTick, sequence, lastCcValues);
-                    processCcParam(fixture, LogicalParam::White, color.w, currentTick, sequence, lastCcValues);
-                    processCcParam(fixture, LogicalParam::UV, color.uv, currentTick, sequence, lastCcValues);
-                }
+                    if (fix.getProperty(StateKeys::RoleName).toString() == targetRole)
+                    {
+                        int startAddress = fix.getProperty(StateKeys::StartAddress);
+                        int paramChannelOffset = fix.getProperty(StateKeys::getMappingKey(param), 0);
 
-                // 3. Trigger Impulsivi (Geyser & Strobo)
-                if (instr->geyserAnim)
-                    processNoteTrigger(fixture, LogicalParam::GeyserBlast, instr->geyserAnim->isActiveAtTick(currentTick, context), currentTick, sequence, lastNoteStates);
-                if (instr->strobeAnim)
-                    processNoteTrigger(fixture, LogicalParam::Strobe, instr->strobeAnim->isActiveAtTick(currentTick, context), currentTick, sequence, lastNoteStates);
-            }
-        }
+                        // Ignora se la macchina non ha questo parametro mappato
+                        if (startAddress < 0 || paramChannelOffset <= 0) continue;
 
-        // Chiusura di sicurezza per le note rimaste aperte a fine traccia
-        closeAllActiveNotes(totalTicks, sequence, lastNoteStates);
+                        int dmxChannel = startAddress + (paramChannelOffset - 1);
+                        int midiChannel = ((dmxChannel - 1) / 128) + 1;
+                        int midiCc = (dmxChannel - 1) % 128;
+
+                        // 4. GENERA AUTOMAZIONE PER QUESTA MACCHINA
+                        if (curve.startsWith("Step"))
+                        {
+                            sequence.addEvent(juce::MidiMessage::controllerEvent(midiChannel, midiCc, startVal), startTick);
+                            sequence.addEvent(juce::MidiMessage::controllerEvent(midiChannel, midiCc, endVal), endTick - 1);
+                        }
+                        else
+                        {
+                            for (long tick = startTick; tick <= endTick; tick += resolutionTicks)
+                            {
+                                double progress = static_cast<double>(tick - startTick) / (endTick - startTick);
+                                int val = startVal;
+
+                                if (curve.startsWith("LinearRamp"))
+                                {
+                                    val = startVal + static_cast<int>((endVal - startVal) * progress);
+                                }
+                                else if (curve.startsWith("Sine"))
+                                {
+                                    constexpr double localPI = 3.14159265358979323846;
+                                    double sineEase = (std::sin(progress * localPI - (localPI / 2.0)) + 1.0) / 2.0;
+                                    val = startVal + static_cast<int>((endVal - startVal) * sineEase);
+                                }
+
+                                val = juce::jlimit(0, 127, val);
+                                sequence.addEvent(juce::MidiMessage::controllerEvent(midiChannel, midiCc, val), tick);
+                            }
+                        }
+                    }
+                } // Fine loop macchine
+            } // Fine loop comandi
+        } // Fine loop scene
 
         sequence.updateMatchedPairs();
         return sequence;
     }
 
-    // Esporta la sequenza formattata su un file fisico .mid
-    bool exportToFile(const juce::MidiMessageSequence& sequence, const juce::File& outputFile) const
+    static bool exportToFile(const juce::MidiMessageSequence& sequence, const juce::File& file, int ppq)
     {
         juce::MidiFile midiFile;
-        midiFile.setTicksPerQuarterNote(context.ppq);
+        midiFile.setTicksPerQuarterNote(ppq);
         midiFile.addTrack(sequence);
-
-        juce::FileOutputStream outputStream(outputFile);
-        if (outputStream.openedOk())
-        {
-            return midiFile.writeTo(outputStream);
-        }
+        juce::FileOutputStream stream(file);
+        if (stream.openedOk()) { stream.setPosition(0); stream.truncate(); return midiFile.writeTo(stream); }
         return false;
-    }
-
-private:
-    MusicalContext context;
-    VenuePatch patch;
-    HardwareMidiMapper mapper;
-
-    void processCcParam(const FixtureInstance& fixture, LogicalParam param, uint8_t value, 
-                        long tick, juce::MidiMessageSequence& seq,
-                        std::unordered_map<int, std::unordered_map<int, uint8_t>>& lastCcCache) const
-    {
-        auto absoluteDmx = fixture.getAbsoluteDmxAddress(param);
-        if (!absoluteDmx.has_value()) return;
-
-        auto target = mapper.getMidiForDmx(absoluteDmx.value(), param);
-        if (!target.has_value() || target->type != MidiEventType::ControlChange) return;
-
-        int ch = target->channel;
-        int cc = target->index;
-
-        // Deduplicazione: invia il messaggio solo se il valore è cambiato
-        if (lastCcCache[ch].find(cc) == lastCcCache[ch].end() || lastCcCache[ch][cc] != value)
-        {
-            auto midiMsg = juce::MidiMessage::controllerEvent(ch, cc, value);
-            seq.addEvent(midiMsg, static_cast<double>(tick));
-            lastCcCache[ch][cc] = value;
-        }
-    }
-
-    void processNoteTrigger(const FixtureInstance& fixture, LogicalParam param, bool shouldBeActive, 
-                            long tick, juce::MidiMessageSequence& seq,
-                            std::unordered_map<int, std::unordered_map<int, bool>>& lastNoteCache) const
-    {
-        auto absoluteDmx = fixture.getAbsoluteDmxAddress(param);
-        if (!absoluteDmx.has_value()) return;
-
-        auto target = mapper.getMidiForDmx(absoluteDmx.value(), param);
-        if (!target.has_value() || target->type != MidiEventType::Note) return;
-
-        int ch = target->channel;
-        int noteNum = target->index;
-        bool currentlyActive = lastNoteCache[ch][noteNum];
-
-        if (shouldBeActive && !currentlyActive)
-        {
-            auto noteOn = juce::MidiMessage::noteOn(ch, noteNum, static_cast<juce::uint8>(127));
-            seq.addEvent(noteOn, static_cast<double>(tick));
-            lastNoteCache[ch][noteNum] = true;
-        } 
-        else if (!shouldBeActive && currentlyActive)
-        {
-            auto noteOff = juce::MidiMessage::noteOff(ch, noteNum, static_cast<juce::uint8>(0));
-            seq.addEvent(noteOff, static_cast<double>(tick));
-            lastNoteCache[ch][noteNum] = false;
-        }
-    }
-
-    void closeAllActiveNotes(long finalTick, juce::MidiMessageSequence& seq,
-                             std::unordered_map<int, std::unordered_map<int, bool>>& lastNoteCache) const
-    {
-        for (auto& chPair : lastNoteCache)
-        {
-            int ch = chPair.first;
-            for (auto& notePair : chPair.second)
-            {
-                int noteNum = notePair.first;
-                if (notePair.second)
-                {
-                    auto noteOff = juce::MidiMessage::noteOff(ch, noteNum, static_cast<juce::uint8>(0));
-                    seq.addEvent(noteOff, static_cast<double>(finalTick));
-                    notePair.second = false; // Reset dello stato
-                }
-            }
-        }
     }
 };

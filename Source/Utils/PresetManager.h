@@ -1,181 +1,143 @@
 #pragma once
 #include <juce_core/juce_core.h>
-#include <fstream>
-#include <vector>
-#include "../Model/VenuePatch.h"
-#include "../Model/Scene.h"
+#include "../../Model/DataStateKeys.h"
 
 class PresetManager
 {
 public:
     // =========================================================================
-    // EXPORT: C++ -> juce::var -> File .json
+    // SALVATAGGIO
     // =========================================================================
-    static bool saveShowToFile(const juce::File& destinationFile, 
-                               const std::string& venueName,
-                               const VenuePatch& patch, 
-                               const std::vector<Scene>& scenes)
+    static bool saveVenue(const juce::ValueTree& appState, const juce::File& file)
     {
-        auto rootObj = new juce::DynamicObject();
-        rootObj->setProperty("version", 1);
-        rootObj->setProperty("appName", "DoYourLightShow");
+        auto venueNode = appState.getChildWithName(StateKeys::VenueNode);
+        return saveValueTreeToJson(venueNode, file);
+    }
 
-        // 1. Serializzazione del Venue Profile (Patch)
-        rootObj->setProperty("venue", serializeVenue(venueName, patch));
-
-        // 2. Serializzazione del pool di Scene
-        juce::Array<juce::var> scenesArray;
-        for (const auto& scene : scenes)
-        {
-            scenesArray.add(serializeScene(scene));
-        }
-        rootObj->setProperty("scenes", scenesArray);
-
-        // 3. Conversione in stringa JSON e scrittura
-        juce::var rootVar(rootObj);
-        juce::String jsonString = juce::JSON::toString(rootVar, false, 2); // 2 spazi di indentazione
-
-        return destinationFile.replaceWithText(jsonString);
+    static bool saveShow(const juce::ValueTree& appState, const juce::File& file)
+    {
+        auto showNode = appState.getChildWithName(StateKeys::ShowNode);
+        return saveValueTreeToJson(showNode, file);
     }
 
     // =========================================================================
-    // IMPORT: File .json -> juce::var -> Parsing C++
+    // CARICAMENTO
     // =========================================================================
-    static bool loadShowFromFile(const juce::File& sourceFile,
-                                 std::string& outVenueName,
-                                 VenuePatch& outPatch,
-                                 std::vector<Scene>& outScenes)
+    static bool loadVenue(juce::ValueTree& appState, const juce::File& file)
     {
-        if (!sourceFile.existsAsFile()) return false;
-
-        juce::var parsedJson = juce::JSON::parse(sourceFile);
-        if (!parsedJson.isObject()) return false;
-
-        auto* rootObj = parsedJson.getDynamicObject();
-        if (!rootObj) return false;
-
-        outPatch.clear();
-        outScenes.clear();
-
-        // 1. Parsing Venue
-        if (rootObj->hasProperty("venue"))
+        juce::ValueTree loadedNode = loadValueTreeFromJson(file);
+        if (loadedNode.isValid() && loadedNode.hasType(StateKeys::VenueNode))
         {
-            auto venueVar = rootObj->getProperty("venue");
-            deserializeVenue(venueVar, outVenueName, outPatch);
+            auto existingNode = appState.getChildWithName(StateKeys::VenueNode);
+            updateNodePreservingListeners(existingNode, loadedNode);
+            return true;
         }
+        return false;
+    }
 
-        // 2. Parsing Scene
-        if (rootObj->hasProperty("scenes"))
+    static bool loadShow(juce::ValueTree& appState, const juce::File& file)
+    {
+        juce::ValueTree loadedNode = loadValueTreeFromJson(file);
+        if (loadedNode.isValid() && loadedNode.hasType(StateKeys::ShowNode))
         {
-            if (auto* scenesArray = rootObj->getProperty("scenes").getArray())
-            {
-                for (const auto& sceneVar : *scenesArray)
-                {
-                    outScenes.push_back(deserializeScene(sceneVar));
-                }
-            }
+            auto existingNode = appState.getChildWithName(StateKeys::ShowNode);
+            updateNodePreservingListeners(existingNode, loadedNode);
+            return true;
         }
-
-        return true;
+        return false;
     }
 
 private:
-    // --- HELPER SERIALIZZAZIONE ---
-    static juce::var serializeVenue(const std::string& venueName, const VenuePatch& patch)
+    // =========================================================================
+    // CORE LOGIC: ValueTree <-> JSON
+    // =========================================================================
+
+    // Aggiorna un nodo senza rimpiazzarlo in memoria per mantenere vivi i listener della GUI
+    static void updateNodePreservingListeners(juce::ValueTree& targetNode, const juce::ValueTree& sourceNode)
     {
-        auto venueObj = new juce::DynamicObject();
-        venueObj->setProperty("name", juce::String(venueName));
+        targetNode.removeAllChildren(nullptr);
+        targetNode.removeAllProperties(nullptr);
 
-        juce::Array<juce::var> fixturesArray;
-        for (const auto& fixture : patch.getFixtures())
+        for (int i = 0; i < sourceNode.getNumProperties(); ++i)
         {
-            auto fixObj = new juce::DynamicObject();
-            fixObj->setProperty("name", juce::String(fixture.getName()));
-            fixObj->setProperty("startAddress", fixture.getStartAddress());
-            
-            if (fixture.getProfile() != nullptr)
-            {
-                fixObj->setProperty("profileId", juce::String(fixture.getProfile()->id));
-            }
-
-            fixturesArray.add(juce::var(fixObj));
+            auto name = sourceNode.getPropertyName(i);
+            targetNode.setProperty(name, sourceNode.getProperty(name), nullptr);
         }
 
-        venueObj->setProperty("fixtures", fixturesArray);
-        return juce::var(venueObj);
+        for (auto child : sourceNode)
+            targetNode.addChild(child.createCopy(), -1, nullptr);
     }
 
-    static juce::var serializeScene(const Scene& scene)
+    // --- Serializzazione (Salvataggio in JSON) ---
+    static bool saveValueTreeToJson(const juce::ValueTree& vt, const juce::File& file)
     {
-        auto sceneObj = new juce::DynamicObject();
-        sceneObj->setProperty("name", juce::String(scene.getName()));
-        sceneObj->setProperty("durationBars", scene.getDurationBars());
+        if (!vt.isValid()) return false;
 
-        auto instructionsObj = new juce::DynamicObject();
-        
-        for (const auto& pair : scene.getAllInstructions())
+        juce::var jsonVar = valueTreeToVar(vt);
+        juce::String jsonString = juce::JSON::toString(jsonVar);
+
+        return file.replaceWithText(jsonString);
+    }
+
+    static juce::var valueTreeToVar(const juce::ValueTree& vt)
+    {
+        auto* obj = new juce::DynamicObject();
+        obj->setProperty("nodeType", vt.getType().toString());
+
+        for (int i = 0; i < vt.getNumProperties(); ++i)
         {
-            const std::string& fixtureName = pair.first;
-            const FixtureInstruction& instr = pair.second;
-            
-            auto fixInstrObj = new juce::DynamicObject();
-            
-            // Pan
-            if (instr.panAnim)
-            {
-                auto panObj = new juce::DynamicObject();
-                panObj->setProperty("active", true);
-                // In una versione completa qui salveremmo shape, rate, min, max ecc.
-                fixInstrObj->setProperty("pan", juce::var(panObj));
-            }
-            // Aggiungere qui la serializzazione di tiltAnim, colorAnim, geyserAnim...
-
-            instructionsObj->setProperty(juce::String(fixtureName), juce::var(fixInstrObj));
+            auto name = vt.getPropertyName(i);
+            obj->setProperty(name.toString(), vt.getProperty(name));
         }
 
-        sceneObj->setProperty("instructions", juce::var(instructionsObj));
-        return juce::var(sceneObj);
-    }
-
-    // --- HELPER DESERIALIZZAZIONE ---
-    static void deserializeVenue(const juce::var& venueVar, std::string& outVenueName, VenuePatch& outPatch)
-    {
-        auto* obj = venueVar.getDynamicObject();
-        if (!obj) return;
-
-        outVenueName = obj->getProperty("name").toString().toStdString();
-        
-        if (auto* fixturesArray = obj->getProperty("fixtures").getArray())
+        if (vt.getNumChildren() > 0)
         {
-            for (const auto& fixVar : *fixturesArray)
-            {
-                auto* fixObj = fixVar.getDynamicObject();
-                if (!fixObj) continue;
-
-                std::string name = fixObj->getProperty("name").toString().toStdString();
-                uint16_t startAddr = static_cast<uint16_t>(static_cast<int>(fixObj->getProperty("startAddress")));
-                
-                // NOTA: In un'app reale, qui useremmo il "profileId" letto dal JSON 
-                // per recuperare il FixtureProfile* da un ProfileManager/Database globale.
-                // Per ora passiamo nullptr.
-                outPatch.addFixture(FixtureInstance(name, nullptr, startAddr));
-            }
+            juce::Array<juce::var> children;
+            for (auto child : vt)
+                children.add(valueTreeToVar(child));
+            obj->setProperty("children", children);
         }
+
+        return juce::var(obj);
     }
 
-    static Scene deserializeScene(const juce::var& sceneVar)
+    // --- Deserializzazione (Caricamento da JSON) ---
+    static juce::ValueTree loadValueTreeFromJson(const juce::File& file)
     {
-        auto* obj = sceneVar.getDynamicObject();
-        if (!obj) return Scene("Default", 4);
+        if (!file.existsAsFile()) return {};
 
-        std::string name = obj->getProperty("name").toString().toStdString();
-        int bars = static_cast<int>(obj->getProperty("durationBars"));
+        auto parsedJson = juce::JSON::parse(file);
+        if (parsedJson.isVoid()) return {};
 
-        Scene loadedScene(name, bars);
-        
-        // Deserializzazione delle istruzioni LFO/Trigger/Color...
-        // ... (Parsing dell'oggetto "instructions") ...
+        return varToValueTree(parsedJson);
+    }
 
-        return loadedScene;
+    static juce::ValueTree varToValueTree(const juce::var& v)
+    {
+        if (auto* obj = v.getDynamicObject())
+        {
+            juce::ValueTree vt(juce::Identifier(obj->getProperty("nodeType").toString()));
+
+            auto& props = obj->getProperties();
+            for (auto& p : props)
+            {
+                // MSVC Fix: estraiamo esplicitamente la stringa per rimuovere l'ambiguità
+                if (p.name.toString() == "nodeType" || p.name.toString() == "children") continue;
+
+                vt.setProperty(p.name, p.value, nullptr);
+            }
+
+            if (obj->hasProperty("children"))
+            {
+                auto* children = obj->getProperty("children").getArray();
+                if (children != nullptr)
+                {
+                    for (auto& c : *children)
+                        vt.addChild(varToValueTree(c), -1, nullptr);
+                }
+            }
+            return vt;
+        }
+        return juce::ValueTree();
     }
 };

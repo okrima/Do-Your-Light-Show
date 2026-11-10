@@ -1,0 +1,55 @@
+# ==========================================
+# JUCE & BUILD DIRECTORIES
+# ==========================================
+/build/
+/bin/
+/obj/
+build/
+bin/
+obj/
+*.xcodeproj/
+*.sln
+*.vcxproj
+*.vcxproj.filters
+*.vcxproj.user
+.vs/
+.gradle/
+cmake-build-*/
+
+# ==========================================
+# PROJUCER / IDE GENERATED FILES
+# ==========================================
+# Se usi Projucer, evita di tracciare i file generati automaticamente per ogni IDE
+JuceLibraryCode/
+osx/
+linux/
+windows/
+msvc*/
+xcode*/
+
+# ==========================================
+# USER PREFERENCES & OS JUNK
+# ==========================================
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon?
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# Linux
+*~
+.directory
+
+# IDE Specifici (VSCode, CLion, Xcode)
+.vscode/
+.idea/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates

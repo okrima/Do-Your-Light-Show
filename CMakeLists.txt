@@ -27,6 +27,9 @@ target_sources(DoYourLightShow
         Source/Main.cpp
         Source/MainComponent.cpp
         Source/MainComponent.h
+        Source/UI/Tabs/VenuePatchTab.cpp
+        Source/UI/Tabs/ShowBuilderTab.cpp
+        Source/UI/Tabs/ExportEngineTab.cpp
         
         # Model
         Source/Model/LogicalParam.h
@@ -45,7 +48,7 @@ target_sources(DoYourLightShow
         
         # UI Tabs & Components
         Source/UI/Tabs/VenuePatchTab.h
-        Source/UI/Tabs/PatternCreatorTab.h
+        Source/UI/Tabs/ShowBuilderTab.h
         Source/UI/Tabs/ExportEngineTab.h
         Source/UI/Components/PanTiltRangeSlider.h
         Source/UI/Components/TwoValueSliderAttachment.h
@@ -74,7 +77,7 @@ target_link_libraries(DoYourLightShow
 )
 
 # 6. Generazione automatica di JuceHeader.h per la compatibilità
-juce_generate_juce_header(DoreMidiShowGenerator)
+juce_generate_juce_header(DoYourLightShow)
 
 # 7. Disabilita warning superflui di JUCE su compilatori moderni
 target_compile_definitions(DoYourLightShow

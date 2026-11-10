@@ -1,0 +1,85 @@
+{
+  "nodeType": "SHOW_TIMELINE",
+  "children": [
+    {
+      "nodeType": "SCENE",
+      "sceneName": "Intro",
+      "startBeat": 1.0,
+      "durationBeats": 32.0,
+      "children": [
+        {
+          "nodeType": "ROLE_COMMAND",
+          "roleName": "WASH_BACK",
+          "parameter": "Dimmer",
+          "startValue": 0,
+          "endValue": 127,
+          "curve": "LinearRamp (Transizione)"
+        },
+        {
+          "nodeType": "ROLE_COMMAND",
+          "roleName": "WASH_FLOOR",
+          "parameter": "Dimmer",
+          "startValue": 0,
+          "endValue": 127,
+          "curve": "LinearRamp (Transizione)"
+        },
+        {
+          "nodeType": "ROLE_COMMAND",
+          "roleName": "WASH_BACK",
+          "parameter": "White",
+          "startValue": 127,
+          "endValue": 127,
+          "curve": "Step (Stato Fisso)"
+        },
+        {
+          "nodeType": "ROLE_COMMAND",
+          "roleName": "WASH_BACK",
+          "parameter": "White",
+          "startValue": 127,
+          "endValue": 127,
+          "curve": "Step (Stato Fisso)"
+        }
+      ]
+    },
+    {
+      "nodeType": "SCENE",
+      "sceneName": "Start Gtrs",
+      "startBeat": 33.0,
+      "durationBeats": 7.0,
+      "children": [
+        {
+          "nodeType": "ROLE_COMMAND",
+          "roleName": "WASH_FLOOR",
+          "parameter": "Dimmer",
+          "startValue": 0,
+          "endValue": 0,
+          "curve": "Step (Stato Fisso)"
+        }
+      ]
+    },
+    {
+      "nodeType": "SCENE",
+      "sceneName": "Ta da!",
+      "startBeat": 39.0,
+      "durationBeats": 0.5,
+      "children": [
+        {
+          "nodeType": "ROLE_COMMAND",
+          "roleName": "WASH_FLOOR",
+          "parameter": "Dimmer",
+          "startValue": 127,
+          "endValue": 127,
+          "curve": "Step (Stato Fisso)"
+        },
+        {
+          "nodeType": "ROLE_COMMAND",
+          "roleName": "WASH_BACK",
+          "parameter": "Dimmer",
+          "startValue": 0,
+          "endValue": 0,
+          "curve": "Step (Stato Fisso)"
+        }
+      ]
+    }
+  ]
+}

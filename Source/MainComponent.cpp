@@ -12,7 +12,7 @@ MainComponent::MainComponent()
 
     tabbedComponent.addTab ("2. Pattern Creator", 
                            juce::Colour (0xff2a2a32), 
-                           &patternTab, 
+                           &showBuilderTab,
                            false);
 
     tabbedComponent.addTab ("3. MIDI Export", 

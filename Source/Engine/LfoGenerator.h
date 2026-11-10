@@ -4,6 +4,9 @@
 #include <algorithm>
 #include "MusicalContext.h"
 
+// Costante PI sicura e indipendente dal compilatore/sistema operativo
+const double PI = 3.14159265358979323846;
+
 enum class WaveShape
 {
     Sine,
@@ -14,14 +17,14 @@ enum class WaveShape
 class LfoGenerator
 {
 public:
-    LfoGenerator(WaveShape shape = WaveShape::Sine, 
-                 NoteDivision rate = NoteDivision::Quarter,
-                 uint8_t minValue = 0, 
-                 uint8_t maxValue = 127,
-                 double phaseOffset = 0.0, 
-                 bool isMirrored = false)
+    LfoGenerator(WaveShape shape = WaveShape::Sine,
+        NoteDivision rate = NoteDivision::Quarter,
+        uint8_t minValue = 0,
+        uint8_t maxValue = 127,
+        double phaseOffset = 0.0,
+        bool isMirrored = false)
         : shape(shape), rate(rate), minValue(minValue), maxValue(maxValue),
-          phaseOffset(phaseOffset), isMirrored(isMirrored)
+        phaseOffset(phaseOffset), isMirrored(isMirrored)
     {
         if (this->minValue > this->maxValue)
             std::swap(this->minValue, this->maxValue);
@@ -40,15 +43,16 @@ public:
 
         switch (shape)
         {
-            case WaveShape::Sine:
-                normalizedValue = (std::sin(phase * 2.0 * M_PI) + 1.0) / 2.0;
-                break;
-            case WaveShape::Triangle:
-                normalizedValue = 2.0 * std::abs(phase - 0.5);
-                break;
-            case WaveShape::LinearRamp:
-                normalizedValue = phase;
-                break;
+        case WaveShape::Sine:
+            // Sostituito M_PI con la costante locale PI
+            normalizedValue = (std::sin(phase * 2.0 * PI) + 1.0) / 2.0;
+            break;
+        case WaveShape::Triangle:
+            normalizedValue = 2.0 * std::abs(phase - 0.5);
+            break;
+        case WaveShape::LinearRamp:
+            normalizedValue = phase;
+            break;
         }
 
         if (isMirrored)

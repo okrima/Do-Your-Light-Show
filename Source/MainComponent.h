@@ -1,7 +1,7 @@
 #pragma once
 #include <juce_gui_basics/juce_gui_basics.h>
 #include "UI/Tabs/VenuePatchTab.h"
-#include "UI/Tabs/PatternCreatorTab.h"
+#include "UI/Tabs/ShowBuilderTab.h"
 #include "UI/Tabs/ExportEngineTab.h"
 
 class MainComponent  : public juce::Component
@@ -19,8 +19,8 @@ private:
     juce::ValueTree mainState { "DO_YOUR_LIGHT_SHOW_STATE" };
 
     VenuePatchTab venueTab {mainState};
-    PatternCreatorTab patternTab {mainState};
-    ExportEngineTab exportTab;
+    ShowBuilderTab showBuilderTab{ mainState };
+    ExportEngineTab exportTab { mainState };
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (MainComponent)
 };
