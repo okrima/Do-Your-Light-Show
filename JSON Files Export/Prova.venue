@@ -15,7 +15,7 @@
     },
     {
       "nodeType": "FIXTURE",
-      "name": "Floor lights",
+      "name": "Floor Light",
       "startAddress": 11,
       "channelCount": 8,
       "role": "WASH_FLOOR",
@@ -24,6 +24,30 @@
       "map_Green": 3,
       "map_Blue": 4,
       "map_White": 5
+    },
+    {
+      "nodeType": "FIXTURE",
+      "name": "PAR Light SIDE",
+      "startAddress": 21,
+      "channelCount": 8,
+      "role": "SIDE_PAR",
+      "map_Dimmer": 1,
+      "map_Red": 2,
+      "map_Green": 3,
+      "map_Blue": 4,
+      "map_White": 5
+    },
+    {
+      "nodeType": "FIXTURE",
+      "name": "GEYSERS",
+      "startAddress": 31,
+      "channelCount": 8,
+      "role": "GEYSER",
+      "map_Dimmer": 0,
+      "map_Red": 0,
+      "map_Green": 0,
+      "map_Blue": 0,
+      "map_GeyserBlast": 1
     }
   ]
 }

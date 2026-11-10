@@ -316,16 +316,45 @@ void SceneEditorPanel::visibilityChanged()
 ShowBuilderTab::ShowBuilderTab(juce::ValueTree& state) : appState(state), editorPanel(state)
 {
     showNode = appState.getChildWithName(StateKeys::ShowNode);
-    if (!showNode.isValid()) { showNode = juce::ValueTree(StateKeys::ShowNode); appState.addChild(showNode, -1, nullptr); }
+    if (!showNode.isValid()) {
+        showNode = juce::ValueTree(StateKeys::ShowNode);
+        appState.addChild(showNode, -1, nullptr);
+    }
     showNode.addListener(this);
+
+    // INIZIALIZZAZIONE LIBRERIA PRESET
+    presetLibNode = appState.getChildWithName(StateKeys::PresetLibNode);
+    if (!presetLibNode.isValid()) {
+        presetLibNode = juce::ValueTree(StateKeys::PresetLibNode);
+        appState.addChild(presetLibNode, -1, nullptr);
+    }
+    presetLibNode.addListener(this);
+
+    // -> CARICA I PRESET SALVATI IN PRECEDENZA DAL DISCO
+    loadPresetLibraryFromDisk();
 
     sceneList.setModel(this);
     sceneList.setColour(juce::ListBox::backgroundColourId, juce::Colour(0xff141417));
     sceneList.setColour(juce::ListBox::outlineColourId, juce::Colour(0xff2a2a32));
+    sceneList.addKeyListener(this);
     addAndMakeVisible(sceneList);
 
-    addSceneBtn.setButtonText("+ Nuova Scena (Cue)"); addSceneBtn.setColour(juce::TextButton::buttonColourId, juce::Colour(0xff3a3a45));
+    addSceneBtn.setButtonText("+ Nuova Scena"); addSceneBtn.setColour(juce::TextButton::buttonColourId, juce::Colour(0xff3a3a45));
     addSceneBtn.onClick = [this]() { addNewSceneToState(); }; addAndMakeVisible(addSceneBtn);
+
+    // Configurazione del bottone Elimina Scena
+    deleteSceneBtn.setButtonText("Elimina Scena...");
+    deleteSceneBtn.setColour(juce::TextButton::buttonColourId, juce::Colour(0xff4d2626)); // Rosso scuro
+    deleteSceneBtn.onClick = [this]() { deleteSelectedScene(); };
+    addAndMakeVisible(deleteSceneBtn);
+
+    // Configurazione Bottone Salva Preset
+    savePresetBtn.setButtonText("Salva come Preset..."); savePresetBtn.setColour(juce::TextButton::buttonColourId, juce::Colour(0xff3d3229));
+    savePresetBtn.onClick = [this]() { saveSceneAsPreset(); }; addAndMakeVisible(savePresetBtn);
+
+    // Configurazione Bottone Inserisci Preset
+    insertPresetBtn.setButtonText("Inserisci da Preset..."); insertPresetBtn.setColour(juce::TextButton::buttonColourId, juce::Colour(0xff29333d));
+    insertPresetBtn.onClick = [this]() { insertPresetIntoShow(); }; addAndMakeVisible(insertPresetBtn);
 
     loadBtn.setButtonText("Carica Show..."); loadBtn.setColour(juce::TextButton::buttonColourId, juce::Colour(0xff3d3d29));
     loadBtn.onClick = [this] { loadShow(); }; addAndMakeVisible(loadBtn);
@@ -333,11 +362,143 @@ ShowBuilderTab::ShowBuilderTab(juce::ValueTree& state) : appState(state), editor
     saveBtn.setButtonText("Salva Show..."); saveBtn.setColour(juce::TextButton::buttonColourId, juce::Colour(0xff293d3d));
     saveBtn.onClick = [this] { saveShow(); }; addAndMakeVisible(saveBtn);
 
+    // Configurazione del pulsante Elimina Preset
+    deletePresetBtnUI.setButtonText("Elimina Preset...");
+    deletePresetBtnUI.setColour(juce::TextButton::buttonColourId, juce::Colour(0xff4d3326));
+    deletePresetBtnUI.onClick = [this]() { deletePresetFromLibrary(); };
+    addAndMakeVisible(deletePresetBtnUI);
+
     addAndMakeVisible(editorPanel);
     if (showNode.getNumChildren() > 0) sceneList.selectRow(0);
 }
 
 ShowBuilderTab::~ShowBuilderTab() { showNode.removeListener(this); }
+
+void ShowBuilderTab::saveSceneAsPreset()
+{
+    int selectedRow = sceneList.getSelectedRow();
+    if (selectedRow < 0 || selectedRow >= showNode.getNumChildren()) return;
+
+    auto sourceScene = showNode.getChild(selectedRow);
+    if (!sourceScene.isValid()) return;
+
+    juce::ValueTree presetCopy(StateKeys::ScenePreset);
+
+    for (int i = 0; i < sourceScene.getNumProperties(); ++i)
+    {
+        auto propName = sourceScene.getPropertyName(i);
+        if (propName.isValid())
+        {
+            presetCopy.setProperty(propName, sourceScene.getProperty(propName), nullptr);
+        }
+    }
+
+    for (int i = 0; i < sourceScene.getNumChildren(); ++i)
+    {
+        auto child = sourceScene.getChild(i);
+        if (child.isValid())
+        {
+            presetCopy.addChild(child.createCopy(), -1, nullptr);
+        }
+    }
+
+    if (presetLibNode.isValid())
+    {
+        presetLibNode.addChild(presetCopy, -1, nullptr);
+
+        // -> SALVA AUTOMATICAMENTE SUL DISCO
+        savePresetLibraryToDisk();
+    }
+
+    juce::String sceneName = sourceScene.getProperty(StateKeys::SceneName, "Scena").toString();
+    juce::NativeMessageBox::showMessageBoxAsync(
+        juce::MessageBoxIconType::InfoIcon,
+        "Preset Salvato",
+        "La scena '" + sceneName + "' e' stata salvata nei preferiti in modo permanente!"
+    );
+}
+
+void ShowBuilderTab::insertPresetIntoShow()
+{
+    if (!presetLibNode.isValid() || presetLibNode.getNumChildren() == 0)
+    {
+        juce::NativeMessageBox::showMessageBoxAsync(
+            juce::MessageBoxIconType::WarningIcon,
+            "Libreria Vuota",
+            "Non ci sono scene salvate nei preferiti. Salva prima un preset!"
+        );
+        return;
+    }
+
+    // Creiamo un menu a tendina dinamico (PopupMenu) con tutti i preset disponibili
+    juce::PopupMenu menu;
+    for (int i = 0; i < presetLibNode.getNumChildren(); ++i)
+    {
+        auto preset = presetLibNode.getChild(i);
+        if (preset.isValid())
+        {
+            juce::String name = "Preset Senza Nome";
+            if (preset.hasProperty(StateKeys::SceneName))
+            {
+                auto propVal = preset.getProperty(StateKeys::SceneName);
+                if (propVal.toString().isNotEmpty())
+                    name = propVal.toString();
+            }
+            menu.addItem(i + 1, name);
+        }
+    }
+
+    // Mostra il menu a tendina sotto il bottone
+    menu.showMenuAsync(juce::PopupMenu::Options().withTargetComponent(&insertPresetBtn), [this](int result) {
+        if (result > 0)
+        {
+            int index = result - 1;
+            auto chosenPreset = presetLibNode.getChild(index);
+            if (!chosenPreset.isValid()) return;
+
+            // 1. Creiamo un nuovo nodo Scena per la timeline
+            juce::ValueTree newSceneInstance(StateKeys::Scene);
+
+            // 2. Copia protetta delle proprietà
+            for (int i = 0; i < chosenPreset.getNumProperties(); ++i)
+            {
+                auto propName = chosenPreset.getPropertyName(i);
+                if (propName.isValid())
+                {
+                    newSceneInstance.setProperty(propName, chosenPreset.getProperty(propName), nullptr);
+                }
+            }
+
+            // 3. Copia protetta dei comandi figli
+            for (int i = 0; i < chosenPreset.getNumChildren(); ++i)
+            {
+                auto child = chosenPreset.getChild(i);
+                if (child.isValid())
+                {
+                    auto childCopy = child.createCopy();
+                    newSceneInstance.addChild(childCopy, -1, nullptr);
+                }
+            }
+
+            // 4. Posizionala ad un beat di default
+            double nextBeat = 1.0;
+            if (showNode.getNumChildren() > 0) {
+                auto lastScene = showNode.getChild(showNode.getNumChildren() - 1);
+                if (lastScene.isValid()) {
+                    double lastStart = lastScene.getProperty(StateKeys::StartBeat, 1.0);
+                    double lastDuration = lastScene.getProperty(StateKeys::DurationBeats, 4.0);
+                    nextBeat = lastStart + lastDuration;
+                }
+            }
+            newSceneInstance.setProperty(StateKeys::StartBeat, nextBeat, nullptr);
+
+            // 5. Aggiungila allo show
+            showNode.addChild(newSceneInstance, -1, nullptr);
+            sceneList.updateContent();
+            sceneList.selectRow(showNode.getNumChildren() - 1);
+        }
+        });
+}
 
 int ShowBuilderTab::getNumRows() { return showNode.getNumChildren(); }
 
@@ -359,16 +520,107 @@ void ShowBuilderTab::paint(juce::Graphics& g) {
     g.fillAll(juce::Colour(0xff1a1a1e)); g.setColour(juce::Colour(0xff2a2a32));
     g.fillRect(juce::Rectangle<float>(getLocalBounds().proportionOfWidth(0.30f), 0.0f, 2.0f, static_cast<float>(getHeight())));
 }
+
+bool ShowBuilderTab::keyPressed(const juce::KeyPress& key, juce::Component* originatingComponent)
+{
+    // Controlla se è stato premuto Canc o Backspace
+    if (key == juce::KeyPress::deleteKey || key == juce::KeyPress::backspaceKey)
+    {
+        deleteSelectedScene();
+        return true; // Segnala che l'evento è stato gestito
+    }
+    return false; // Lascia gestire altri tasti se necessario
+}
+
+void ShowBuilderTab::deleteSelectedScene()
+{
+    int selectedRow = sceneList.getSelectedRow();
+    if (selectedRow < 0 || selectedRow >= showNode.getNumChildren())
+    {
+        juce::NativeMessageBox::showMessageBoxAsync(
+            juce::MessageBoxIconType::WarningIcon,
+            "Attenzione",
+            "Seleziona prima una scena dalla lista da eliminare!"
+        );
+        return;
+    }
+
+    // Prende il nodo della scena da rimuovere
+    auto sceneToRemove = showNode.getChild(selectedRow);
+    if (sceneToRemove.isValid())
+    {
+        // Rimuovendo il figlio dal ValueTree, l'interfaccia si aggiornerà da sola via listener
+        showNode.removeChild(sceneToRemove, nullptr);
+
+        // Seleziona un'altra riga vicina per evitare selezioni orfane
+        int newRow = juce::jmin(selectedRow, showNode.getNumChildren() - 1);
+        sceneList.selectRow(newRow);
+    }
+}
+
 void ShowBuilderTab::resized() {
     auto bounds = getLocalBounds();
     auto leftPanel = bounds.removeFromLeft(juce::roundToInt(bounds.getWidth() * 0.30f));
-    auto bottomArea = leftPanel.removeFromBottom(110).reduced(10, 5);
-    saveBtn.setBounds(bottomArea.removeFromBottom(30)); bottomArea.removeFromBottom(5);
-    loadBtn.setBounds(bottomArea.removeFromBottom(30)); bottomArea.removeFromBottom(5);
-    addSceneBtn.setBounds(bottomArea.removeFromBottom(30));
+
+    // Spazio in basso per i pulsanti (portato a 240 per includere il nuovo bottone)
+    auto bottomArea = leftPanel.removeFromBottom(240).reduced(10, 5);
+
+    saveBtn.setBounds(bottomArea.removeFromBottom(28)); bottomArea.removeFromBottom(4);
+    loadBtn.setBounds(bottomArea.removeFromBottom(28)); bottomArea.removeFromBottom(4);
+    deletePresetBtnUI.setBounds(bottomArea.removeFromBottom(28)); bottomArea.removeFromBottom(4); // <- POSIZIONATO QUI
+    deleteSceneBtn.setBounds(bottomArea.removeFromBottom(28)); bottomArea.removeFromBottom(4);
+    insertPresetBtn.setBounds(bottomArea.removeFromBottom(28)); bottomArea.removeFromBottom(4);
+    savePresetBtn.setBounds(bottomArea.removeFromBottom(28)); bottomArea.removeFromBottom(4);
+    addSceneBtn.setBounds(bottomArea.removeFromBottom(28));
+
     sceneList.setBounds(leftPanel.reduced(10));
     bounds.removeFromLeft(2); editorPanel.setBounds(bounds);
 }
+
+void ShowBuilderTab::deletePresetFromLibrary()
+{
+    if (!presetLibNode.isValid() || presetLibNode.getNumChildren() == 0)
+    {
+        juce::NativeMessageBox::showMessageBoxAsync(
+            juce::MessageBoxIconType::WarningIcon,
+            "Libreria Vuota",
+            "Non ci sono preset salvati da eliminare."
+        );
+        return;
+    }
+
+    // Creiamo un menu a tendina con i preset salvati
+    juce::PopupMenu menu;
+    for (int i = 0; i < presetLibNode.getNumChildren(); ++i)
+    {
+        auto preset = presetLibNode.getChild(i);
+        juce::String name = preset.getProperty(StateKeys::SceneName, "Preset Senza Nome").toString();
+        menu.addItem(i + 1, name);
+    }
+
+    menu.showMenuAsync(juce::PopupMenu::Options().withTargetComponent(&deletePresetBtnUI), [this](int result) {
+        if (result > 0)
+        {
+            int index = result - 1;
+            auto presetToRemove = presetLibNode.getChild(index);
+            if (presetToRemove.isValid())
+            {
+                // Rimuove il preset dalla libreria in memoria
+                presetLibNode.removeChild(presetToRemove, nullptr);
+
+                // Aggiorna immediatamente il file XML su disco
+                savePresetLibraryToDisk();
+
+                juce::NativeMessageBox::showMessageBoxAsync(
+                    juce::MessageBoxIconType::InfoIcon,
+                    "Preset Eliminato",
+                    "Il preset e' stato rimosso con successo dalla libreria."
+                );
+            }
+        }
+        });
+}
+
 void ShowBuilderTab::addNewSceneToState() {
     juce::ValueTree newScene(StateKeys::Scene);
     newScene.setProperty(StateKeys::SceneName, "Scena " + juce::String(showNode.getNumChildren() + 1), nullptr);
@@ -395,3 +647,47 @@ void ShowBuilderTab::valueTreeChildAdded(juce::ValueTree& t, juce::ValueTree&) {
 void ShowBuilderTab::valueTreeChildRemoved(juce::ValueTree& t, juce::ValueTree&, int) { if (t == showNode) { sceneList.updateContent(); editorPanel.setSceneNode(juce::ValueTree()); } }
 void ShowBuilderTab::valueTreeChildOrderChanged(juce::ValueTree&, int, int) { sceneList.updateContent(); }
 void ShowBuilderTab::valueTreePropertyChanged(juce::ValueTree& tree, const juce::Identifier&) { if (tree.hasType(StateKeys::Scene)) sceneList.repaint(); }
+
+juce::File getPresetLibraryFile()
+{
+    // Salva in una cartella dedicata ai documenti dell'utente o nei file speciali di JUCE
+    auto dir = juce::File::getSpecialLocation(juce::File::userApplicationDataDirectory)
+        .getChildFile("DoYourLightShow");
+    dir.createDirectory(); // Assicura che la cartella esista
+    return dir.getChildFile("preset_library.xml");
+}
+
+void ShowBuilderTab::savePresetLibraryToDisk()
+{
+    if (!presetLibNode.isValid()) return;
+
+    // Converte il ValueTree in un blocco XML
+    std::unique_ptr<juce::XmlElement> xml(presetLibNode.createXml());
+    if (xml != nullptr)
+    {
+        auto file = getPresetLibraryFile();
+        xml->writeTo(file);
+    }
+}
+
+void ShowBuilderTab::loadPresetLibraryFromDisk()
+{
+    auto file = getPresetLibraryFile();
+    if (file.existsAsFile())
+    {
+        std::unique_ptr<juce::XmlElement> xml(juce::XmlDocument::parse(file));
+        if (xml != nullptr)
+        {
+            auto loadedTree = juce::ValueTree::fromXml(*xml);
+            if (loadedTree.isValid() && loadedTree.hasType(StateKeys::PresetLibNode))
+            {
+                // Sostituisce i figli attuali con quelli caricati dal disco
+                presetLibNode.removeAllChildren(nullptr);
+                for (int i = 0; i < loadedTree.getNumChildren(); ++i)
+                {
+                    presetLibNode.addChild(loadedTree.getChild(i).createCopy(), -1, nullptr);
+                }
+            }
+        }
+    }
+}

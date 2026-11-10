@@ -3,20 +3,12 @@
   "children": [
     {
       "nodeType": "SCENE",
-      "sceneName": "Intro",
+      "sceneName": "INTRO",
       "startBeat": 1.0,
       "durationBeats": 32.0,
       "children": [
         {
           "nodeType": "ROLE_COMMAND",
-          "roleName": "WASH_BACK",
-          "parameter": "Dimmer",
-          "startValue": 0,
-          "endValue": 127,
-          "curve": "LinearRamp (Transizione)"
-        },
-        {
-          "nodeType": "ROLE_COMMAND",
           "roleName": "WASH_FLOOR",
           "parameter": "Dimmer",
           "startValue": 0,
@@ -25,15 +17,7 @@
         },
         {
           "nodeType": "ROLE_COMMAND",
-          "roleName": "WASH_BACK",
-          "parameter": "White",
-          "startValue": 127,
-          "endValue": 127,
-          "curve": "Step (Stato Fisso)"
-        },
-        {
-          "nodeType": "ROLE_COMMAND",
-          "roleName": "WASH_BACK",
+          "roleName": "WASH_FLOOR",
           "parameter": "White",
           "startValue": 127,
           "endValue": 127,
@@ -43,30 +27,62 @@
     },
     {
       "nodeType": "SCENE",
-      "sceneName": "Start Gtrs",
+      "sceneName": "Blast Beat White - BACK UP",
       "startBeat": 33.0,
-      "durationBeats": 7.0,
+      "durationBeats": 32.0,
       "children": [
         {
           "nodeType": "ROLE_COMMAND",
           "roleName": "WASH_FLOOR",
+          "parameter": "Strobe",
+          "startValue": 100,
+          "endValue": 100,
+          "curve": "Step (Stato Fisso)"
+        },
+        {
+          "nodeType": "ROLE_COMMAND",
+          "roleName": "WASH_BACK",
           "parameter": "Dimmer",
-          "startValue": 0,
-          "endValue": 0,
+          "startValue": 127,
+          "endValue": 127,
+          "curve": "Step (Stato Fisso)"
+        },
+        {
+          "nodeType": "ROLE_COMMAND",
+          "roleName": "WASH_BACK",
+          "parameter": "White",
+          "startValue": 127,
+          "endValue": 127,
           "curve": "Step (Stato Fisso)"
         }
       ]
     },
     {
       "nodeType": "SCENE",
-      "sceneName": "Ta da!",
-      "startBeat": 39.0,
-      "durationBeats": 0.5,
+      "sceneName": "Blast Beat Red - FLOOR",
+      "startBeat": 65.0,
+      "durationBeats": 32.0,
       "children": [
         {
           "nodeType": "ROLE_COMMAND",
           "roleName": "WASH_FLOOR",
+          "parameter": "Strobe",
+          "startValue": 100,
+          "endValue": 100,
+          "curve": "Step (Stato Fisso)"
+        },
+        {
+          "nodeType": "ROLE_COMMAND",
+          "roleName": "WASH_FLOOR",
           "parameter": "Dimmer",
+          "startValue": 127,
+          "endValue": 127,
+          "curve": "Step (Stato Fisso)"
+        },
+        {
+          "nodeType": "ROLE_COMMAND",
+          "roleName": "WASH_FLOOR",
+          "parameter": "White",
           "startValue": 127,
           "endValue": 127,
           "curve": "Step (Stato Fisso)"

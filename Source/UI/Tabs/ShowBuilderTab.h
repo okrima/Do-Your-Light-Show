@@ -67,7 +67,8 @@ private:
 // =============================================================================
 class ShowBuilderTab : public juce::Component,
     public juce::ListBoxModel,
-    private juce::ValueTree::Listener
+    private juce::ValueTree::Listener,
+    private juce::KeyListener
 {
 public:
     ShowBuilderTab(juce::ValueTree& state);
@@ -82,20 +83,33 @@ public:
 
 private:
     void addNewSceneToState();
+    void saveSceneAsPreset(); // NUOVO: Salva la scena selezionata nei preferiti
+    void insertPresetIntoShow(); // NUOVO: Prende un preset e lo mette sulla timeline
     void saveShow();
     void loadShow();
+    void deleteSelectedScene();
+    void deletePresetFromLibrary();
+    void savePresetLibraryToDisk();   // Salva i preset su file locale
+    void loadPresetLibraryFromDisk();   // Carica i preset dal file locale
 
     void valueTreeChildAdded(juce::ValueTree&, juce::ValueTree&) override;
     void valueTreeChildRemoved(juce::ValueTree&, juce::ValueTree&, int) override;
     void valueTreeChildOrderChanged(juce::ValueTree&, int, int) override;
     void valueTreePropertyChanged(juce::ValueTree&, const juce::Identifier&) override;
     void valueTreeParentChanged(juce::ValueTree&) override {}
+    bool keyPressed(const juce::KeyPress& key, juce::Component* originatingComponent) override;
+
 
     juce::ValueTree& appState;
     juce::ValueTree showNode;
+    juce::ValueTree presetLibNode;
 
     juce::ListBox sceneList;
     juce::TextButton addSceneBtn;
+    juce::TextButton deleteSceneBtn;
+    juce::TextButton deletePresetBtnUI;
+    juce::TextButton savePresetBtn;  
+    juce::TextButton insertPresetBtn; 
     juce::TextButton saveBtn;
     juce::TextButton loadBtn;
 

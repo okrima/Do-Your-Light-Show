@@ -7,6 +7,10 @@ namespace StateKeys
     const juce::Identifier VenueNode{ "VENUE" };
     const juce::Identifier ShowNode{ "SHOW_TIMELINE" };
 
+    // --- NUOVI NODI PRESET LIBRARY ---
+    const juce::Identifier PresetLibNode{ "PRESET_LIBRARY" };
+    const juce::Identifier ScenePreset{ "SCENE_PRESET" };
+
     // Nodi Figli Venue
     const juce::Identifier Fixture{ "FIXTURE" };
     const juce::Identifier FixtureName{ "name" };

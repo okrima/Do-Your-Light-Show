@@ -18,7 +18,7 @@ ExportEngineTab::ExportEngineTab(juce::ValueTree& state) : appState(state)
     statusBox.setCaretVisible(false);
     statusBox.setColour(juce::TextEditor::backgroundColourId, juce::Colour(0xff141417));
     statusBox.setColour(juce::TextEditor::outlineColourId, juce::Colour(0xff2a2a32));
-    statusBox.setText("Pronto per l'esportazione.\nIl motore tradurra' i pattern a quarti (Tab 2) sugli indirizzi DMX fisici del locale (Tab 1).");
+    statusBox.setText("Pronto per l'esportazione.");
     addAndMakeVisible(statusBox);
 }
 
