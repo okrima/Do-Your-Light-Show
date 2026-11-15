@@ -16,7 +16,7 @@ public:
 
         if (!venueNode.isValid() || !showNode.isValid()) return sequence;
 
-        int ticksPerBar = (context.ppq * 4 * context.timeSigNumerator) / context.timeSigDenominator;
+        //int ticksPerBar = (context.ppq * 4 * context.timeSigNumerator) / context.timeSigDenominator;
         int resolutionTicks = context.ppq / 8; // CC ogni 32esimo
 
         // 1. CICLA SU TUTTE LE SCENE DELLA TIMELINE

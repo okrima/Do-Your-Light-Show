@@ -313,8 +313,69 @@ void SceneEditorPanel::visibilityChanged()
 // =============================================================================
 // ShowBuilderTab Implementation (Main)
 // =============================================================================
-ShowBuilderTab::ShowBuilderTab(juce::ValueTree& state) : appState(state), editorPanel(state)
+ShowBuilderTab::ShowBuilderTab(juce::ValueTree& state) : appState(state), miniDawTimeline(state, audioEngine, beatTimeMap), editorPanel(state), aiWizardPanel(state, audioEngine)
 {
+
+    // 1. Garantisce che AUDIO_STEMS, AESTHETIC_CONFIG, BEAT_MAP, VENUE, SHOW e PRESET esistano
+    ShowArchiveManager::ensureValidAppStateStructure(appState);
+
+    // 2. Aggancia il convertitore Tempo <-> Quarti allo stato dell'app
+    beatTimeMap.bindToAppState(appState);
+
+    setWantsKeyboardFocus(true);
+    addKeyListener(this);                // Ascolta la tastiera sul pannello generale
+    miniDawTimeline.addKeyListener(this); // Ascolta la tastiera quando clicchi sulla forma d'onda
+    sceneList.addKeyListener(this);      // Ascolta la tastiera quando sei sulla lista scene
+
+    // Collega il click sulle scene della timeline alla selezione nella lista
+    miniDawTimeline.onSceneSelectedFromTimeline = [this](int sceneIndex) {
+        sceneList.selectRow(sceneIndex);
+        };
+    addAndMakeVisible(miniDawTimeline);
+    miniDawTimeline.syncWithAppState();
+
+    // Sincronizza la forma d'onda se il Full Mix viene caricato o trascinato dagli slot Stem
+    aiWizardPanel.onFullMixUpdated = [this]() {
+        miniDawTimeline.syncWithAppState();
+        };
+
+    aiWizardPanel.onGenerateShowRequested = [this]() {
+        // Mettiamo in pausa l'audio durante la scansione ad alta velocita'
+        audioEngine.pause();
+
+        analysisJob = std::make_unique<AudioAnalysisEngine::AnalysisJob>(
+            appState,
+            audioEngine,
+            [this](const AudioAnalysisEngine::AnalysisResult& analysis) {
+                if (!analysis.success)
+                {
+                    juce::NativeMessageBox::showMessageBoxAsync(
+                        juce::MessageBoxIconType::WarningIcon,
+                        "Errore Analisi",
+                        "Impossibile completare l'analisi del brano.");
+                    return;
+                }
+
+                // Applica in modo sicuro la mappa BPM sul Message Thread e aggiorna la Mini-DAW
+                AudioAnalysisEngine::applyResultToState(analysis, appState, beatTimeMap);
+                miniDawTimeline.syncWithAppState();
+
+                juce::String report = "BPM Rilevato: " + juce::String(analysis.detectedBpm, 1)
+                    + (analysis.usedClickTrack ? " (da traccia Click)\n" : " (stimato da Full Mix)\n")
+                    + "Durata totale: " + juce::String(analysis.totalBeats, 1) + " quarti\n"
+                    + "Sezioni musicali individuate: " + juce::String(analysis.sections.size());
+
+                juce::NativeMessageBox::showMessageBoxAsync(
+                    juce::MessageBoxIconType::InfoIcon,
+                    "Analisi Audio AI Completata",
+                    report);
+            });
+
+        analysisJob->launchThread();
+        };
+
+    addAndMakeVisible(aiWizardPanel);
+
     showNode = appState.getChildWithName(StateKeys::ShowNode);
     if (!showNode.isValid()) {
         showNode = juce::ValueTree(StateKeys::ShowNode);
@@ -372,7 +433,10 @@ ShowBuilderTab::ShowBuilderTab(juce::ValueTree& state) : appState(state), editor
     if (showNode.getNumChildren() > 0) sceneList.selectRow(0);
 }
 
-ShowBuilderTab::~ShowBuilderTab() { showNode.removeListener(this); }
+ShowBuilderTab::~ShowBuilderTab() { 
+    analysisJob.reset();
+    showNode.removeListener(this); 
+}
 
 void ShowBuilderTab::saveSceneAsPreset()
 {
@@ -512,24 +576,58 @@ void ShowBuilderTab::paintListBoxItem(int row, juce::Graphics& g, int w, int h, 
         g.drawText("[Beat " + juce::String(beat, 2) + "] " + name, 10, 0, w - 20, h, juce::Justification::centredLeft, true);
     }
 }
+
 void ShowBuilderTab::selectedRowsChanged(int lastRow) {
-    if (lastRow >= 0 && lastRow < showNode.getNumChildren()) editorPanel.setSceneNode(showNode.getChild(lastRow));
+    miniDawTimeline.setSelectedSceneIndex(lastRow);
+
+    if (lastRow >= 0 && lastRow < showNode.getNumChildren()) 
+        editorPanel.setSceneNode(showNode.getChild(lastRow));
     else editorPanel.setSceneNode(juce::ValueTree());
 }
-void ShowBuilderTab::paint(juce::Graphics& g) {
-    g.fillAll(juce::Colour(0xff1a1a1e)); g.setColour(juce::Colour(0xff2a2a32));
-    g.fillRect(juce::Rectangle<float>(getLocalBounds().proportionOfWidth(0.30f), 0.0f, 2.0f, static_cast<float>(getHeight())));
+
+void ShowBuilderTab::paint(juce::Graphics& g)
+{
+    g.fillAll(juce::Colour(0xff1a1a1e));
+    g.setColour(juce::Colour(0xff2a2a32));
+
+    const float topOffset = 257.0f;
+    const float dividerX = getLocalBounds().toFloat().proportionOfWidth(0.30f);
+    g.fillRect(juce::Rectangle<float>(dividerX, topOffset, 2.0f, static_cast<float>(getHeight()) - topOffset));
 }
 
 bool ShowBuilderTab::keyPressed(const juce::KeyPress& key, juce::Component* originatingComponent)
 {
-    // Controlla se è stato premuto Canc o Backspace
+    juce::ignoreUnused(originatingComponent);
+
+    // Sicurezza: se l'utente sta scrivendo dentro una casella di testo (es. Nome Scena),
+    // lascia che i tasti (spazio, W, backspace) scrivano normalmente nel campo.
+    if (dynamic_cast<juce::TextEditor*>(juce::Component::getCurrentlyFocusedComponent()) != nullptr)
+        return false;
+
+    // 1. BARRA SPAZIATRICE -> Play / Pausa immediato della Mini-DAW
+    if (key == juce::KeyPress::spaceKey)
+    {
+        audioEngine.togglePlayPause();
+        miniDawTimeline.repaint();
+        return true;
+    }
+
+    // 2. TASTO W oppure HOME (Stile Reaper) -> Porta istantaneamente il cursore a 00:00.000 (Beat 1.00)
+    if (key == juce::KeyPress::homeKey || key.getTextCharacter() == 'w' || key.getTextCharacter() == 'W')
+    {
+        audioEngine.setPositionSeconds(0.0);
+        miniDawTimeline.repaint();
+        return true;
+    }
+
+    // 3. CANC / BACKSPACE -> Elimina la scena selezionata
     if (key == juce::KeyPress::deleteKey || key == juce::KeyPress::backspaceKey)
     {
         deleteSelectedScene();
-        return true; // Segnala che l'evento è stato gestito
+        return true;
     }
-    return false; // Lascia gestire altri tasti se necessario
+
+    return false;
 }
 
 void ShowBuilderTab::deleteSelectedScene()
@@ -558,23 +656,30 @@ void ShowBuilderTab::deleteSelectedScene()
     }
 }
 
-void ShowBuilderTab::resized() {
+void ShowBuilderTab::resized()
+{
     auto bounds = getLocalBounds();
-    auto leftPanel = bounds.removeFromLeft(juce::roundToInt(bounds.getWidth() * 0.30f));
 
-    // Spazio in basso per i pulsanti (portato a 240 per includere il nuovo bottone)
+    // 1. Fascia Superiore: Mini-DAW (145 px) + AI Wizard & Slot Stem (108 px)
+    miniDawTimeline.setBounds(bounds.removeFromTop(145));
+    aiWizardPanel.setBounds(bounds.removeFromTop(108));
+    bounds.removeFromTop(4);
+
+    // 2. Parte Inferiore: Lista Scene a sinistra + SceneEditorPanel a destra
+    auto leftPanel = bounds.removeFromLeft(juce::roundToInt(bounds.getWidth() * 0.30f));
     auto bottomArea = leftPanel.removeFromBottom(240).reduced(10, 5);
 
     saveBtn.setBounds(bottomArea.removeFromBottom(28)); bottomArea.removeFromBottom(4);
     loadBtn.setBounds(bottomArea.removeFromBottom(28)); bottomArea.removeFromBottom(4);
-    deletePresetBtnUI.setBounds(bottomArea.removeFromBottom(28)); bottomArea.removeFromBottom(4); // <- POSIZIONATO QUI
+    deletePresetBtnUI.setBounds(bottomArea.removeFromBottom(28)); bottomArea.removeFromBottom(4);
     deleteSceneBtn.setBounds(bottomArea.removeFromBottom(28)); bottomArea.removeFromBottom(4);
     insertPresetBtn.setBounds(bottomArea.removeFromBottom(28)); bottomArea.removeFromBottom(4);
     savePresetBtn.setBounds(bottomArea.removeFromBottom(28)); bottomArea.removeFromBottom(4);
     addSceneBtn.setBounds(bottomArea.removeFromBottom(28));
 
     sceneList.setBounds(leftPanel.reduced(10));
-    bounds.removeFromLeft(2); editorPanel.setBounds(bounds);
+    bounds.removeFromLeft(2);
+    editorPanel.setBounds(bounds);
 }
 
 void ShowBuilderTab::deletePresetFromLibrary()
@@ -641,6 +746,8 @@ void ShowBuilderTab::loadShow() {
     fileChooser->launchAsync(juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles, [this](const juce::FileChooser& fc) {
         if (fc.getResult() != juce::File{}) { PresetManager::loadShow(appState, fc.getResult()); sceneList.updateContent(); if (showNode.getNumChildren() > 0) sceneList.selectRow(0); }
         });
+
+    miniDawTimeline.syncWithAppState();
 }
 
 void ShowBuilderTab::valueTreeChildAdded(juce::ValueTree& t, juce::ValueTree&) { if (t == showNode) sceneList.updateContent(); }

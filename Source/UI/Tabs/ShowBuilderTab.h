@@ -1,7 +1,13 @@
 #pragma once
+#include "../../Audio/StemAudioEngine.h"
+#include "../Components/MiniDawTimeline.h"
+#include "../../Model/BeatTimeMap.h"
+#include "../../Model/ShowArchiveManager.h"
 #include <juce_gui_basics/juce_gui_basics.h>
 #include "../../Model/DataStateKeys.h"
 #include "../../Utils/PresetManager.h"
+#include "../Components/AIWizardPanel.h"
+#include "../../AI/AudioAnalysisEngine.h"
 
 // =============================================================================
 // SceneEditorPanel (Pannello Destro)
@@ -60,6 +66,7 @@ private:
     juce::Label curveLabel;      juce::ComboBox curveSelector;
     juce::Label startValLabel;   juce::Slider startValSlider;
     juce::Label endValLabel;     juce::Slider endValSlider;
+
 };
 
 // =============================================================================
@@ -114,7 +121,14 @@ private:
     juce::TextButton loadBtn;
 
     SceneEditorPanel editorPanel;
+    BeatTimeMap beatTimeMap;
+    StemAudioEngine audioEngine;
+    MiniDawTimeline miniDawTimeline;
+    AIWizardPanel aiWizardPanel;
+
     std::unique_ptr<juce::FileChooser> fileChooser;
+    std::unique_ptr<AudioAnalysisEngine::AnalysisJob> analysisJob;
+
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(ShowBuilderTab)
 };

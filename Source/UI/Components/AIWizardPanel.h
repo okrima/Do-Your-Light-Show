@@ -1,0 +1,491 @@
+#pragma once
+#include <JuceHeader.h>
+#include "../../Model/DataStateKeys.h"
+#include "../../Audio/StemAudioEngine.h"
+
+class AIWizardPanel : public juce::Component,
+    public juce::FileDragAndDropTarget,
+    private juce::ValueTree::Listener
+{
+public:
+    std::function<void()> onFullMixUpdated;
+    std::function<void()> onGenerateShowRequested;
+
+    AIWizardPanel(juce::ValueTree& state, StemAudioEngine& engine)
+        : appState(state), audioEngine(engine)
+    {
+        appState.addListener(this);
+
+        // Definiamo i 5 slot categorizzati per l'AI
+        stemSlots = {
+            { StateKeys::StemFullMix, "1. Full Mix *",     "Obbligatorio (Struttura)", {} },
+            { StateKeys::StemClick,   "2. Click / BPM",    "Cadenza e Griglia Quarti", {} },
+            { StateKeys::StemDrums,   "3. Batteria",       "Accenti Cassa / Rullante", {} },
+            { StateKeys::StemBass,    "4. Basso",          "Pulsazione Dimmer / Wash", {} },
+            { StateKeys::StemGuitars, "5. Chitarre / Mel", "Aperture e Colori LFO",    {} }
+        };
+
+        // --- TT-3.2: Mood Preset rapidi ---
+        moodCombo.addItem("Gelo & Nebbia (Blu / Ciano / Bianco)", 1);
+        moodCombo.addItem("Fuoco & Rame (Rosso / Ambra / Oro)", 2);
+        moodCombo.addItem("Crepuscolo Antico (Viola / Verde / Ambra)", 3);
+        moodCombo.addItem("Abisso & Strobo (Indaco / Rosso / Bianco)", 4);
+        moodCombo.addItem("Personalizzato", 5);
+        moodCombo.onChange = [this]() { applySelectedMoodPreset(); };
+        addAndMakeVisible(moodCombo);
+
+        // Slider Intensita' Strobo
+        strobeSlider.setSliderStyle(juce::Slider::LinearBar);
+        strobeSlider.setRange(0.0, 100.0, 1.0);
+        strobeSlider.setTextValueSuffix(" % Strobo");
+        strobeSlider.onValueChange = [this]() {
+            auto aesthetic = appState.getChildWithName(StateKeys::AestheticNode);
+            if (aesthetic.isValid())
+                aesthetic.setProperty(StateKeys::StrobeIntensity, strobeSlider.getValue() / 100.0, nullptr);
+            };
+        addAndMakeVisible(strobeSlider);
+
+        // --- TT-3.3: Toggle Layering & Pulsante Genera Show ---
+        layeringToggle.setButtonText("Solo nuovi fari (Layering)");
+        layeringToggle.onClick = [this]() {
+            auto aesthetic = appState.getChildWithName(StateKeys::AestheticNode);
+            if (aesthetic.isValid())
+                aesthetic.setProperty(StateKeys::PreserveExistingRoles, layeringToggle.getToggleState(), nullptr);
+            };
+        addAndMakeVisible(layeringToggle);
+
+        generateBtn.setButtonText("Genera Show con AI");
+        generateBtn.setColour(juce::TextButton::buttonColourId, juce::Colour(0xff7c3aed)); // Viola AI
+        generateBtn.onClick = [this]() { handleGenerateClick(); };
+        addAndMakeVisible(generateBtn);
+
+        syncUIFromState();
+    }
+
+    ~AIWizardPanel() override
+    {
+        appState.removeListener(this);
+    }
+
+    void syncUIFromState()
+    {
+        auto aesthetic = appState.getChildWithName(StateKeys::AestheticNode);
+        if (aesthetic.isValid())
+        {
+            double strobeVal = static_cast<double>(aesthetic.getProperty(StateKeys::StrobeIntensity, 0.5));
+            strobeSlider.setValue(strobeVal * 100.0, juce::dontSendNotification);
+
+            bool preserve = static_cast<bool>(aesthetic.getProperty(StateKeys::PreserveExistingRoles, false));
+            layeringToggle.setToggleState(preserve, juce::dontSendNotification);
+
+            juce::String profile = aesthetic.getProperty(StateKeys::MoodProfile, "IceAndFog").toString();
+            if (profile == "IceAndFog")           moodCombo.setSelectedId(1, juce::dontSendNotification);
+            else if (profile == "FireAndCopper")  moodCombo.setSelectedId(2, juce::dontSendNotification);
+            else if (profile == "AncientDusk")    moodCombo.setSelectedId(3, juce::dontSendNotification);
+            else if (profile == "AbyssAndStrobe") moodCombo.setSelectedId(4, juce::dontSendNotification);
+            else                                  moodCombo.setSelectedId(5, juce::dontSendNotification);
+        }
+        repaint();
+    }
+
+    void resized() override
+    {
+        auto bounds = getLocalBounds().reduced(6);
+
+        // Divisione in 3 colonne: Sinistra (Stem 48%), Centro (Colori 32%), Destra (Azioni AI 20%)
+        leftColBounds = bounds.removeFromLeft(juce::roundToInt(bounds.getWidth() * 0.48f));
+        bounds.removeFromLeft(6);
+        rightColBounds = bounds.removeFromRight(juce::roundToInt(bounds.getWidth() * 0.38f));
+        bounds.removeFromRight(6);
+        centerColBounds = bounds;
+
+        // 1. Layout dei 5 Slot Stem (3 sulla riga alta, 2 sulla riga bassa)
+        auto stemArea = leftColBounds.reduced(8);
+        stemArea.removeFromTop(20); // Spazio per il titolo sezione
+        auto topRow = stemArea.removeFromTop(34);
+        stemArea.removeFromTop(6);
+        auto botRow = stemArea.removeFromTop(34);
+
+        int topSlotW = (topRow.getWidth() - 12) / 3;
+        stemSlots[0].bounds = topRow.removeFromLeft(topSlotW); topRow.removeFromLeft(6);
+        stemSlots[1].bounds = topRow.removeFromLeft(topSlotW); topRow.removeFromLeft(6);
+        stemSlots[2].bounds = topRow;
+
+        int botSlotW = (botRow.getWidth() - 6) / 2;
+        stemSlots[3].bounds = botRow.removeFromLeft(botSlotW); botRow.removeFromLeft(6);
+        stemSlots[4].bounds = botRow;
+
+        // 2. Layout Sezione "Quali colori vuoi?"
+        auto colorArea = centerColBounds.reduced(8);
+        colorArea.removeFromTop(20); // Spazio titolo
+
+        auto moodRow = colorArea.removeFromTop(26);
+        moodCombo.setBounds(moodRow.removeFromLeft(juce::roundToInt(moodRow.getWidth() * 0.62f)));
+        moodRow.removeFromLeft(6);
+        strobeSlider.setBounds(moodRow);
+
+        colorArea.removeFromTop(6);
+        auto swatchRow = colorArea.removeFromTop(36);
+        int swatchW = (swatchRow.getWidth() - 12) / 3;
+        colorSwatchBounds[0] = swatchRow.removeFromLeft(swatchW); swatchRow.removeFromLeft(6);
+        colorSwatchBounds[1] = swatchRow.removeFromLeft(swatchW); swatchRow.removeFromLeft(6);
+        colorSwatchBounds[2] = swatchRow;
+
+        // 3. Layout Sezione Generazione & Layering
+        auto actionArea = rightColBounds.reduced(8);
+        actionArea.removeFromTop(18);
+        layeringToggle.setBounds(actionArea.removeFromTop(26));
+        actionArea.removeFromTop(6);
+        generateBtn.setBounds(actionArea.removeFromTop(38));
+    }
+
+    void paint(juce::Graphics& g) override
+    {
+        g.fillAll(juce::Colour(0xff141418));
+
+        auto drawPanelBox = [&g](const juce::Rectangle<int>& r, const juce::String& title) {
+            g.setColour(juce::Colour(0xff1b1b22));
+            g.fillRoundedRectangle(r.toFloat(), 5.0f);
+            g.setColour(juce::Colour(0xff2a2a35));
+            g.drawRoundedRectangle(r.toFloat(), 5.0f, 1.0f);
+
+            g.setColour(juce::Colour(0xff94a3b8));
+            g.setFont(juce::FontOptions(12.0f, juce::Font::bold));
+            g.drawText(title, r.getX() + 10, r.getY() + 4, r.getWidth() - 20, 18, juce::Justification::centredLeft, false);
+            };
+
+        drawPanelBox(leftColBounds, "TRACCE AUDIO PER ANALISI AI (Clicca o Trascina file)");
+        drawPanelBox(centerColBounds, "QUALI COLORI VUOI? (Mood & Palette Brano)");
+        drawPanelBox(rightColBounds, "MOTORE AI LOCALE");
+
+        // Disegna i 5 Slot Stem
+        auto stemsNode = appState.getChildWithName(StateKeys::AudioStemsNode);
+        for (size_t i = 0; i < stemSlots.size(); ++i)
+        {
+            const auto& slot = stemSlots[i];
+            juce::String path = stemsNode.isValid() ? stemsNode.getProperty(slot.key, "").toString() : "";
+            juce::File f(path);
+            bool isLoaded = (path.isNotEmpty() && f.existsAsFile());
+
+            g.setColour(isLoaded ? juce::Colour(0xff1e3a2f) : juce::Colour(0xff23232c));
+            g.fillRoundedRectangle(slot.bounds.toFloat(), 4.0f);
+
+            g.setColour(isLoaded ? juce::Colour(0xff10b981) : juce::Colour(0xff383846));
+            g.drawRoundedRectangle(slot.bounds.toFloat(), 4.0f, 1.0f);
+
+            // Pallino stato (Verde = caricato, Grigio = vuoto)
+            g.setColour(isLoaded ? juce::Colour(0xff10b981) : juce::Colour(0xff64748b));
+            g.fillEllipse(static_cast<float>(slot.bounds.getX() + 7),
+                static_cast<float>(slot.bounds.getY() + 7), 7.0f, 7.0f);
+
+            // Nome categoria
+            g.setColour(juce::Colours::white);
+            g.setFont(juce::FontOptions(11.5f, juce::Font::bold));
+            g.drawText(slot.title, slot.bounds.getX() + 18, slot.bounds.getY() + 2,
+                slot.bounds.getWidth() - 34, 15, juce::Justification::centredLeft, true);
+
+            // Nome file o suggerimento
+            g.setColour(isLoaded ? juce::Colour(0xffa7f3d0) : juce::Colour(0xff808090));
+            g.setFont(juce::FontOptions(10.5f));
+            juce::String subText = isLoaded ? f.getFileName() : slot.subtitle;
+            g.drawText(subText, slot.bounds.getX() + 8, slot.bounds.getY() + 17,
+                slot.bounds.getWidth() - 24, 14, juce::Justification::centredLeft, true);
+
+            // Tasto X per rimuovere lo stem se caricato
+            if (isLoaded)
+            {
+                auto clearRect = getClearRectForSlot(slot.bounds);
+                g.setColour(juce::Colour(0xffef4444));
+                g.setFont(juce::FontOptions(11.0f, juce::Font::bold));
+                g.drawText("X", clearRect, juce::Justification::centred, false);
+            }
+        }
+
+        // Disegna i 3 campioni colore ("Atmosfera", "Melodia", "Flash")
+        const char* colorLabels[3] = { "1. Atmosfera", "2. Melodia", "3. Flash" };
+        const juce::Identifier colorKeys[3] = {
+            StateKeys::PrimaryColor, StateKeys::SecondaryColor, StateKeys::AccentColor
+        };
+
+        auto aesthetic = appState.getChildWithName(StateKeys::AestheticNode);
+        for (int i = 0; i < 3; ++i)
+        {
+            auto r = colorSwatchBounds[i];
+            juce::Colour c = getColourFromState(aesthetic, colorKeys[i]);
+
+            g.setColour(c);
+            g.fillRoundedRectangle(r.toFloat(), 4.0f);
+
+            g.setColour(juce::Colours::white.withAlpha(0.75f));
+            g.drawRoundedRectangle(r.toFloat(), 4.0f, 1.0f);
+
+            // Fascia scura semi-trasparente per rendere sempre leggibile l'etichetta
+            auto labelBar = r.withTop(r.getBottom() - 16);
+            g.setColour(juce::Colours::black.withAlpha(0.65f));
+            g.fillRoundedRectangle(labelBar.toFloat(), 3.0f);
+
+            g.setColour(juce::Colours::white);
+            g.setFont(juce::FontOptions(11.0f, juce::Font::bold));
+            g.drawText(colorLabels[i], labelBar, juce::Justification::centred, false);
+        }
+    }
+
+    void mouseDown(const juce::MouseEvent& e) override
+    {
+        // 1. Controlla click sugli slot Stem
+        for (size_t i = 0; i < stemSlots.size(); ++i)
+        {
+            if (stemSlots[i].bounds.contains(e.getPosition()))
+            {
+                auto clearRect = getClearRectForSlot(stemSlots[i].bounds);
+                if (clearRect.contains(e.getPosition()))
+                    clearStemSlot(i);
+                else
+                    promptForStemFile(i);
+                return;
+            }
+        }
+
+        // 2. Controlla click sui 3 selettori colore ("Quali colori vuoi?")
+        const juce::Identifier colorKeys[3] = {
+            StateKeys::PrimaryColor, StateKeys::SecondaryColor, StateKeys::AccentColor
+        };
+        for (int i = 0; i < 3; ++i)
+        {
+            if (colorSwatchBounds[i].contains(e.getPosition()))
+            {
+                openColourPickerPopup(colorKeys[i], colorSwatchBounds[i]);
+                return;
+            }
+        }
+    }
+
+    // --- Supporto Drag & Drop diretto dei file audio sugli slot ---
+    bool isInterestedInFileDrag(const juce::StringArray& files) override
+    {
+        for (const auto& path : files)
+        {
+            if (path.endsWithIgnoreCase(".wav") || path.endsWithIgnoreCase(".mp3") ||
+                path.endsWithIgnoreCase(".flac") || path.endsWithIgnoreCase(".aiff") ||
+                path.endsWithIgnoreCase(".ogg"))
+                return true;
+        }
+        return false;
+    }
+
+    void filesDropped(const juce::StringArray& files, int x, int y) override
+    {
+        if (files.isEmpty()) return;
+        juce::Point<int> dropPt(x, y);
+
+        for (size_t i = 0; i < stemSlots.size(); ++i)
+        {
+            if (stemSlots[i].bounds.contains(dropPt))
+            {
+                assignFileToStemSlot(i, juce::File(files[0]));
+                return;
+            }
+        }
+    }
+
+private:
+    struct StemSlotInfo
+    {
+        juce::Identifier key;
+        juce::String title;
+        juce::String subtitle;
+        juce::Rectangle<int> bounds;
+    };
+
+    // Selettore colore popup collegato al ValueTree
+    class ColourPickerPopup : public juce::Component,
+        public juce::ChangeListener
+    {
+    public:
+        ColourPickerPopup(juce::Colour initialColour, std::function<void(juce::Colour)> onChanged)
+            : callback(std::move(onChanged)),
+            selector(juce::ColourSelector::showColourAtTop |
+                juce::ColourSelector::showSliders |
+                juce::ColourSelector::showColourspace)
+        {
+            selector.setCurrentColour(initialColour);
+            selector.addChangeListener(this);
+            addAndMakeVisible(selector);
+            setSize(260, 280);
+        }
+
+        ~ColourPickerPopup() override
+        {
+            selector.removeChangeListener(this);
+        }
+
+        void resized() override
+        {
+            selector.setBounds(getLocalBounds());
+        }
+
+        void changeListenerCallback(juce::ChangeBroadcaster*) override
+        {
+            if (callback)
+                callback(selector.getCurrentColour());
+        }
+
+    private:
+        std::function<void(juce::Colour)> callback;
+        juce::ColourSelector selector;
+    };
+
+    juce::Rectangle<int> getClearRectForSlot(const juce::Rectangle<int>& slotBounds) const
+    {
+        return juce::Rectangle<int>(slotBounds.getRight() - 18, slotBounds.getY() + 2, 16, 16);
+    }
+
+    static juce::Colour getColourFromState(const juce::ValueTree& aesthetic, const juce::Identifier& key)
+    {
+        if (!aesthetic.isValid()) return juce::Colours::dodgerblue;
+        juce::String hex = aesthetic.getProperty(key, "ff1e3a8a").toString();
+        return juce::Colour::fromString(hex);
+    }
+
+    void openColourPickerPopup(const juce::Identifier& colorKey, const juce::Rectangle<int>& targetBounds)
+    {
+        auto aesthetic = appState.getChildWithName(StateKeys::AestheticNode);
+        juce::Colour initial = getColourFromState(aesthetic, colorKey);
+
+        auto picker = std::make_unique<ColourPickerPopup>(initial, [this, colorKey](juce::Colour newCol) {
+            auto node = appState.getChildWithName(StateKeys::AestheticNode);
+            if (node.isValid())
+            {
+                node.setProperty(colorKey, newCol.toString(), nullptr);
+                node.setProperty(StateKeys::MoodProfile, "Custom", nullptr);
+                moodCombo.setSelectedId(5, juce::dontSendNotification);
+                repaint();
+            }
+            });
+
+        juce::CallOutBox::launchAsynchronously(std::move(picker), targetBounds, this);
+    }
+
+    void applySelectedMoodPreset()
+    {
+        auto aesthetic = appState.getChildWithName(StateKeys::AestheticNode);
+        if (!aesthetic.isValid()) return;
+
+        int id = moodCombo.getSelectedId();
+        if (id == 1) // Gelo & Nebbia
+        {
+            aesthetic.setProperty(StateKeys::MoodProfile, "IceAndFog", nullptr);
+            aesthetic.setProperty(StateKeys::PrimaryColor, "ff1e3a8a", nullptr); // Blu Ghiaccio
+            aesthetic.setProperty(StateKeys::SecondaryColor, "ff06b6d4", nullptr); // Ciano
+            aesthetic.setProperty(StateKeys::AccentColor, "ffffffff", nullptr); // Bianco
+            strobeSlider.setValue(45.0, juce::sendNotificationSync);
+        }
+        else if (id == 2) // Fuoco & Rame
+        {
+            aesthetic.setProperty(StateKeys::MoodProfile, "FireAndCopper", nullptr);
+            aesthetic.setProperty(StateKeys::PrimaryColor, "ff7f1d1d", nullptr); // Rosso Scuro
+            aesthetic.setProperty(StateKeys::SecondaryColor, "ffd97706", nullptr); // Ambra/Rame
+            aesthetic.setProperty(StateKeys::AccentColor, "fffef08a", nullptr); // Oro Chiaro
+            strobeSlider.setValue(55.0, juce::sendNotificationSync);
+        }
+        else if (id == 3) // Crepuscolo Antico
+        {
+            aesthetic.setProperty(StateKeys::MoodProfile, "AncientDusk", nullptr);
+            aesthetic.setProperty(StateKeys::PrimaryColor, "ff3b0764", nullptr); // Viola Profondo
+            aesthetic.setProperty(StateKeys::SecondaryColor, "ff15803d", nullptr); // Verde Foresta
+            aesthetic.setProperty(StateKeys::AccentColor, "fff59e0b", nullptr); // Ambra
+            strobeSlider.setValue(30.0, juce::sendNotificationSync);
+        }
+        else if (id == 4) // Abisso & Strobo
+        {
+            aesthetic.setProperty(StateKeys::MoodProfile, "AbyssAndStrobe", nullptr);
+            aesthetic.setProperty(StateKeys::PrimaryColor, "ff172554", nullptr); // Indaco Abisso
+            aesthetic.setProperty(StateKeys::SecondaryColor, "ff991b1b", nullptr); // Rosso Sangue
+            aesthetic.setProperty(StateKeys::AccentColor, "ffffffff", nullptr); // Bianco Strobo
+            strobeSlider.setValue(85.0, juce::sendNotificationSync);
+        }
+        repaint();
+    }
+
+    void promptForStemFile(size_t slotIndex)
+    {
+        if (slotIndex >= stemSlots.size()) return;
+
+        fileChooser = std::make_unique<juce::FileChooser>(
+            "Seleziona traccia per " + stemSlots[slotIndex].title,
+            juce::File::getSpecialLocation(juce::File::userMusicDirectory),
+            "*.wav;*.mp3;*.flac;*.aiff;*.ogg");
+
+        auto chooserFlags = juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles;
+        fileChooser->launchAsync(chooserFlags, [this, slotIndex](const juce::FileChooser& fc) {
+            auto file = fc.getResult();
+            if (file.existsAsFile())
+                assignFileToStemSlot(slotIndex, file);
+            });
+    }
+
+    void assignFileToStemSlot(size_t slotIndex, const juce::File& file)
+    {
+        if (slotIndex >= stemSlots.size() || !file.existsAsFile()) return;
+
+        const auto& key = stemSlots[slotIndex].key;
+        if (key == StateKeys::StemFullMix)
+        {
+            if (audioEngine.loadFullMix(file, appState) && onFullMixUpdated)
+                onFullMixUpdated();
+        }
+        else
+        {
+            audioEngine.setSecondaryStemFile(key, file, appState);
+        }
+        repaint();
+    }
+
+    void clearStemSlot(size_t slotIndex)
+    {
+        if (slotIndex >= stemSlots.size()) return;
+        auto stemsNode = appState.getChildWithName(StateKeys::AudioStemsNode);
+        if (stemsNode.isValid())
+        {
+            stemsNode.setProperty(stemSlots[slotIndex].key, "", nullptr);
+            repaint();
+        }
+    }
+
+    void handleGenerateClick()
+    {
+        auto stemsNode = appState.getChildWithName(StateKeys::AudioStemsNode);
+        juce::String fullMixPath = stemsNode.isValid() ? stemsNode.getProperty(StateKeys::StemFullMix, "").toString() : "";
+
+        if (fullMixPath.isEmpty() || !juce::File(fullMixPath).existsAsFile())
+        {
+            juce::NativeMessageBox::showMessageBoxAsync(
+                juce::MessageBoxIconType::WarningIcon,
+                "Full Mix Mancante",
+                "Carica almeno la traccia '1. Full Mix *' prima di avviare la generazione AI dello spettacolo.");
+            return;
+        }
+
+        if (onGenerateShowRequested)
+            onGenerateShowRequested();
+    }
+
+    void valueTreePropertyChanged(juce::ValueTree&, const juce::Identifier&) override { syncUIFromState(); }
+    void valueTreeChildAdded(juce::ValueTree&, juce::ValueTree&) override { syncUIFromState(); }
+    void valueTreeChildRemoved(juce::ValueTree&, juce::ValueTree&, int) override {}
+    void valueTreeChildOrderChanged(juce::ValueTree&, int, int) override {}
+    void valueTreeParentChanged(juce::ValueTree&) override {}
+
+    juce::ValueTree& appState;
+    StemAudioEngine& audioEngine;
+
+    std::vector<StemSlotInfo> stemSlots;
+    juce::Rectangle<int> colorSwatchBounds[3];
+    juce::Rectangle<int> leftColBounds, centerColBounds, rightColBounds;
+
+    juce::ComboBox moodCombo;
+    juce::Slider strobeSlider;
+    juce::ToggleButton layeringToggle;
+    juce::TextButton generateBtn;
+    std::unique_ptr<juce::FileChooser> fileChooser;
+};

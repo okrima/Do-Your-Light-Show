@@ -3,51 +3,48 @@
   "children": [
     {
       "nodeType": "FIXTURE",
-      "name": "Back Light",
+      "name": "Nuova Macchina 1",
       "startAddress": 1,
       "channelCount": 8,
       "role": "WASH_BACK",
       "map_Dimmer": 1,
       "map_Red": 2,
       "map_Green": 3,
-      "map_Blue": 4,
-      "map_White": 5
+      "map_Blue": 4
     },
     {
       "nodeType": "FIXTURE",
-      "name": "Floor Light",
+      "name": "Nuova Macchina 2",
       "startAddress": 11,
       "channelCount": 8,
-      "role": "WASH_FLOOR",
+      "role": "WASH_FRONT",
       "map_Dimmer": 1,
       "map_Red": 2,
       "map_Green": 3,
-      "map_Blue": 4,
-      "map_White": 5
+      "map_Blue": 4
     },
     {
       "nodeType": "FIXTURE",
-      "name": "PAR Light SIDE",
+      "name": "Nuova Macchina 3",
       "startAddress": 21,
       "channelCount": 8,
-      "role": "SIDE_PAR",
-      "map_Dimmer": 1,
-      "map_Red": 2,
-      "map_Green": 3,
-      "map_Blue": 4,
-      "map_White": 5
-    },
-    {
-      "nodeType": "FIXTURE",
-      "name": "GEYSERS",
-      "startAddress": 31,
-      "channelCount": 8,
-      "role": "GEYSER",
+      "role": "FOG_GEYSERS",
       "map_Dimmer": 0,
       "map_Red": 0,
       "map_Green": 0,
       "map_Blue": 0,
       "map_GeyserBlast": 1
+    },
+    {
+      "nodeType": "FIXTURE",
+      "name": "Nuova Macchina 4",
+      "startAddress": 31,
+      "channelCount": 8,
+      "role": "BLINDERS",
+      "map_Dimmer": 1,
+      "map_Red": 2,
+      "map_Green": 3,
+      "map_Blue": 4
     }
   ]
 }

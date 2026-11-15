@@ -12,6 +12,7 @@ public:
 
     void initialise (const juce::String& commandLine) override
     {
+        juce::ignoreUnused(commandLine);
         mainWindow = std::make_unique<MainWindow> (getApplicationName());
     }
 
@@ -25,7 +26,10 @@ public:
         quit();
     }
 
-    void anotherInstanceStarted (const juce::String& commandLine) override {}
+    void anotherInstanceStarted (const juce::String& commandLine) override
+    {
+        juce::ignoreUnused(commandLine);
+    }
 
     class MainWindow    : public juce::DocumentWindow
     {
