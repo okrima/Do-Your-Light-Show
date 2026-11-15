@@ -80,7 +80,6 @@ public:
             audioEngine(engine),
             completionCallback(std::move(onComplete))
         {
-            // Estrae i percorsi file in modo sicuro sul Message Thread prima di partire
             auto stemsNode = appState.getChildWithName(StateKeys::AudioStemsNode);
             if (stemsNode.isValid())
             {
@@ -113,7 +112,6 @@ public:
             result = AudioAnalysisEngine::runOfflineAnalysis(input, audioEngine.getFormatManager(), progressFn);
         }
 
-        // Chiamato automaticamente da JUCE sul Message Thread al termine di run()
         void threadComplete(bool userPressedCancel) override
         {
             if (!userPressedCancel && completionCallback)
@@ -127,7 +125,6 @@ public:
         std::function<void(const AnalysisResult&)> completionCallback;
     };
 
-    // Scrive i risultati estratti dentro BEAT_MAP (da chiamare sul Message Thread)
     static void applyResultToState(const AnalysisResult& result,
         juce::ValueTree& appState,
         BeatTimeMap& beatTimeMap)
@@ -173,20 +170,30 @@ private:
 
         result.totalDurationSec = static_cast<double>(fullMixReader->lengthInSamples) / fullMixReader->sampleRate;
 
-        // 1. Fase Cadenza / BPM (0% -> 25%)
         auto clickReader = openReader(formatManager, input.clickFile);
+        auto drumsReader = openReader(formatManager, input.drumsFile);
+        auto bassReader = openReader(formatManager, input.bassFile);
+        auto guitarsReader = openReader(formatManager, input.guitarsFile);
+
+        // 1. Fase Cadenza / BPM (0% -> 30%)
+        // Priorita': 1) Click Track -> 2) Stem Batteria -> 3) Full Mix
         if (clickReader != nullptr && clickReader->lengthInSamples > 0)
         {
             if (!analyzeClickTrack(*clickReader, result, reportProgress))
                 return result;
         }
+        else if (drumsReader != nullptr && drumsReader->lengthInSamples > 0)
+        {
+            if (!estimateTempoAutocorrelation(*drumsReader, true, result, reportProgress))
+                return result;
+        }
         else
         {
-            if (!estimateTempoFromFullMix(*fullMixReader, result, reportProgress))
+            if (!estimateTempoAutocorrelation(*fullMixReader, false, result, reportProgress))
                 return result;
         }
 
-        // Costruisce una BeatTimeMap temporanea locale al thread per convertire secondi <-> quarti
+        // Costruisce la BeatTimeMap locale al thread
         juce::ValueTree localRoot("TEMP_ROOT");
         juce::ValueTree localBeatMapNode(StateKeys::BeatMapNode);
         localBeatMapNode.setProperty(StateKeys::BpmBase, result.detectedBpm, nullptr);
@@ -205,11 +212,7 @@ private:
         localBeatMap.bindToAppState(localRoot);
         result.totalBeats = localBeatMap.secondsToBeat(result.totalDurationSec);
 
-        // 2. Fase Estrazione Feature per ogni quarto (25% -> 92%)
-        auto drumsReader = openReader(formatManager, input.drumsFile);
-        auto bassReader = openReader(formatManager, input.bassFile);
-        auto guitarsReader = openReader(formatManager, input.guitarsFile);
-
+        // 2. Fase Estrazione Feature quarto per quarto (30% -> 92%)
         if (!extractBeatFeatures(*fullMixReader,
             drumsReader.get(),
             bassReader.get(),
@@ -232,7 +235,7 @@ private:
         return result;
     }
 
-    // --- TT-4.2A: Rilevamento picchi su traccia Click ---
+    // --- TT-4.2A: Rilevamento ad alta precisione su traccia Click ---
     static bool analyzeClickTrack(juce::AudioFormatReader& clickReader,
         AnalysisResult& result,
         const ProgressCallback& reportProgress)
@@ -241,47 +244,46 @@ private:
             return false;
 
         const double sr = clickReader.sampleRate;
+        const int hopSamples = juce::jmax(64, static_cast<int>(std::round(sr * 0.004))); // Finestre da 4 ms
         const juce::int64 totalSamples = clickReader.lengthInSamples;
-        const int blockSize = 4096;
 
-        juce::AudioBuffer<float> buffer(2, blockSize);
-        std::vector<double> onsetTimesSec;
+        juce::AudioBuffer<float> buffer(2, hopSamples);
+        std::vector<float> env;
+        env.reserve(static_cast<size_t>(totalSamples / hopSamples) + 1);
 
-        const double minPeakDistanceSec = 0.18;
-        double lastPeakSec = -1.0;
-        float runningPeak = 0.05f;
-        int blockCounter = 0;
+        float maxPeak = 0.001f;
+        int stepCount = 0;
 
-        for (juce::int64 pos = 0; pos < totalSamples; pos += blockSize)
+        for (juce::int64 pos = 0; pos + hopSamples <= totalSamples; pos += hopSamples)
         {
-            if ((++blockCounter % 64) == 0)
+            if ((++stepCount % 500) == 0)
             {
-                double prog = 0.02 + 0.22 * (static_cast<double>(pos) / static_cast<double>(totalSamples));
+                double prog = 0.02 + 0.18 * (static_cast<double>(pos) / static_cast<double>(totalSamples));
                 if (!reportProgress(prog, ""))
                     return false;
             }
 
-            int numToRead = static_cast<int>(juce::jmin<juce::int64>(blockSize, totalSamples - pos));
-            clickReader.read(&buffer, 0, numToRead, pos, true, true);
-            const float* data = buffer.getReadPointer(0);
+            clickReader.read(&buffer, 0, hopSamples, pos, true, true);
+            float pk = juce::jmax(buffer.getMagnitude(0, 0, hopSamples),
+                buffer.getMagnitude(1, 0, hopSamples));
+            env.push_back(pk);
+            if (pk > maxPeak) maxPeak = pk;
+        }
 
-            for (int i = 0; i < numToRead; ++i)
+        // Soglia tarata per catturare sia l'accento forte (1) sia i quarti deboli (2, 3, 4)
+        const float threshold = juce::jmax(0.02f, maxPeak * 0.18f);
+        const int minDistanceFrames = static_cast<int>(0.18 / 0.004); // Minimo 180 ms tra due click
+        int lastPeakFrame = -minDistanceFrames;
+
+        std::vector<double> onsetTimesSec;
+        for (size_t i = 1; i + 1 < env.size(); ++i)
+        {
+            if (env[i] > threshold && env[i] >= env[i - 1] && env[i] >= env[i + 1])
             {
-                float absSample = std::abs(data[i]);
-                if (absSample > runningPeak)
-                    runningPeak = absSample;
-                else
-                    runningPeak = runningPeak * 0.99995f + 0.00005f * 0.05f;
-
-                float threshold = juce::jmax(0.08f, runningPeak * 0.45f);
-                if (absSample > threshold)
+                if (static_cast<int>(i) - lastPeakFrame >= minDistanceFrames)
                 {
-                    double currentSec = static_cast<double>(pos + i) / sr;
-                    if (currentSec - lastPeakSec >= minPeakDistanceSec)
-                    {
-                        onsetTimesSec.push_back(currentSec);
-                        lastPeakSec = currentSec;
-                    }
+                    onsetTimesSec.push_back(static_cast<double>(i * hopSamples) / sr);
+                    lastPeakFrame = static_cast<int>(i);
                 }
             }
         }
@@ -293,7 +295,7 @@ private:
             for (size_t i = 1; i < onsetTimesSec.size(); ++i)
             {
                 double dt = onsetTimesSec[i] - onsetTimesSec[i - 1];
-                if (dt >= 0.22 && dt <= 1.2)
+                if (dt >= 0.22 && dt <= 1.20)
                     intervals.push_back(dt);
             }
 
@@ -301,11 +303,26 @@ private:
             {
                 std::sort(intervals.begin(), intervals.end());
                 double medianInterval = intervals[intervals.size() / 2];
-                double bpm = 60.0 / medianInterval;
+
+                // Media pesata attorno alla mediana per precisione sub-millisecondo
+                double sumInterval = 0.0;
+                int countValid = 0;
+                for (double dt : intervals)
+                {
+                    if (std::abs(dt - medianInterval) <= medianInterval * 0.08)
+                    {
+                        sumInterval += dt;
+                        ++countValid;
+                    }
+                }
+
+                double refinedInterval = (countValid > 0) ? (sumInterval / countValid) : medianInterval;
+                double bpm = 60.0 / refinedInterval;
 
                 while (bpm < 70.0)  bpm *= 2.0;
-                while (bpm > 210.0) bpm *= 0.5;
+                while (bpm > 205.0) bpm *= 0.5;
 
+                // Arrotonda al mezzo BPM (es. 120.0, 120.5)
                 result.detectedBpm = std::round(bpm * 2.0) / 2.0;
                 result.firstDownbeatSec = onsetTimesSec.front();
                 result.usedClickTrack = true;
@@ -317,7 +334,7 @@ private:
                     {
                         double spanSec = onsetTimesSec[i + 4] - onsetTimesSec[i];
                         if (spanSec > 0.5)
-                            localBpm = juce::jlimit(50.0, 250.0, (4.0 * 60.0) / spanSec);
+                            localBpm = std::round(juce::jlimit(50.0, 250.0, (4.0 * 60.0) / spanSec) * 2.0) / 2.0;
                     }
                     result.anchors.push_back({ static_cast<double>(i + 1), onsetTimesSec[i], localBpm });
                 }
@@ -326,75 +343,220 @@ private:
         return true;
     }
 
-    // --- TT-4.2B: Stima BPM dal Full Mix ---
-    static bool estimateTempoFromFullMix(juce::AudioFormatReader& fullMixReader,
+    // --- TT-4.2B: Stima BPM via Autocorrelazione Multi-Banda + Comb Filter a 200 Hz (5 ms) ---
+    static bool estimateTempoAutocorrelation(juce::AudioFormatReader& reader,
+        bool isDrumStem,
         AnalysisResult& result,
         const ProgressCallback& reportProgress)
     {
-        if (!reportProgress(0.02, "Stima cadenza e BPM dal Full Mix..."))
+        juce::String sourceName = isDrumStem ? "dallo Stem Batteria..." : "dal Full Mix...";
+        if (!reportProgress(0.02, "Estrazione inviluppo ritmico " + sourceName))
             return false;
 
-        const double sr = fullMixReader.sampleRate;
-        const int hopSize = static_cast<int>(sr * 0.02);
-        const juce::int64 maxSamplesToScan = juce::jmin<juce::int64>(
-            fullMixReader.lengthInSamples, static_cast<juce::int64>(sr * 90.0));
+        const double sr = reader.sampleRate;
+        const double envRate = 200.0; // 200 frame al secondo (risoluzione 5 ms)
+        const int hopSamples = juce::jmax(64, static_cast<int>(std::round(sr / envRate)));
+        const double actualEnvRate = sr / static_cast<double>(hopSamples);
 
-        juce::AudioBuffer<float> buffer(2, hopSize);
-        std::vector<double> onsetTimes;
-        float prevEnergy = 0.0f;
-        float avgFlux = 0.01f;
-        double lastOnsetSec = -1.0;
-        int stepCount = 0;
+        // Analizziamo fino a 180 secondi per saltare eventuali intro atmosferici lunghi
+        const juce::int64 maxSamples = juce::jmin<juce::int64>(
+            reader.lengthInSamples, static_cast<juce::int64>(sr * 180.0));
 
-        for (juce::int64 pos = 0; pos + hopSize < maxSamplesToScan; pos += hopSize)
+        const size_t numFrames = static_cast<size_t>(maxSamples / hopSamples);
+        if (numFrames < 400)
+            return true;
+
+        juce::AudioBuffer<float> buffer(2, hopSamples);
+        std::vector<float> rawOnset(numFrames, 0.0f);
+        std::vector<float> frameRms(numFrames, 0.0f);
+
+        // Coefficienti filtro 1-polo per isolare Cassa (< 135 Hz) e Rullante/Attacco (> 1200 Hz)
+        const float lpAlpha = static_cast<float>(juce::jlimit(0.005, 0.4, (2.0 * 3.14159265 * 135.0) / sr));
+        const float hpAlpha = static_cast<float>(juce::jlimit(0.05, 0.85, (2.0 * 3.14159265 * 1200.0) / sr));
+
+        float lpState = 0.0f;
+        float midState = 0.0f;
+        float prevLowLog = 0.0f;
+        float prevHighLog = 0.0f;
+        float maxTrackRms = 0.0001f;
+
+        for (size_t f = 0; f < numFrames; ++f)
         {
-            if ((++stepCount % 100) == 0)
+            if ((f % 600) == 0)
             {
-                double prog = 0.02 + 0.22 * (static_cast<double>(pos) / static_cast<double>(maxSamplesToScan));
+                double prog = 0.02 + 0.16 * (static_cast<double>(f) / static_cast<double>(numFrames));
                 if (!reportProgress(prog, ""))
                     return false;
             }
 
-            fullMixReader.read(&buffer, 0, hopSize, pos, true, true);
-            float rms = (buffer.getRMSLevel(0, 0, hopSize) + buffer.getRMSLevel(1, 0, hopSize)) * 0.5f;
-            float flux = juce::jmax(0.0f, rms - prevEnergy);
-            prevEnergy = rms;
+            juce::int64 pos = static_cast<juce::int64>(f) * hopSamples;
+            reader.read(&buffer, 0, hopSamples, pos, true, true);
+            const float* dL = buffer.getReadPointer(0);
+            const float* dR = buffer.getReadPointer(1);
 
-            avgFlux = avgFlux * 0.96f + flux * 0.04f;
-            double sec = static_cast<double>(pos) / sr;
+            float lowSqSum = 0.0f;
+            float highSqSum = 0.0f;
+            float totSqSum = 0.0f;
 
-            if (flux > avgFlux * 1.8f && rms > 0.03f && (sec - lastOnsetSec) >= 0.24)
+            for (int i = 0; i < hopSamples; ++i)
             {
-                onsetTimes.push_back(sec);
-                lastOnsetSec = sec;
+                float mono = (dL[i] + dR[i]) * 0.5f;
+                totSqSum += mono * mono;
+
+                // Passa-basso Cassa
+                lpState += lpAlpha * (mono - lpState);
+                lowSqSum += lpState * lpState;
+
+                // Passa-alto Rullante / Transienti
+                midState += hpAlpha * (mono - midState);
+                float highSample = mono - midState;
+                highSqSum += highSample * highSample;
             }
+
+            float invN = 1.0f / static_cast<float>(hopSamples);
+            float totRms = std::sqrt(totSqSum * invN);
+            float lowRms = std::sqrt(lowSqSum * invN);
+            float highRms = std::sqrt(highSqSum * invN);
+
+            frameRms[f] = totRms;
+            if (totRms > maxTrackRms) maxTrackRms = totRms;
+
+            // Compressione logaritmica per rilevare i transienti anche nei mix molto compressi
+            float lowLog = std::log10(1.0f + 35.0f * lowRms);
+            float highLog = std::log10(1.0f + 35.0f * highRms);
+
+            float dLow = juce::jmax(0.0f, lowLog - prevLowLog);
+            float dHigh = juce::jmax(0.0f, highLog - prevHighLog);
+
+            prevLowLog = lowLog;
+            prevHighLog = highLog;
+
+            rawOnset[f] = (dLow * 1.45f) + (dHigh * 1.0f);
         }
 
-        if (onsetTimes.size() >= 10)
+        if (!reportProgress(0.20, "Calcolo autocorrelazione ritmica e griglia BPM..."))
+            return false;
+
+        // Sottrae la media mobile locale (finestra di ~250 ms) per esaltare solo i picchi ritmici netti
+        std::vector<float> cleanOnset(numFrames, 0.0f);
+        const int halfWin = 25;
+        for (size_t f = 0; f < numFrames; ++f)
         {
-            result.firstDownbeatSec = onsetTimes.front();
-            std::vector<int> bpmBins(220, 0);
-            for (size_t i = 1; i < onsetTimes.size(); ++i)
-            {
-                double dt = onsetTimes[i] - onsetTimes[i - 1];
-                if (dt > 0.25 && dt < 1.5)
-                {
-                    double candBpm = 60.0 / dt;
-                    while (candBpm < 80.0)  candBpm *= 2.0;
-                    while (candBpm > 190.0) candBpm *= 0.5;
-                    int bin = juce::jlimit(60, 210, static_cast<int>(std::round(candBpm)));
-                    bpmBins[static_cast<size_t>(bin)] += 2;
-                    bpmBins[static_cast<size_t>(bin - 1)] += 1;
-                    bpmBins[static_cast<size_t>(bin + 1)] += 1;
-                }
-            }
+            size_t startW = (f > static_cast<size_t>(halfWin)) ? (f - halfWin) : 0;
+            size_t endW = juce::jmin(numFrames - 1, f + halfWin);
+            float localMean = 0.0f;
+            for (size_t k = startW; k <= endW; ++k)
+                localMean += rawOnset[k];
+            localMean /= static_cast<float>(endW - startW + 1);
 
-            auto maxIt = std::max_element(bpmBins.begin() + 70, bpmBins.begin() + 200);
-            if (*maxIt >= 6)
-                result.detectedBpm = static_cast<double>(std::distance(bpmBins.begin(), maxIt));
+            // Ignora i frame di silenzio o di pura quiete ambientale (< 12% del volume massimo)
+            if (frameRms[f] > maxTrackRms * 0.12f)
+                cleanOnset[f] = juce::jmax(0.0f, rawOnset[f] - localMean);
         }
 
+        // Calcola l'Autocorrelazione per i lag da 35 BPM a 400 BPM
+        const int minLag = juce::jmax(10, static_cast<int>(std::floor((60.0 * actualEnvRate) / 400.0)));
+        const int maxLag = juce::jmin(static_cast<int>(numFrames / 2),
+            static_cast<int>(std::ceil((60.0 * actualEnvRate) / 35.0)));
+
+        std::vector<double> acf(static_cast<size_t>(maxLag + 2), 0.0);
+        for (int lag = minLag; lag <= maxLag; ++lag)
+        {
+            double sum = 0.0;
+            size_t limit = numFrames - static_cast<size_t>(lag);
+            for (size_t n = 0; n < limit; ++n)
+                sum += static_cast<double>(cleanOnset[n]) * static_cast<double>(cleanOnset[n + static_cast<size_t>(lag)]);
+
+            acf[static_cast<size_t>(lag)] = sum / static_cast<double>(limit);
+        }
+
+        // Funzione helper per leggere l'ACF con interpolazione lineare sui sub-frame
+        auto sampleAcf = [&acf, minLag, maxLag](double exactLag) -> double {
+            int idx = static_cast<int>(std::floor(exactLag));
+            if (idx < minLag || idx + 1 > maxLag)
+                return 0.0;
+            double frac = exactLag - static_cast<double>(idx);
+            // Media anche sui 2 frame adiacenti per tollerare micro-fluttuazioni umane
+            double center = (1.0 - frac) * acf[static_cast<size_t>(idx)] + frac * acf[static_cast<size_t>(idx + 1)];
+            double left = (idx - 1 >= minLag) ? acf[static_cast<size_t>(idx - 1)] : center;
+            double right = (idx + 2 <= maxLag) ? acf[static_cast<size_t>(idx + 2)] : center;
+            return 0.60 * center + 0.20 * left + 0.20 * right;
+            };
+
+        // Comb Filter sui candidati BPM da 68.0 a 195.0 (step di 0.25 BPM)
+        double bestBpm = result.detectedBpm;
+        double bestScore = -1.0;
+        std::vector<std::pair<double, double>> bpmScores;
+
+        for (double candBpm = 68.0; candBpm <= 195.0; candBpm += 0.25)
+        {
+            double baseLag = (60.0 * actualEnvRate) / candBpm;
+
+            // Somma armonica: 1 quarto + 2 quarti + 4 quarti (1 battuta) + 1/2 quarto (ottavi)
+            double combScore = 1.00 * sampleAcf(baseLag)
+                + 0.55 * sampleAcf(baseLag * 2.0)
+                + 0.35 * sampleAcf(baseLag * 4.0)
+                + 0.25 * sampleAcf(baseLag * 0.5);
+
+            // Finestra percettiva gaussiana centrata a 126 BPM per evitare dimezzamenti/raddoppi errati
+            double diff = (candBpm - 126.0) / 48.0;
+            double perceptualWeight = std::exp(-0.5 * diff * diff);
+
+            double totalScore = combScore * (0.65 + 0.35 * perceptualWeight);
+            bpmScores.push_back({ candBpm, totalScore });
+
+            if (totalScore > bestScore)
+            {
+                bestScore = totalScore;
+                bestBpm = candBpm;
+            }
+        }
+
+        // Aggancio intelligente al BPM intero (es. 120.0, 140.0) se il punteggio e' quasi identico
+        double roundedIntBpm = std::round(bestBpm);
+        for (const auto& pair : bpmScores)
+        {
+            if (std::abs(pair.first - roundedIntBpm) < 0.01 && pair.second >= bestScore * 0.96)
+            {
+                bestBpm = roundedIntBpm;
+                break;
+            }
+        }
+
+        result.detectedBpm = bestBpm;
         result.usedClickTrack = false;
+
+        // --- Allineamento di Fase (ricerca del primo Downbeat reale) ---
+        double beatPeriodFrames = (60.0 * actualEnvRate) / result.detectedBpm;
+        int periodInt = juce::jmax(1, static_cast<int>(std::round(beatPeriodFrames)));
+
+        int bestPhaseFrame = 0;
+        double bestPhaseEnergy = -1.0;
+        for (int phase = 0; phase < periodInt; ++phase)
+        {
+            double phaseSum = 0.0;
+            for (size_t f = static_cast<size_t>(phase); f < numFrames; f += static_cast<size_t>(periodInt))
+                phaseSum += static_cast<double>(cleanOnset[f]);
+
+            if (phaseSum > bestPhaseEnergy)
+            {
+                bestPhaseEnergy = phaseSum;
+                bestPhaseFrame = phase;
+            }
+        }
+
+        // Trova il primo quarto attivo del brano allineato alla fase migliore
+        size_t firstActiveFrame = static_cast<size_t>(bestPhaseFrame);
+        for (size_t f = static_cast<size_t>(bestPhaseFrame); f < numFrames; f += static_cast<size_t>(periodInt))
+        {
+            if (frameRms[f] > maxTrackRms * 0.15f && cleanOnset[f] > 0.01f)
+            {
+                firstActiveFrame = f;
+                break;
+            }
+        }
+
+        result.firstDownbeatSec = static_cast<double>(firstActiveFrame * hopSamples) / sr;
         return true;
     }
 
@@ -421,7 +583,7 @@ private:
         {
             if ((b % 8) == 0 || b == 1)
             {
-                double prog = 0.25 + 0.67 * (static_cast<double>(b) / static_cast<double>(numBeats));
+                double prog = 0.30 + 0.62 * (static_cast<double>(b) / static_cast<double>(numBeats));
                 juce::String msg = "Analisi timbrica e ritmica: quarto " + juce::String(b) + " di " + juce::String(numBeats);
                 if (!reportProgress(prog, msg))
                     return false;

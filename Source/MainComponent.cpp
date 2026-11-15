@@ -21,7 +21,7 @@ MainComponent::MainComponent()
                            false);
 
     addAndMakeVisible (tabbedComponent);
-    setSize (1100, 720);
+    setSize(1600, 950);
 }
 
 MainComponent::~MainComponent() {}

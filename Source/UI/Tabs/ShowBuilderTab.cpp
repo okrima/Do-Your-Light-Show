@@ -313,7 +313,7 @@ void SceneEditorPanel::visibilityChanged()
 // =============================================================================
 // ShowBuilderTab Implementation (Main)
 // =============================================================================
-ShowBuilderTab::ShowBuilderTab(juce::ValueTree& state) : appState(state), miniDawTimeline(state, audioEngine, beatTimeMap), editorPanel(state), aiWizardPanel(state, audioEngine)
+ShowBuilderTab::ShowBuilderTab(juce::ValueTree& state) : appState(state), miniDawTimeline(state, audioEngine, beatTimeMap), editorPanel(state), aiWizardPanel(state, audioEngine), stageSimulator(state, audioEngine, beatTimeMap)
 {
 
     // 1. Garantisce che AUDIO_STEMS, AESTHETIC_CONFIG, BEAT_MAP, VENUE, SHOW e PRESET esistano
@@ -326,6 +326,12 @@ ShowBuilderTab::ShowBuilderTab(juce::ValueTree& state) : appState(state), miniDa
     addKeyListener(this);                // Ascolta la tastiera sul pannello generale
     miniDawTimeline.addKeyListener(this); // Ascolta la tastiera quando clicchi sulla forma d'onda
     sceneList.addKeyListener(this);      // Ascolta la tastiera quando sei sulla lista scene
+
+    stageSimulator.onToggleExpandRequested = [this]() {
+        resized();
+        repaint();
+        };
+    addAndMakeVisible(stageSimulator);
 
     // Collega il click sulle scene della timeline alla selezione nella lista
     miniDawTimeline.onSceneSelectedFromTimeline = [this](int sceneIndex) {
@@ -340,7 +346,6 @@ ShowBuilderTab::ShowBuilderTab(juce::ValueTree& state) : appState(state), miniDa
         };
 
     aiWizardPanel.onGenerateShowRequested = [this]() {
-        // Mettiamo in pausa l'audio durante la scansione ad alta velocita'
         audioEngine.pause();
 
         analysisJob = std::make_unique<AudioAnalysisEngine::AnalysisJob>(
@@ -356,18 +361,31 @@ ShowBuilderTab::ShowBuilderTab(juce::ValueTree& state) : appState(state), miniDa
                     return;
                 }
 
-                // Applica in modo sicuro la mappa BPM sul Message Thread e aggiorna la Mini-DAW
+                // 1. Applica la griglia dei quarti e il BPM rilevato
                 AudioAnalysisEngine::applyResultToState(analysis, appState, beatTimeMap);
-                miniDawTimeline.syncWithAppState();
 
-                juce::String report = "BPM Rilevato: " + juce::String(analysis.detectedBpm, 1)
-                    + (analysis.usedClickTrack ? " (da traccia Click)\n" : " (stimato da Full Mix)\n")
-                    + "Durata totale: " + juce::String(analysis.totalBeats, 1) + " quarti\n"
-                    + "Sezioni musicali individuate: " + juce::String(analysis.sections.size());
+                // 2. Genera automaticamente le SCENE e i ROLE_COMMAND (o applica il Layering)
+                auto genStats = AIShowGenerator::generateShowFromAnalysis(appState, analysis);
+
+                // 3. Aggiorna la UI (Mini-DAW, Lista Scene e seleziona la prima scena)
+                miniDawTimeline.syncWithAppState();
+                sceneList.updateContent();
+                if (showNode.getNumChildren() > 0)
+                    sceneList.selectRow(0);
+                repaint();
+
+                juce::String modeStr = genStats.wasIncrementalLayering
+                    ? "Layering Incrementale (preservate scene esistenti)"
+                    : "Generazione Completa Show";
+
+                juce::String report = "Modalita': " + modeStr + "\n"
+                    + "BPM Rilevato: " + juce::String(analysis.detectedBpm, 1) + "\n"
+                    + "Scene generate/aggiornate: " + juce::String(genStats.scenesCreatedOrUpdated) + "\n"
+                    + "Comandi luminosi creati: " + juce::String(genStats.commandsGenerated);
 
                 juce::NativeMessageBox::showMessageBoxAsync(
                     juce::MessageBoxIconType::InfoIcon,
-                    "Analisi Audio AI Completata",
+                    "Show Generato con Successo",
                     report);
             });
 
@@ -679,7 +697,20 @@ void ShowBuilderTab::resized()
 
     sceneList.setBounds(leftPanel.reduced(10));
     bounds.removeFromLeft(2);
-    editorPanel.setBounds(bounds);
+    
+    // Area Destra: Simulatore Palco 2D + Editor Comandi Scena
+    if (stageSimulator.getIsExpanded())
+    {
+        stageSimulator.setBounds(bounds.reduced(4));
+        editorPanel.setVisible(false);
+    }
+    else
+    {
+        editorPanel.setVisible(true);
+        auto simArea = bounds.removeFromTop(juce::roundToInt(bounds.getHeight() * 0.52f));
+        stageSimulator.setBounds(simArea.reduced(4, 2));
+        editorPanel.setBounds(bounds);
+    }
 }
 
 void ShowBuilderTab::deletePresetFromLibrary()

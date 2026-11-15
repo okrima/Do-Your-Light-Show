@@ -4,6 +4,7 @@
 #include "../../Model/BeatTimeMap.h"
 #include "../../Model/DataStateKeys.h"
 
+
 class MiniDawTimeline : public juce::Component,
     private juce::Timer,
     private juce::ChangeListener,

@@ -3,21 +3,36 @@
   "children": [
     {
       "nodeType": "FIXTURE",
-      "name": "Nuova Macchina 1",
+      "name": "Appesi Wash",
       "startAddress": 1,
       "channelCount": 8,
-      "role": "WASH_BACK",
+      "role": "Aria: Wash Controluce (Fondale)",
       "map_Dimmer": 1,
       "map_Red": 2,
       "map_Green": 3,
-      "map_Blue": 4
+      "map_Blue": 4,
+      "map_Pan": 5,
+      "map_Tilt": 6
     },
     {
       "nodeType": "FIXTURE",
-      "name": "Nuova Macchina 2",
+      "name": "Appesi Beam",
       "startAddress": 11,
       "channelCount": 8,
-      "role": "WASH_FRONT",
+      "role": "Aria: Teste Mobili / Beam",
+      "map_Dimmer": 1,
+      "map_Red": 2,
+      "map_Green": 3,
+      "map_Blue": 4,
+      "map_Pan": 5,
+      "map_Tilt": 6
+    },
+    {
+      "nodeType": "FIXTURE",
+      "name": "Terra Fisse Back",
+      "startAddress": 21,
+      "channelCount": 8,
+      "role": "Terra: Controluce / Sotto-Batteria",
       "map_Dimmer": 1,
       "map_Red": 2,
       "map_Green": 3,
@@ -25,10 +40,59 @@
     },
     {
       "nodeType": "FIXTURE",
-      "name": "Nuova Macchina 3",
-      "startAddress": 21,
+      "name": "Terra Barre Laterari",
+      "startAddress": 31,
       "channelCount": 8,
-      "role": "FOG_GEYSERS",
+      "role": "Terra: Par / Barre Laterali (Taglio)",
+      "map_Dimmer": 1,
+      "map_Red": 2,
+      "map_Green": 3,
+      "map_Blue": 4,
+      "map_Pan": 0,
+      "map_Tilt": 0
+    },
+    {
+      "nodeType": "FIXTURE",
+      "name": "Terra Teste Mobili",
+      "startAddress": 41,
+      "channelCount": 8,
+      "role": "Terra: Teste Mobili a Terra",
+      "map_Dimmer": 1,
+      "map_Red": 2,
+      "map_Green": 3,
+      "map_Blue": 4,
+      "map_Pan": 5,
+      "map_Tilt": 6
+    },
+    {
+      "nodeType": "FIXTURE",
+      "name": "Blinder Crowd",
+      "startAddress": 51,
+      "channelCount": 8,
+      "role": "Impatto: Blinder Pubblico",
+      "map_Dimmer": 1,
+      "map_Red": 2,
+      "map_Green": 3,
+      "map_Blue": 4
+    },
+    {
+      "nodeType": "FIXTURE",
+      "name": "Strobo",
+      "startAddress": 61,
+      "channelCount": 8,
+      "role": "Impatto: Strobo",
+      "map_Dimmer": 1,
+      "map_Red": 2,
+      "map_Green": 3,
+      "map_Blue": 4,
+      "map_Strobe": 5
+    },
+    {
+      "nodeType": "FIXTURE",
+      "name": "Hazer",
+      "startAddress": 71,
+      "channelCount": 8,
+      "role": "FX: Macchina del Fumo / Hazer",
       "map_Dimmer": 0,
       "map_Red": 0,
       "map_Green": 0,
@@ -37,14 +101,15 @@
     },
     {
       "nodeType": "FIXTURE",
-      "name": "Nuova Macchina 4",
-      "startAddress": 31,
+      "name": "Geyser",
+      "startAddress": 81,
       "channelCount": 8,
-      "role": "BLINDERS",
+      "role": "FX: Geyser Verticale (Fumo + LED)",
       "map_Dimmer": 1,
       "map_Red": 2,
       "map_Green": 3,
-      "map_Blue": 4
+      "map_Blue": 4,
+      "map_GeyserBlast": 5
     }
   ]
 }

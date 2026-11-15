@@ -47,8 +47,9 @@ public:
             setFullScreen (true);
            #else
             setResizable (true, true);
-            setResizeLimits (900, 600, 3840, 2160);
+            setResizeLimits(1280, 768, 10000, 10000);
             centreWithSize (getWidth(), getHeight());
+            setFullScreen(true); // Avvia la finestra massimizzata a tutto schermo su Windows/Mac
            #endif
 
             setVisible (true);

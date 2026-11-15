@@ -2,6 +2,8 @@
 #include <juce_gui_basics/juce_gui_basics.h>
 #include "../../Model/LogicalParam.h"
 #include "../../Utils/PresetManager.h"
+#include "../../Model/StageRoleCatalog.h"
+
 #include <vector>
 #include <memory>
 
@@ -44,7 +46,7 @@ private:
 
     // NUOVI CONTROLLI RUOLO
     juce::Label roleLabel;
-    juce::TextEditor roleEditor;
+    juce::ComboBox roleCombo;
 
     juce::Label startAddrLabel;
     juce::Slider startAddrSlider;

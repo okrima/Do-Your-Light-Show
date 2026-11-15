@@ -8,6 +8,8 @@
 #include "../../Utils/PresetManager.h"
 #include "../Components/AIWizardPanel.h"
 #include "../../AI/AudioAnalysisEngine.h"
+#include "../../AI/AIShowGenerator.h"
+#include "../Components/StageSimulatorView.h"
 
 // =============================================================================
 // SceneEditorPanel (Pannello Destro)
@@ -125,6 +127,7 @@ private:
     StemAudioEngine audioEngine;
     MiniDawTimeline miniDawTimeline;
     AIWizardPanel aiWizardPanel;
+    StageSimulatorView stageSimulator;
 
     std::unique_ptr<juce::FileChooser> fileChooser;
     std::unique_ptr<AudioAnalysisEngine::AnalysisJob> analysisJob;

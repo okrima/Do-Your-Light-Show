@@ -26,13 +26,24 @@ FixtureEditorPanel::FixtureEditorPanel(juce::ValueTree& state) : appState(state)
     roleLabel.setText("Ruolo/Gruppo:", juce::dontSendNotification);
     roleLabel.setColour(juce::Label::textColourId, juce::Colours::lightgrey);
     addAndMakeVisible(roleLabel);
+    
+    // 1. Popola il ComboBox con le 10 categorie fisiche ufficiali e abilita il testo modificabile
+    StageRoleCatalog::populateComboBox(roleCombo, true);
 
-    roleEditor.setColour(juce::TextEditor::backgroundColourId, juce::Colour(0xff2a2a32));
-    roleEditor.onTextChange = [this]() {
-        if (currentFixtureNode.isValid() && !isUpdatingUI)
-            currentFixtureNode.setProperty(StateKeys::RoleName, roleEditor.getText(), nullptr);
+    // 2. Quando l'utente cambia ruolo dal menu (o preme Invio dopo aver scritto un sottogruppo),
+    //salva subito il valore dentro il nodo FIXTURE selezionato
+    roleCombo.onChange = [this]()
+        {
+            if (isUpdatingUI || !currentFixtureNode.isValid())
+                return;
+
+            // Sostituisci 'fixtureNode' col nome del tuo ValueTree del faro selezionato
+            currentFixtureNode.setProperty(StateKeys::RoleName, StageRoleCatalog::getRoleFromCombo(roleCombo), nullptr);
+            
         };
-    addAndMakeVisible(roleEditor);
+
+    roleCombo.setColour(juce::ComboBox::backgroundColourId, juce::Colour(0xff2a2a32));
+    addAndMakeVisible(roleCombo);
 
     // -- START DMX ADDRESS --
     startAddrLabel.setText("Start DMX:", juce::dontSendNotification);
@@ -108,11 +119,19 @@ void FixtureEditorPanel::setFixtureNode(juce::ValueTree fixtureNode)
     currentFixtureNode = fixtureNode;
 
     if (currentFixtureNode.isValid()) {
+        roleCombo.setEnabled(true);
+        // Legge il ruolo salvato nel ValueTree e seleziona la voce corrispondente nel ComboBox
+        juce::String savedRole = fixtureNode.getProperty(StateKeys::RoleName, "").toString();
+        StageRoleCatalog::setComboSelectionFromRole(roleCombo, savedRole);
+
         currentFixtureNode.addListener(this);
         updateUIFromNode();
         setVisible(true);
     }
     else {
+        // Nessun faro selezionato: disabilita il menu
+        roleCombo.setEnabled(false);
+        roleCombo.setText("", juce::dontSendNotification);
         setVisible(false);
     }
 }
@@ -132,7 +151,7 @@ void FixtureEditorPanel::resized()
     bounds.removeFromTop(10);
     auto rowRole = bounds.removeFromTop(24);
     roleLabel.setBounds(rowRole.removeFromLeft(100));
-    roleEditor.setBounds(rowRole.removeFromLeft(200));
+    roleCombo.setBounds(rowRole.removeFromLeft(200));
 
     bounds.removeFromTop(10);
     auto row2 = bounds.removeFromTop(24);
@@ -154,10 +173,12 @@ void FixtureEditorPanel::resized()
     int colWidth = gridBounds.getWidth() / 2;
     int rowHeight = 28;
 
-    for (size_t i = 0; i < paramControls.size(); ++i)
+    int count = static_cast<int>(paramControls.size());
+
+    for (size_t i = 0; i < count; ++i)
     {
         int col = i % 2;
-        int row = i / 2;
+        int row = static_cast<int>(i / 2);
         auto cell = gridBounds.withTrimmedLeft(col * colWidth).withWidth(colWidth).withTrimmedTop(row * rowHeight).withHeight(rowHeight);
 
         paramControls[i]->label.setBounds(cell.removeFromLeft(100));
@@ -170,10 +191,11 @@ void FixtureEditorPanel::updateUIFromNode()
     if (!currentFixtureNode.isValid()) return;
     juce::ScopedValueSetter<bool> setter(isUpdatingUI, true);
 
-    nameEditor.setText(currentFixtureNode.getProperty(StateKeys::FixtureName, "Nuova Macchina").toString(), juce::dontSendNotification);
+    nameEditor.setText(currentFixtureNode.getProperty(StateKeys::FixtureName, "Nuovo Faro").toString(), juce::dontSendNotification);
 
-    // LEGGIAMO IL RUOLO (Se non c'è, mostriamo "NESSUNO")
-    roleEditor.setText(currentFixtureNode.getProperty(StateKeys::RoleName, "NESSUNO").toString(), juce::dontSendNotification);
+    // LEGGIAMO IL RUOLO DAL NOD0 E SINCRONIZZIAMO IL COMBOBOX
+    juce::String savedRole = currentFixtureNode.getProperty(StateKeys::RoleName, "").toString();
+    StageRoleCatalog::setComboSelectionFromRole(roleCombo, savedRole);
 
     startAddrSlider.setValue(currentFixtureNode.getProperty(StateKeys::StartAddress, 1), juce::dontSendNotification);
     chCountSlider.setValue(currentFixtureNode.getProperty(StateKeys::ChannelCount, 1), juce::dontSendNotification);
@@ -181,7 +203,8 @@ void FixtureEditorPanel::updateUIFromNode()
     // Aggiorna gli slider di mappatura
     for (size_t i = 0; i < availableParams.size(); ++i)
     {
-        auto key = StateKeys::getMappingKey(availableParams[i]);
+        auto key = StateKeys::getMappingKey(availableParams[static_cast<int>(i)]);
+        //auto key = StateKeys::getMappingKey(availableParams[i]);
         int val = currentFixtureNode.getProperty(key, 0); // 0 = Default non assegnato
         paramControls[i]->slider.setValue(val, juce::dontSendNotification);
     }
@@ -212,7 +235,7 @@ VenuePatchTab::VenuePatchTab(juce::ValueTree& state)
     addAndMakeVisible(fixtureList);
 
     // Configurazione Pulsanti
-    addFixtureBtn.setButtonText("+ Aggiungi Macchina");
+    addFixtureBtn.setButtonText("+ Aggiungi Faro");
     addFixtureBtn.setColour(juce::TextButton::buttonColourId, juce::Colour(0xff3a3a45));
     addFixtureBtn.onClick = [this] { addNewFixtureToState(); };
     addAndMakeVisible(addFixtureBtn);
@@ -286,7 +309,7 @@ void VenuePatchTab::paint(juce::Graphics& g)
     g.fillAll(juce::Colour(0xff1a1a1e));
 
     g.setColour(juce::Colour(0xff2a2a32));
-    float divX = getLocalBounds().proportionOfWidth(0.3f);
+    float divX = getLocalBounds().toFloat().proportionOfWidth(0.3f);
     g.fillRect(juce::Rectangle<float>(divX, 0.0f, 2.0f, static_cast<float>(getHeight())));
 }
 
@@ -317,10 +340,12 @@ void VenuePatchTab::addNewFixtureToState()
 {
     juce::ValueTree newFix(StateKeys::Fixture);
     int newIndex = venueNode.getNumChildren() + 1;
-    newFix.setProperty(StateKeys::FixtureName, "Nuova Macchina " + juce::String(newIndex), nullptr);
+    newFix.setProperty(StateKeys::FixtureName, "Nuovo Faro " + juce::String(newIndex), nullptr);
     newFix.setProperty(StateKeys::StartAddress, (newIndex - 1) * 10 + 1, nullptr);
     newFix.setProperty(StateKeys::ChannelCount, 8, nullptr); // Default: 8 Canali
-    newFix.setProperty(StateKeys::RoleName, "WASH_BACK", nullptr);
+
+    // Assegna subito il primo ruolo ufficiale del catalogo ("Aria: Wash Controluce (Fondale)")
+    newFix.setProperty(StateKeys::RoleName, StageRoleCatalog::getAllRoles()[0].displayName, nullptr);
 
     // Assegnazione di base per comodità (es. Wash classico cinese 7 canali)
     newFix.setProperty(StateKeys::getMappingKey("Dimmer"), 1, nullptr);
@@ -344,8 +369,8 @@ void VenuePatchTab::saveVenue()
         "*.venue"
     );
 
-    auto flags = juce::FileBrowserComponent::saveMode | juce::FileBrowserComponent::canSelectFiles;
-    fileChooser->launchAsync(flags, [this](const juce::FileChooser& fc) {
+    auto chooserFlags = juce::FileBrowserComponent::saveMode | juce::FileBrowserComponent::canSelectFiles;
+    fileChooser->launchAsync(chooserFlags, [this](const juce::FileChooser& fc) {
         auto file = fc.getResult();
         if (file != juce::File{})
         {
@@ -362,8 +387,8 @@ void VenuePatchTab::loadVenue()
         "*.venue"
     );
 
-    auto flags = juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles;
-    fileChooser->launchAsync(flags, [this](const juce::FileChooser& fc) {
+    auto chooserFlags = juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles;
+    fileChooser->launchAsync(chooserFlags, [this](const juce::FileChooser& fc) {
         auto file = fc.getResult();
         if (file != juce::File{})
         {
