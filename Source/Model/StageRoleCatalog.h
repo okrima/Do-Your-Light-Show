@@ -2,6 +2,8 @@
 #include <JuceHeader.h>
 #include <vector>
 
+#include "DataStateKeys.h"
+
 class StageRoleCatalog
 {
 public:
@@ -135,4 +137,76 @@ public:
 
         return Category::AirWashBack;
     }
+
+    struct StrobeHardwareSpec
+    {
+        int mode = 1;            // 0 = Nessuno (Solo Dimmer), 1 = Canale Separato, 2 = Condiviso con Dimmer
+        int dimmerMaxVal = 255;  // Limite superiore del Dimmer se mode == 2 (es. 134)
+        int openVal = 0;         // Valore DMX quando lo strobo e' spento (shutter aperto / no strobo)
+        int minVal = 20;         // Valore DMX inizio strobo lento
+        float minHz = 1.0f;      // Frequenza in Hz al valore minVal
+        int maxVal = 245;        // Valore DMX fine strobo veloce
+        float maxHz = 20.0f;     // Frequenza in Hz al valore maxVal
+        bool allowDimmerStrobe = true;
+
+        static StrobeHardwareSpec fromFixtureNode(const juce::ValueTree& fix)
+        {
+            StrobeHardwareSpec s;
+            if (!fix.isValid()) return s;
+
+            int dimCh = static_cast<int>(fix.getProperty(StateKeys::getMappingKey("Dimmer"), 0));
+            int strCh = static_cast<int>(fix.getProperty(StateKeys::getMappingKey("Strobe"), 0));
+
+            int defaultMode = (strCh > 0 && strCh == dimCh) ? 2 : (strCh > 0 ? 1 : 0);
+            s.mode = static_cast<int>(fix.getProperty(StateKeys::StrobeMode, defaultMode));
+            s.dimmerMaxVal = static_cast<int>(fix.getProperty(StateKeys::DimmerMaxVal, s.mode == 2 ? 134 : 255));
+            s.openVal = static_cast<int>(fix.getProperty(StateKeys::StrobeOpenVal, 0));
+            s.minVal = static_cast<int>(fix.getProperty(StateKeys::StrobeMinVal, s.mode == 2 ? 135 : 20));
+            s.minHz = static_cast<float>(static_cast<double>(fix.getProperty(StateKeys::StrobeMinHz, 1.0)));
+            s.maxVal = static_cast<int>(fix.getProperty(StateKeys::StrobeMaxVal, s.mode == 2 ? 239 : 245));
+            s.maxHz = static_cast<float>(static_cast<double>(fix.getProperty(StateKeys::StrobeMaxHz, 20.0)));
+            s.allowDimmerStrobe = static_cast<bool>(fix.getProperty(StateKeys::AllowDimmerStrobe, true));
+            return s;
+        }
+
+        // Converte una frequenza desiderata in Hz nel valore DMX esatto del faro
+        int hzToDmx(float targetHz) const
+        {
+            if (mode == 0 || targetHz <= 0.01f)
+                return openVal;
+
+            float lowHz = juce::jmin(minHz, maxHz);
+            float highHz = juce::jmax(minHz, maxHz);
+            float clampedHz = juce::jlimit(lowHz, highHz, targetHz);
+
+            float spanHz = juce::jmax(0.01f, maxHz - minHz);
+            float ratio = juce::jlimit(0.0f, 1.0f, (clampedHz - minHz) / spanHz);
+
+            int dmx = juce::roundToInt(static_cast<float>(minVal) + ratio * static_cast<float>(maxVal - minVal));
+            return juce::jlimit(0, 255, dmx);
+        }
+
+        // Converte un valore DMX (0..255) nella frequenza reale in Hz per il Simulatore 2D
+        float dmxToHz(int dmxVal) const
+        {
+            if (mode == 0)
+                return 0.0f;
+
+            int lowDmx = juce::jmin(minVal, maxVal);
+            int highDmx = juce::jmax(minVal, maxVal);
+            if (dmxVal < lowDmx || dmxVal > highDmx)
+                return 0.0f;
+
+            float spanDmx = static_cast<float>(juce::jmax(1, std::abs(maxVal - minVal)));
+            float ratio = static_cast<float>(std::abs(dmxVal - minVal)) / spanDmx;
+            return minHz + ratio * (maxHz - minHz);
+        }
+
+        // Scala un dimmer normale (0..255) nel range consentito (evita di sconfinare nello strobo se mode == 2)
+        int scaleNormalDimmer(int rawDimmer0to255) const
+        {
+            int maxOut = (mode == 2) ? juce::jlimit(1, 255, dimmerMaxVal) : 255;
+            return juce::roundToInt((static_cast<float>(juce::jlimit(0, 255, rawDimmer0to255)) / 255.0f) * static_cast<float>(maxOut));
+        }
+    };
 };

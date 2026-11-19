@@ -1,18 +1,34 @@
 #include "VenuePatchTab.h"
 
+namespace
+{
+    void configureCompactSlider(juce::Slider& s, double minV, double maxV, double stepV, int textW = 42)
+    {
+        s.setSliderStyle(juce::Slider::IncDecButtons);
+        s.setTextBoxStyle(juce::Slider::TextBoxLeft, false, textW, 20);
+        s.setRange(minV, maxV, stepV);
+    }
+
+    void configureFieldLabel(juce::Label& l, const juce::String& text)
+    {
+        l.setText(text, juce::dontSendNotification);
+        l.setFont(juce::FontOptions(12.5f));
+        l.setColour(juce::Label::textColourId, juce::Colours::lightgrey);
+    }
+}
+
 // =============================================================================
 // FixtureEditorPanel Implementation
 // =============================================================================
 FixtureEditorPanel::FixtureEditorPanel(juce::ValueTree& state) : appState(state)
 {
-    titleLabel.setText("Fixture Editor & Patch", juce::dontSendNotification);
-    titleLabel.setFont(juce::FontOptions(18.0f, juce::Font::bold));
+    titleLabel.setText("1. Configurazione & Calibrazione Faro", juce::dontSendNotification);
+    titleLabel.setFont(juce::FontOptions(16.5f, juce::Font::bold));
     titleLabel.setColour(juce::Label::textColourId, juce::Colour(0xff00d2ff));
     addAndMakeVisible(titleLabel);
 
-    // -- NOME --
-    nameLabel.setText("Nome Macchina:", juce::dontSendNotification);
-    nameLabel.setColour(juce::Label::textColourId, juce::Colours::lightgrey);
+    // -- NOME & RUOLO --
+    configureFieldLabel(nameLabel, "Nome Faro:");
     addAndMakeVisible(nameLabel);
 
     nameEditor.setColour(juce::TextEditor::backgroundColourId, juce::Colour(0xff2a2a32));
@@ -22,91 +38,224 @@ FixtureEditorPanel::FixtureEditorPanel(juce::ValueTree& state) : appState(state)
         };
     addAndMakeVisible(nameEditor);
 
-    // -- RUOLO --
-    roleLabel.setText("Ruolo/Gruppo:", juce::dontSendNotification);
-    roleLabel.setColour(juce::Label::textColourId, juce::Colours::lightgrey);
+    configureFieldLabel(roleLabel, "Categoria:");
     addAndMakeVisible(roleLabel);
-    
-    // 1. Popola il ComboBox con le 10 categorie fisiche ufficiali e abilita il testo modificabile
+
     StageRoleCatalog::populateComboBox(roleCombo, true);
-
-    // 2. Quando l'utente cambia ruolo dal menu (o preme Invio dopo aver scritto un sottogruppo),
-    //salva subito il valore dentro il nodo FIXTURE selezionato
-    roleCombo.onChange = [this]()
-        {
-            if (isUpdatingUI || !currentFixtureNode.isValid())
-                return;
-
-            // Sostituisci 'fixtureNode' col nome del tuo ValueTree del faro selezionato
-            currentFixtureNode.setProperty(StateKeys::RoleName, StageRoleCatalog::getRoleFromCombo(roleCombo), nullptr);
-            
+    roleCombo.onChange = [this]() {
+        if (isUpdatingUI || !currentFixtureNode.isValid())
+            return;
+        currentFixtureNode.setProperty(StateKeys::RoleName, StageRoleCatalog::getRoleFromCombo(roleCombo), nullptr);
         };
-
     roleCombo.setColour(juce::ComboBox::backgroundColourId, juce::Colour(0xff2a2a32));
     addAndMakeVisible(roleCombo);
 
-    // -- START DMX ADDRESS --
-    startAddrLabel.setText("Start DMX:", juce::dontSendNotification);
-    startAddrLabel.setColour(juce::Label::textColourId, juce::Colours::lightgrey);
+    // -- START DMX, TOTALE CANALI & QUANTITA' FISICA (STESSO INDIRIZZO DMX) --
+    configureFieldLabel(startAddrLabel, "Start DMX:");
     addAndMakeVisible(startAddrLabel);
-
-    startAddrSlider.setSliderStyle(juce::Slider::IncDecButtons);
-    startAddrSlider.setTextBoxStyle(juce::Slider::TextBoxLeft, false, 50, 20);
-    startAddrSlider.setRange(1, 512, 1);
+    configureCompactSlider(startAddrSlider, 1, 512, 1, 45);
     startAddrSlider.onValueChange = [this]() {
         if (currentFixtureNode.isValid() && !isUpdatingUI)
             currentFixtureNode.setProperty(StateKeys::StartAddress, static_cast<int>(startAddrSlider.getValue()), nullptr);
         };
     addAndMakeVisible(startAddrSlider);
 
-    // -- TOTAL CHANNELS --
-    chCountLabel.setText("Totale Canali:", juce::dontSendNotification);
-    chCountLabel.setColour(juce::Label::textColourId, juce::Colours::lightgrey);
+    configureFieldLabel(chCountLabel, "Tot. Canali:");
     addAndMakeVisible(chCountLabel);
-
-    chCountSlider.setSliderStyle(juce::Slider::IncDecButtons);
-    chCountSlider.setTextBoxStyle(juce::Slider::TextBoxLeft, false, 50, 20);
-    chCountSlider.setRange(1, 64, 1);
+    configureCompactSlider(chCountSlider, 1, 64, 1, 42);
     chCountSlider.onValueChange = [this]() {
         if (currentFixtureNode.isValid() && !isUpdatingUI)
             currentFixtureNode.setProperty(StateKeys::ChannelCount, static_cast<int>(chCountSlider.getValue()), nullptr);
         };
     addAndMakeVisible(chCountSlider);
 
-    // -- TITOLO MAPPATURA --
-    mapTitleLabel.setText("Mappatura Parametri (0 = Non Assegnato)", juce::dontSendNotification);
-    mapTitleLabel.setFont(juce::FontOptions(14.0f, juce::Font::bold));
+    configureFieldLabel(qtyLabel, "Quantita':");
+    addAndMakeVisible(qtyLabel);
+    configureCompactSlider(qtySlider, 1, 32, 1, 40);
+    qtySlider.setTooltip("Numero di fari fisici nel Simulatore/Light Case collegati a questo stesso indirizzo DMX");
+    qtySlider.onValueChange = [this]() {
+        if (currentFixtureNode.isValid() && !isUpdatingUI)
+        {
+            currentFixtureNode.setProperty(StateKeys::FixtureQuantity, static_cast<int>(qtySlider.getValue()), nullptr);
+            VenueUnitHelper::syncUnitsForFixture(currentFixtureNode);
+        }
+        };
+    addAndMakeVisible(qtySlider);
+
+    // -- MAPPATURA CANALI --
+    mapTitleLabel.setText("2. Mappatura Canali DMX (0 = Non Presente)", juce::dontSendNotification);
+    mapTitleLabel.setFont(juce::FontOptions(13.5f, juce::Font::bold));
     mapTitleLabel.setColour(juce::Label::textColourId, juce::Colours::orange);
     addAndMakeVisible(mapTitleLabel);
 
-    // -- GENERAZIONE DINAMICA MAPPATURA --
     availableParams = { "Dimmer", "Pan", "Tilt", "Red", "Green", "Blue", "White", "UV", "Strobe", "GeyserBlast" };
 
     for (const auto& param : availableParams)
     {
         auto ctrl = std::make_unique<ParamControl>();
-
-        ctrl->label.setText(param + " [Ch]:", juce::dontSendNotification);
-        ctrl->label.setColour(juce::Label::textColourId, juce::Colours::lightgrey);
+        configureFieldLabel(ctrl->label, param + " [Ch]:");
         addAndMakeVisible(ctrl->label);
 
-        ctrl->slider.setSliderStyle(juce::Slider::IncDecButtons);
-        ctrl->slider.setTextBoxStyle(juce::Slider::TextBoxLeft, false, 40, 20);
-        ctrl->slider.setRange(0, 64, 1); // 0 significa parametro ignorato/non presente nella macchina
-        ctrl->slider.setTooltip("Seleziona in quale canale (da 1 a Totale) si trova " + param);
-
-        // Listener personalizzato per ogni slider che salva la mappatura
+        configureCompactSlider(ctrl->slider, 0, 64, 1, 38);
         ctrl->slider.onValueChange = [this, param, sPtr = &ctrl->slider]() {
             if (currentFixtureNode.isValid() && !isUpdatingUI)
                 currentFixtureNode.setProperty(StateKeys::getMappingKey(param), static_cast<int>(sPtr->getValue()), nullptr);
             };
         addAndMakeVisible(ctrl->slider);
-
         paramControls.push_back(std::move(ctrl));
     }
 
+    // -- CALIBRAZIONE STROBO DI FABBRICA --
+    strobeSectionLabel.setText("3. Calibrazione Strobo Hardware & Frequenza (Hz)", juce::dontSendNotification);
+    strobeSectionLabel.setFont(juce::FontOptions(13.5f, juce::Font::bold));
+    strobeSectionLabel.setColour(juce::Label::textColourId, juce::Colour(0xff38bdf8));
+    addAndMakeVisible(strobeSectionLabel);
+
+    configureFieldLabel(strobeModeLabel, "Tipo Canale:");
+    addAndMakeVisible(strobeModeLabel);
+
+    strobeModeCombo.addItem("Nessuno (Usa solo Dimmer 0 / 255)", 1);
+    strobeModeCombo.addItem("Canale Strobo Separato (Shutter + Hz)", 2);
+    strobeModeCombo.addItem("Condiviso con Dimmer (Sub-Range + Hz)", 3);
+    strobeModeCombo.setColour(juce::ComboBox::backgroundColourId, juce::Colour(0xff2a2a32));
+    strobeModeCombo.onChange = [this]() {
+        if (isUpdatingUI || !currentFixtureNode.isValid()) return;
+        int mode = strobeModeCombo.getSelectedId() - 1; // 0, 1, 2
+        currentFixtureNode.setProperty(StateKeys::StrobeMode, mode, nullptr);
+
+        // Pre-imposta valori tipici sensati al cambio modalita'
+        if (mode == 2) // Condiviso con Dimmer (es. 0-134 Dimmer, 135-239 Strobo)
+        {
+            int dimCh = static_cast<int>(currentFixtureNode.getProperty(StateKeys::getMappingKey("Dimmer"), 1));
+            if (dimCh > 0)
+                currentFixtureNode.setProperty(StateKeys::getMappingKey("Strobe"), dimCh, nullptr);
+            if (static_cast<int>(currentFixtureNode.getProperty(StateKeys::DimmerMaxVal, 255)) == 255)
+                currentFixtureNode.setProperty(StateKeys::DimmerMaxVal, 134, nullptr);
+            if (static_cast<int>(currentFixtureNode.getProperty(StateKeys::StrobeMinVal, 20)) < 100)
+                currentFixtureNode.setProperty(StateKeys::StrobeMinVal, 135, nullptr);
+        }
+        updateUIFromNode();
+        };
+    addAndMakeVisible(strobeModeCombo);
+
+    configureFieldLabel(dimmerOrOpenLabel, "DMX Luce Fissa:");
+    addAndMakeVisible(dimmerOrOpenLabel);
+    configureCompactSlider(dimmerOrOpenSlider, 0, 255, 1, 40);
+    dimmerOrOpenSlider.onValueChange = [this]() {
+        if (isUpdatingUI || !currentFixtureNode.isValid()) return;
+        int mode = static_cast<int>(currentFixtureNode.getProperty(StateKeys::StrobeMode, 1));
+        int val = static_cast<int>(dimmerOrOpenSlider.getValue());
+        if (mode == 2)
+            currentFixtureNode.setProperty(StateKeys::DimmerMaxVal, val, nullptr);
+        else
+            currentFixtureNode.setProperty(StateKeys::StrobeOpenVal, val, nullptr);
+        };
+    addAndMakeVisible(dimmerOrOpenSlider);
+
+    allowDimmerStrobeToggle.setButtonText("Consenti anche Flash Dimmer 0/255");
+    allowDimmerStrobeToggle.setColour(juce::ToggleButton::textColourId, juce::Colours::lightgrey);
+    allowDimmerStrobeToggle.onClick = [this]() {
+        if (currentFixtureNode.isValid() && !isUpdatingUI)
+            currentFixtureNode.setProperty(StateKeys::AllowDimmerStrobe, allowDimmerStrobeToggle.getToggleState(), nullptr);
+        };
+    addAndMakeVisible(allowDimmerStrobeToggle);
+
+    configureFieldLabel(strobeStartDmxLabel, "Start DMX:");
+    configureFieldLabel(strobeStartHzLabel, "Start Hz:");
+    configureFieldLabel(strobeEndDmxLabel, "End DMX:");
+    configureFieldLabel(strobeEndHzLabel, "End Hz:");
+    addAndMakeVisible(strobeStartDmxLabel); addAndMakeVisible(strobeStartHzLabel);
+    addAndMakeVisible(strobeEndDmxLabel);   addAndMakeVisible(strobeEndHzLabel);
+
+    configureCompactSlider(strobeStartDmxSlider, 0, 255, 1, 40);
+    configureCompactSlider(strobeEndDmxSlider, 0, 255, 1, 40);
+
+    strobeStartHzSlider.setSliderStyle(juce::Slider::IncDecButtons);
+    strobeStartHzSlider.setTextBoxStyle(juce::Slider::TextBoxLeft, false, 46, 20);
+    strobeStartHzSlider.setRange(0.5, 50.0, 0.5);
+    strobeStartHzSlider.setTextValueSuffix(" Hz");
+
+    strobeEndHzSlider.setSliderStyle(juce::Slider::IncDecButtons);
+    strobeEndHzSlider.setTextBoxStyle(juce::Slider::TextBoxLeft, false, 46, 20);
+    strobeEndHzSlider.setRange(0.5, 50.0, 0.5);
+    strobeEndHzSlider.setTextValueSuffix(" Hz");
+
+    strobeStartDmxSlider.onValueChange = [this]() {
+        if (currentFixtureNode.isValid() && !isUpdatingUI)
+            currentFixtureNode.setProperty(StateKeys::StrobeMinVal, static_cast<int>(strobeStartDmxSlider.getValue()), nullptr);
+        };
+    strobeStartHzSlider.onValueChange = [this]() {
+        if (currentFixtureNode.isValid() && !isUpdatingUI)
+            currentFixtureNode.setProperty(StateKeys::StrobeMinHz, strobeStartHzSlider.getValue(), nullptr);
+        };
+    strobeEndDmxSlider.onValueChange = [this]() {
+        if (currentFixtureNode.isValid() && !isUpdatingUI)
+            currentFixtureNode.setProperty(StateKeys::StrobeMaxVal, static_cast<int>(strobeEndDmxSlider.getValue()), nullptr);
+        };
+    strobeEndHzSlider.onValueChange = [this]() {
+        if (currentFixtureNode.isValid() && !isUpdatingUI)
+            currentFixtureNode.setProperty(StateKeys::StrobeMaxHz, strobeEndHzSlider.getValue(), nullptr);
+        };
+
+    addAndMakeVisible(strobeStartDmxSlider); addAndMakeVisible(strobeStartHzSlider);
+    addAndMakeVisible(strobeEndDmxSlider);   addAndMakeVisible(strobeEndHzSlider);
+
+    // -- CALIBRAZIONE PAN / TILT (HOME, OFFSET, RANGE) --
+    ptSectionLabel.setText("4. Posizione a Riposo (Home), Offset & Range Pan/Tilt", juce::dontSendNotification);
+    ptSectionLabel.setFont(juce::FontOptions(13.5f, juce::Font::bold));
+    ptSectionLabel.setColour(juce::Label::textColourId, juce::Colour(0xffa78bfa));
+    addAndMakeVisible(ptSectionLabel);
+
+    configureFieldLabel(panHomeLabel, "Pan Home:");
+    configureFieldLabel(tiltHomeLabel, "Tilt Home:");
+    configureFieldLabel(panOffsetLabel, "Pan Offset:");
+    configureFieldLabel(tiltOffsetLabel, "Tilt Offset:");
+    configureFieldLabel(panRangeLabel, "Pan Range:");
+    configureFieldLabel(tiltRangeLabel, "Tilt Range:");
+
+    addAndMakeVisible(panHomeLabel);    addAndMakeVisible(tiltHomeLabel);
+    addAndMakeVisible(panOffsetLabel);  addAndMakeVisible(tiltOffsetLabel);
+    addAndMakeVisible(panRangeLabel);   addAndMakeVisible(tiltRangeLabel);
+
+    configureCompactSlider(panHomeSlider, 0, 255, 1, 38);
+    configureCompactSlider(tiltHomeSlider, 0, 255, 1, 38);
+    configureCompactSlider(panOffsetSlider, -127, 127, 1, 38);
+    configureCompactSlider(tiltOffsetSlider, -127, 127, 1, 38);
+    configureCompactSlider(panRangeSlider, 10, 255, 1, 38);
+    configureCompactSlider(tiltRangeSlider, 10, 255, 1, 38);
+
+    panHomeSlider.onValueChange = [this]() {
+        if (currentFixtureNode.isValid() && !isUpdatingUI)
+            currentFixtureNode.setProperty(StateKeys::PanHome, static_cast<int>(panHomeSlider.getValue()), nullptr);
+        };
+    tiltHomeSlider.onValueChange = [this]() {
+        if (currentFixtureNode.isValid() && !isUpdatingUI)
+            currentFixtureNode.setProperty(StateKeys::TiltHome, static_cast<int>(tiltHomeSlider.getValue()), nullptr);
+        };
+    panOffsetSlider.onValueChange = [this]() {
+        if (currentFixtureNode.isValid() && !isUpdatingUI)
+            currentFixtureNode.setProperty(StateKeys::PanOffset, static_cast<int>(panOffsetSlider.getValue()), nullptr);
+        };
+    tiltOffsetSlider.onValueChange = [this]() {
+        if (currentFixtureNode.isValid() && !isUpdatingUI)
+            currentFixtureNode.setProperty(StateKeys::TiltOffset, static_cast<int>(tiltOffsetSlider.getValue()), nullptr);
+        };
+    panRangeSlider.onValueChange = [this]() {
+        if (currentFixtureNode.isValid() && !isUpdatingUI)
+            currentFixtureNode.setProperty(StateKeys::PanRange, static_cast<int>(panRangeSlider.getValue()), nullptr);
+        };
+    tiltRangeSlider.onValueChange = [this]() {
+        if (currentFixtureNode.isValid() && !isUpdatingUI)
+            currentFixtureNode.setProperty(StateKeys::TiltRange, static_cast<int>(tiltRangeSlider.getValue()), nullptr);
+        };
+
+    addAndMakeVisible(panHomeSlider);   addAndMakeVisible(tiltHomeSlider);
+    addAndMakeVisible(panOffsetSlider); addAndMakeVisible(tiltOffsetSlider);
+    addAndMakeVisible(panRangeSlider);  addAndMakeVisible(tiltRangeSlider);
+
     setVisible(false);
 }
+
 FixtureEditorPanel::~FixtureEditorPanel()
 {
     if (currentFixtureNode.isValid())
@@ -115,75 +264,146 @@ FixtureEditorPanel::~FixtureEditorPanel()
 
 void FixtureEditorPanel::setFixtureNode(juce::ValueTree fixtureNode)
 {
-    if (currentFixtureNode.isValid()) currentFixtureNode.removeListener(this);
+    if (currentFixtureNode.isValid())
+        currentFixtureNode.removeListener(this);
+
     currentFixtureNode = fixtureNode;
 
-    if (currentFixtureNode.isValid()) {
+    if (currentFixtureNode.isValid())
+    {
+        VenueUnitHelper::syncUnitsForFixture(currentFixtureNode);
         roleCombo.setEnabled(true);
-        // Legge il ruolo salvato nel ValueTree e seleziona la voce corrispondente nel ComboBox
-        juce::String savedRole = fixtureNode.getProperty(StateKeys::RoleName, "").toString();
-        StageRoleCatalog::setComboSelectionFromRole(roleCombo, savedRole);
-
         currentFixtureNode.addListener(this);
         updateUIFromNode();
         setVisible(true);
     }
-    else {
-        // Nessun faro selezionato: disabilita il menu
+    else
+    {
         roleCombo.setEnabled(false);
         roleCombo.setText("", juce::dontSendNotification);
         setVisible(false);
     }
 }
 
+void FixtureEditorPanel::paint(juce::Graphics& g)
+{
+    g.fillAll(juce::Colour(0xff18181f));
+}
+
 void FixtureEditorPanel::resized()
 {
-    auto bounds = getLocalBounds().reduced(15);
+    auto bounds = getLocalBounds().reduced(12, 10);
 
-    titleLabel.setBounds(bounds.removeFromTop(30));
-    bounds.removeFromTop(10);
+    titleLabel.setBounds(bounds.removeFromTop(24));
+    bounds.removeFromTop(6);
 
-    // Impaginazione Base (Nome, Start, Totale)
+    // Riga 1: Nome + Categoria
     auto row1 = bounds.removeFromTop(24);
-    nameLabel.setBounds(row1.removeFromLeft(100));
-    nameEditor.setBounds(row1.removeFromLeft(150));
+    nameLabel.setBounds(row1.removeFromLeft(75));
+    nameEditor.setBounds(row1.removeFromLeft(135));
+    row1.removeFromLeft(10);
+    roleLabel.setBounds(row1.removeFromLeft(68));
+    roleCombo.setBounds(row1);
 
-    bounds.removeFromTop(10);
-    auto rowRole = bounds.removeFromTop(24);
-    roleLabel.setBounds(rowRole.removeFromLeft(100));
-    roleCombo.setBounds(rowRole.removeFromLeft(200));
+    bounds.removeFromTop(6);
 
-    bounds.removeFromTop(10);
-    auto row2 = bounds.removeFromTop(24);
+    // Riga 2: Start DMX + Tot. Canali + Quantita' (Simulatore)
+    auto rowDmx = bounds.removeFromTop(24);
+    startAddrLabel.setBounds(rowDmx.removeFromLeft(70));
+    startAddrSlider.setBounds(rowDmx.removeFromLeft(90));
+    rowDmx.removeFromLeft(8);
+    chCountLabel.setBounds(rowDmx.removeFromLeft(72));
+    chCountSlider.setBounds(rowDmx.removeFromLeft(85));
+    rowDmx.removeFromLeft(8);
+    qtyLabel.setBounds(rowDmx.removeFromLeft(65));
+    qtySlider.setBounds(rowDmx.removeFromLeft(85));
 
-    // AUMENTATO LO SPAZIO DEGLI SLIDER DA 80 A 110 PER MOSTRARE IL SIMBOLO "+"
-    startAddrLabel.setBounds(row2.removeFromLeft(90));
-    startAddrSlider.setBounds(row2.removeFromLeft(110));
+    bounds.removeFromTop(12);
+    mapTitleLabel.setBounds(bounds.removeFromTop(20));
+    bounds.removeFromTop(4);
 
-    row2.removeFromLeft(20); // Spaziatura centrale
-    chCountLabel.setBounds(row2.removeFromLeft(100));
-    chCountSlider.setBounds(row2.removeFromLeft(110));
-
-    bounds.removeFromTop(20);
-    mapTitleLabel.setBounds(bounds.removeFromTop(24));
-    bounds.removeFromTop(10);
-
-    // Impaginazione Mappatura a Griglia (2 Colonne)
-    auto gridBounds = bounds.removeFromTop(160);
+    // Griglia Mappatura (2 Colonne x 5 Righe)
+    auto gridBounds = bounds.removeFromTop(135);
     int colWidth = gridBounds.getWidth() / 2;
-    int rowHeight = 28;
-
+    int rowHeight = 26;
     int count = static_cast<int>(paramControls.size());
 
-    for (size_t i = 0; i < count; ++i)
+    for (int i = 0; i < count; ++i)
     {
         int col = i % 2;
-        int row = static_cast<int>(i / 2);
-        auto cell = gridBounds.withTrimmedLeft(col * colWidth).withWidth(colWidth).withTrimmedTop(row * rowHeight).withHeight(rowHeight);
+        int row = i / 2;
+        auto cell = gridBounds.withTrimmedLeft(col * colWidth).withWidth(colWidth)
+            .withTrimmedTop(row * rowHeight).withHeight(rowHeight);
 
-        paramControls[i]->label.setBounds(cell.removeFromLeft(100));
-        paramControls[i]->slider.setBounds(cell.removeFromLeft(70));
+        paramControls[static_cast<size_t>(i)]->label.setBounds(cell.removeFromLeft(95));
+        paramControls[static_cast<size_t>(i)]->slider.setBounds(cell.removeFromLeft(85));
     }
+
+	// Riga Strobo
+    bounds.removeFromTop(10);
+    strobeSectionLabel.setBounds(bounds.removeFromTop(20));
+    bounds.removeFromTop(4);
+
+    // Riga Strobo 1: Tipo Canale (Nessuno / Separato / Condiviso con Dimmer)
+    auto sRow1 = bounds.removeFromTop(24);
+    strobeModeLabel.setBounds(sRow1.removeFromLeft(80));
+    strobeModeCombo.setBounds(sRow1);
+
+    bounds.removeFromTop(4);
+
+    // Riga Strobo 2: Max Dimmer (se condiviso) o DMX Luce Fissa (se separato) + Toggle Flash Dimmer
+    auto sRow2 = bounds.removeFromTop(24);
+    dimmerOrOpenLabel.setBounds(sRow2.removeFromLeft(110));
+    dimmerOrOpenSlider.setBounds(sRow2.removeFromLeft(88));
+    sRow2.removeFromLeft(8);
+    allowDimmerStrobeToggle.setBounds(sRow2);
+
+    bounds.removeFromTop(4);
+
+    // Riga Strobo 3: Start DMX + Start Hz
+    int halfStrobeW = bounds.getWidth() / 2;
+    auto sRow3 = bounds.removeFromTop(24);
+    auto sr3L = sRow3.removeFromLeft(halfStrobeW);
+    strobeStartDmxLabel.setBounds(sr3L.removeFromLeft(75));
+    strobeStartDmxSlider.setBounds(sr3L.removeFromLeft(90));
+    strobeStartHzLabel.setBounds(sRow3.removeFromLeft(65));
+    strobeStartHzSlider.setBounds(sRow3.removeFromLeft(105));
+
+    bounds.removeFromTop(4);
+
+    // Riga Strobo 4: End DMX + End Hz
+    auto sRow4 = bounds.removeFromTop(24);
+    auto sr4L = sRow4.removeFromLeft(halfStrobeW);
+    strobeEndDmxLabel.setBounds(sr4L.removeFromLeft(75));
+    strobeEndDmxSlider.setBounds(sr4L.removeFromLeft(90));
+    strobeEndHzLabel.setBounds(sRow4.removeFromLeft(65));
+    strobeEndHzSlider.setBounds(sRow4.removeFromLeft(105));
+
+    // Griglia Pan/Tilt (3 righe: Home, Offset, Range)
+    int halfW = bounds.getWidth() / 2;
+
+    auto ptRow1 = bounds.removeFromTop(24);
+    auto p1L = ptRow1.removeFromLeft(halfW);
+    panHomeLabel.setBounds(p1L.removeFromLeft(80));
+    panHomeSlider.setBounds(p1L.removeFromLeft(90));
+    tiltHomeLabel.setBounds(ptRow1.removeFromLeft(80));
+    tiltHomeSlider.setBounds(ptRow1.removeFromLeft(90));
+
+    bounds.removeFromTop(4);
+    auto ptRow2 = bounds.removeFromTop(24);
+    auto p2L = ptRow2.removeFromLeft(halfW);
+    panOffsetLabel.setBounds(p2L.removeFromLeft(80));
+    panOffsetSlider.setBounds(p2L.removeFromLeft(90));
+    tiltOffsetLabel.setBounds(ptRow2.removeFromLeft(80));
+    tiltOffsetSlider.setBounds(ptRow2.removeFromLeft(90));
+
+    bounds.removeFromTop(4);
+    auto ptRow3 = bounds.removeFromTop(24);
+    auto p3L = ptRow3.removeFromLeft(halfW);
+    panRangeLabel.setBounds(p3L.removeFromLeft(80));
+    panRangeSlider.setBounds(p3L.removeFromLeft(90));
+    tiltRangeLabel.setBounds(ptRow3.removeFromLeft(80));
+    tiltRangeSlider.setBounds(ptRow3.removeFromLeft(90));
 }
 
 void FixtureEditorPanel::updateUIFromNode()
@@ -193,21 +413,58 @@ void FixtureEditorPanel::updateUIFromNode()
 
     nameEditor.setText(currentFixtureNode.getProperty(StateKeys::FixtureName, "Nuovo Faro").toString(), juce::dontSendNotification);
 
-    // LEGGIAMO IL RUOLO DAL NOD0 E SINCRONIZZIAMO IL COMBOBOX
     juce::String savedRole = currentFixtureNode.getProperty(StateKeys::RoleName, "").toString();
     StageRoleCatalog::setComboSelectionFromRole(roleCombo, savedRole);
 
-    startAddrSlider.setValue(currentFixtureNode.getProperty(StateKeys::StartAddress, 1), juce::dontSendNotification);
-    chCountSlider.setValue(currentFixtureNode.getProperty(StateKeys::ChannelCount, 1), juce::dontSendNotification);
+    startAddrSlider.setValue(static_cast<double>(currentFixtureNode.getProperty(StateKeys::StartAddress, 1)), juce::dontSendNotification);
+    chCountSlider.setValue(static_cast<double>(currentFixtureNode.getProperty(StateKeys::ChannelCount, 8)), juce::dontSendNotification);
+    qtySlider.setValue(static_cast<double>(currentFixtureNode.getProperty(StateKeys::FixtureQuantity, 1)), juce::dontSendNotification);
 
-    // Aggiorna gli slider di mappatura
-    for (size_t i = 0; i < availableParams.size(); ++i)
+    for (int i = 0; i < availableParams.size(); ++i)
     {
-        auto key = StateKeys::getMappingKey(availableParams[static_cast<int>(i)]);
-        //auto key = StateKeys::getMappingKey(availableParams[i]);
-        int val = currentFixtureNode.getProperty(key, 0); // 0 = Default non assegnato
-        paramControls[i]->slider.setValue(val, juce::dontSendNotification);
+        auto key = StateKeys::getMappingKey(availableParams[i]);
+        int val = static_cast<int>(currentFixtureNode.getProperty(key, 0));
+        paramControls[static_cast<size_t>(i)]->slider.setValue(static_cast<double>(val), juce::dontSendNotification);
     }
+
+    auto spec = StageRoleCatalog::StrobeHardwareSpec::fromFixtureNode(currentFixtureNode);
+    strobeModeCombo.setSelectedId(spec.mode + 1, juce::dontSendNotification);
+
+    bool hasHwStrobe = (spec.mode != 0);
+    if (spec.mode == 2)
+    {
+        dimmerOrOpenLabel.setText("Max Dimmer DMX:", juce::dontSendNotification);
+        dimmerOrOpenSlider.setValue(spec.dimmerMaxVal, juce::dontSendNotification);
+    }
+    else
+    {
+        dimmerOrOpenLabel.setText("DMX Luce Fissa:", juce::dontSendNotification);
+        dimmerOrOpenSlider.setValue(spec.openVal, juce::dontSendNotification);
+    }
+
+    dimmerOrOpenLabel.setEnabled(hasHwStrobe);
+    dimmerOrOpenSlider.setEnabled(hasHwStrobe);
+    strobeStartDmxLabel.setEnabled(hasHwStrobe);
+    strobeStartDmxSlider.setEnabled(hasHwStrobe);
+    strobeStartHzLabel.setEnabled(hasHwStrobe);
+    strobeStartHzSlider.setEnabled(hasHwStrobe);
+    strobeEndDmxLabel.setEnabled(hasHwStrobe);
+    strobeEndDmxSlider.setEnabled(hasHwStrobe);
+    strobeEndHzLabel.setEnabled(hasHwStrobe);
+    strobeEndHzSlider.setEnabled(hasHwStrobe);
+
+    strobeStartDmxSlider.setValue(spec.minVal, juce::dontSendNotification);
+    strobeStartHzSlider.setValue(spec.minHz, juce::dontSendNotification);
+    strobeEndDmxSlider.setValue(spec.maxVal, juce::dontSendNotification);
+    strobeEndHzSlider.setValue(spec.maxHz, juce::dontSendNotification);
+    allowDimmerStrobeToggle.setToggleState(spec.allowDimmerStrobe, juce::dontSendNotification);
+
+    panHomeSlider.setValue(static_cast<double>(currentFixtureNode.getProperty(StateKeys::PanHome, 128)), juce::dontSendNotification);
+    tiltHomeSlider.setValue(static_cast<double>(currentFixtureNode.getProperty(StateKeys::TiltHome, 90)), juce::dontSendNotification);
+    panOffsetSlider.setValue(static_cast<double>(currentFixtureNode.getProperty(StateKeys::PanOffset, 0)), juce::dontSendNotification);
+    tiltOffsetSlider.setValue(static_cast<double>(currentFixtureNode.getProperty(StateKeys::TiltOffset, 0)), juce::dontSendNotification);
+    panRangeSlider.setValue(static_cast<double>(currentFixtureNode.getProperty(StateKeys::PanRange, 120)), juce::dontSendNotification);
+    tiltRangeSlider.setValue(static_cast<double>(currentFixtureNode.getProperty(StateKeys::TiltRange, 90)), juce::dontSendNotification);
 }
 
 void FixtureEditorPanel::valueTreePropertyChanged(juce::ValueTree&, const juce::Identifier&)
@@ -216,17 +473,692 @@ void FixtureEditorPanel::valueTreePropertyChanged(juce::ValueTree&, const juce::
 }
 
 // =============================================================================
+// StagePatchAndCasePanel Implementation ("Light Case" + Smart Masking Stage)
+// =============================================================================
+StagePatchAndCasePanel::StagePatchAndCasePanel(juce::ValueTree& state) : appState(state)
+{
+    // Ascolta appState direttamente: intercetta creazione VENUE, nuovi fari, rinomine e Load Venue
+    appState.addListener(this);
+
+    venueNode = appState.getChildWithName(StateKeys::VenueNode);
+    if (venueNode.isValid())
+        venueNode.addListener(this);
+
+    autoPlaceBtn.setButtonText("Piazza Tutto Auto");
+    autoPlaceBtn.setColour(juce::TextButton::buttonColourId, juce::Colour(0xff1e3a5f));
+    autoPlaceBtn.onClick = [this]() { autoPlaceAllUnits(); };
+    addAndMakeVisible(autoPlaceBtn);
+
+    clearStageBtn.setButtonText("Rimetti Tutto nel Case");
+    clearStageBtn.setColour(juce::TextButton::buttonColourId, juce::Colour(0xff3f2e3e));
+    clearStageBtn.onClick = [this]() { returnAllUnitsToCase(); };
+    addAndMakeVisible(clearStageBtn);
+
+    rebuildUnitCache();
+}
+
+StagePatchAndCasePanel::~StagePatchAndCasePanel()
+{
+    appState.removeListener(this);
+
+    if (venueNode.isValid())
+        venueNode.removeListener(this);
+}
+
+void StagePatchAndCasePanel::handleVenueTreeChange(const juce::ValueTree& tree)
+{
+    if (isRebuilding)
+        return;
+
+    if (tree.hasType(StateKeys::VenueNode) ||
+        tree.hasType(StateKeys::Fixture) ||
+        tree.hasType(StateKeys::FixtureUnit))
+    {
+        rebuildUnitCache();
+        repaint();
+    }
+}
+
+void StagePatchAndCasePanel::valueTreePropertyChanged(juce::ValueTree& tree, const juce::Identifier&)
+{
+    handleVenueTreeChange(tree);
+}
+
+void StagePatchAndCasePanel::valueTreeChildAdded(juce::ValueTree& parent, juce::ValueTree& child)
+{
+    handleVenueTreeChange(child.hasType(StateKeys::VenueNode) ? child : parent);
+}
+
+void StagePatchAndCasePanel::valueTreeChildRemoved(juce::ValueTree& parent, juce::ValueTree& child, int)
+{
+    handleVenueTreeChange(child.hasType(StateKeys::VenueNode) ? child : parent);
+}
+
+void StagePatchAndCasePanel::valueTreeChildOrderChanged(juce::ValueTree& parent, int, int)
+{
+    handleVenueTreeChange(parent);
+}
+
+StagePatchAndCasePanel::ValidZone StagePatchAndCasePanel::getValidZoneForCategory(StageRoleCatalog::Category cat)
+{
+    using Cat = StageRoleCatalog::Category;
+    switch (cat)
+    {
+    case Cat::AirWashBack:
+    case Cat::AirParFront:
+    case Cat::AirMovingBeam:
+    case Cat::ImpactBlinder:
+    case Cat::ImpactStrobe:
+        return ValidZone::AirTruss;
+
+    case Cat::FloorSideWash:
+        return ValidZone::SideWings;
+
+    case Cat::FloorBackSilhouette:
+    case Cat::FloorMovingBeam:
+    case Cat::FxGeyserBurst:
+    case Cat::FxSmokeHazer:
+        return ValidZone::FloorStage;
+    }
+    return ValidZone::AirTruss;
+}
+
+void StagePatchAndCasePanel::resized()
+{
+    auto b = getLocalBounds().toFloat().reduced(8.0f);
+
+    auto topHeader = getLocalBounds().removeFromTop(32).reduced(14, 4);
+    clearStageBtn.setBounds(topHeader.removeFromRight(155));
+    topHeader.removeFromRight(6);
+    autoPlaceBtn.setBounds(topHeader.removeFromRight(135));
+
+    lightCaseArea = b.removeFromTop(118.0f);
+    b.removeFromTop(8.0f);
+    stageCanvasArea = b;
+
+    float sx = stageCanvasArea.getX() + 12.0f;
+    float sy = stageCanvasArea.getY() + 30.0f;
+    float sw = stageCanvasArea.getWidth() - 24.0f;
+    float sh = stageCanvasArea.getHeight() - 42.0f;
+
+    airZoneRect = juce::Rectangle<float>(sx + sw * 0.10f, sy + sh * 0.04f, sw * 0.80f, sh * 0.22f);
+    floorZoneRect = juce::Rectangle<float>(sx + sw * 0.12f, sy + sh * 0.68f, sw * 0.76f, sh * 0.26f);
+    leftWingRect = juce::Rectangle<float>(sx + sw * 0.01f, sy + sh * 0.28f, sw * 0.10f, sh * 0.64f);
+    rightWingRect = juce::Rectangle<float>(sx + sw * 0.89f, sy + sh * 0.28f, sw * 0.10f, sh * 0.64f);
+
+    rebuildUnitCache();
+}
+
+void StagePatchAndCasePanel::rebuildUnitCache()
+{
+    if (isRebuilding)
+        return;
+
+    juce::ScopedValueSetter<bool> guard(isRebuilding, true);
+
+    unplacedUnits.clear();
+    placedUnits.clear();
+
+    venueNode = appState.getChildWithName(StateKeys::VenueNode);
+    if (!venueNode.isValid())
+        return;
+
+    VenueUnitHelper::ensureVenueUnitsInitialized(venueNode);
+
+    for (int f = 0; f < venueNode.getNumChildren(); ++f)
+    {
+        auto fix = venueNode.getChild(f);
+        if (!fix.hasType(StateKeys::Fixture))
+            continue;
+
+        juce::String baseName = fix.getProperty(StateKeys::FixtureName, "Faro").toString();
+        juce::String roleName = fix.getProperty(StateKeys::RoleName, "").toString();
+        auto cat = StageRoleCatalog::classifyRole(roleName, baseName);
+
+        // Tutte le unita' fisiche di questo faro condividono lo stesso identico StartAddress DMX
+        int sharedDmxAddr = static_cast<int>(fix.getProperty(StateKeys::StartAddress, 1));
+
+        int unitCounter = 0;
+        for (int u = 0; u < fix.getNumChildren(); ++u)
+        {
+            auto unitNode = fix.getChild(u);
+            if (!unitNode.hasType(StateKeys::FixtureUnit))
+                continue;
+
+            ++unitCounter;
+            VisualUnitItem item;
+            item.fixtureIdx = f;
+            item.unitIdxInChild = u;
+            item.unitNumber = unitCounter;
+            item.dmxAddress = sharedDmxAddr;
+            item.label = baseName + " #" + juce::String(unitCounter);
+            item.roleName = roleName;
+            item.category = cat;
+            item.isPlaced = static_cast<bool>(unitNode.getProperty(StateKeys::IsPlaced, false));
+            item.unitNode = unitNode;
+
+            if (item.isPlaced)
+            {
+                float normX = static_cast<float>(static_cast<double>(unitNode.getProperty(StateKeys::PosX, 0.5)));
+                float normY = static_cast<float>(static_cast<double>(unitNode.getProperty(StateKeys::PosY, 0.15)));
+                float px = stageCanvasArea.getX() + normX * stageCanvasArea.getWidth();
+                float py = stageCanvasArea.getY() + normY * stageCanvasArea.getHeight();
+                item.screenBounds = juce::Rectangle<float>(px - 26.0f, py - 16.0f, 52.0f, 32.0f);
+                placedUnits.push_back(item);
+            }
+            else
+            {
+                unplacedUnits.push_back(item);
+            }
+        }
+    }
+
+    float caseX = lightCaseArea.getX() + 10.0f;
+    float caseY = lightCaseArea.getY() + 32.0f;
+    float tileW = 86.0f;
+    float tileH = 36.0f;
+    float gap = 6.0f;
+    float maxRight = lightCaseArea.getRight() - 10.0f;
+
+    for (auto& item : unplacedUnits)
+    {
+        if (caseX + tileW > maxRight)
+        {
+            caseX = lightCaseArea.getX() + 10.0f;
+            caseY += tileH + gap;
+        }
+        item.screenBounds = juce::Rectangle<float>(caseX, caseY, tileW, tileH);
+        caseX += tileW + gap;
+    }
+}
+
+void StagePatchAndCasePanel::paint(juce::Graphics& g)
+{
+    g.fillAll(juce::Colour(0xff12131a));
+
+    // --- 1. DISEGNO BOX "LIGHT CASE" ---
+    g.setColour(juce::Colour(0xff1c1e29));
+    g.fillRoundedRectangle(lightCaseArea, 6.0f);
+    g.setColour(juce::Colour(0xff38bdf8).withAlpha(0.5f));
+    g.drawRoundedRectangle(lightCaseArea, 6.0f, 1.5f);
+
+    g.setColour(juce::Colour(0xff38bdf8));
+    g.setFont(juce::FontOptions(14.0f, juce::Font::bold));
+    g.drawText("LIGHT CASE (Trascina le luci sul Palco)",
+        static_cast<int>(lightCaseArea.getX() + 12.0f),
+        static_cast<int>(lightCaseArea.getY() + 6.0f),
+        340, 22, juce::Justification::centredLeft, true);
+
+    auto drawUnitTile = [&](const auto& item, const juce::Rectangle<float>& tileRect, juce::Colour zoneCol)
+        {
+            const bool hasSelection = (selectedFixtureIdx >= 0);
+            const bool isSelectedGroup = (hasSelection && item.fixtureIdx == selectedFixtureIdx);
+            const float contentAlpha = (hasSelection && !isSelectedGroup) ? 0.55f : 1.0f;
+
+            if (isSelectedGroup)
+            {
+                g.setColour(juce::Colour(0xfffacc15).withAlpha(0.28f));
+                g.fillRoundedRectangle(tileRect.expanded(3.5f), 7.0f);
+            }
+
+            // Sfondo sempre opaco (100%) per non far trasparire le scritte delle zone sottostanti
+            g.setColour(isSelectedGroup ? juce::Colour(0xff2b3146)
+                : (hasSelection ? juce::Colour(0xff151924) : juce::Colour(0xff1e2436)));
+            g.fillRoundedRectangle(tileRect, 5.0f);
+
+            g.setColour(isSelectedGroup ? juce::Colour(0xfffacc15) : zoneCol.withAlpha(contentAlpha));
+            g.drawRoundedRectangle(tileRect, 5.0f, isSelectedGroup ? 2.4f : 1.3f);
+
+            g.setColour((isSelectedGroup ? juce::Colour(0xfffef08a) : juce::Colours::white).withAlpha(contentAlpha));
+            g.setFont(juce::FontOptions(11.0f, juce::Font::bold));
+            g.drawText(item.label, tileRect.withHeight(18.0f).reduced(3.0f, 1.0f),
+                juce::Justification::centred, true);
+
+            g.setColour((isSelectedGroup ? juce::Colour(0xfffde047) : zoneCol.brighter(0.3f)).withAlpha(contentAlpha));
+            g.setFont(juce::FontOptions(9.5f));
+            g.drawText("DMX " + juce::String(item.dmxAddress),
+                tileRect.withTrimmedTop(17.0f),
+                juce::Justification::centred, true);
+        };
+
+    auto getZoneColour = [](ValidZone z) -> juce::Colour
+        {
+            if (z == ValidZone::FloorStage) return juce::Colour(0xfff59e0b);
+            if (z == ValidZone::SideWings)  return juce::Colour(0xffa855f7);
+            return juce::Colour(0xff38bdf8);
+        };
+
+    if (unplacedUnits.empty())
+    {
+        g.setColour(juce::Colour(0xff64748b));
+        g.setFont(juce::FontOptions(13.0f));
+        g.drawText("Tutte le luci sono montate sul palco! (Tasto destro su una luce del palco per rimetterla nel Case)",
+            lightCaseArea.withTrimmedTop(26.0f), juce::Justification::centred, true);
+    }
+    else
+    {
+        // 1. Disegna i fari nel Light Case (NESSUN altro fillRoundedRectangle/drawText qui dentro)
+        for (const auto& item : unplacedUnits)
+        {
+            auto zoneCol = getZoneColour(getValidZoneForCategory(item.category));
+            drawUnitTile(item, item.screenBounds, zoneCol);
+        }
+    }
+
+    // --- 2. DISEGNO PALCO 2D E STRUTTURE ---
+    g.setColour(juce::Colour(0xff0b0c12));
+    g.fillRoundedRectangle(stageCanvasArea, 6.0f);
+
+    g.setColour(juce::Colour(0xffcbd5e1));
+    g.setFont(juce::FontOptions(13.0f, juce::Font::bold));
+    g.drawText("MAPPA FISICA PALCO (Aria / Quinte Laterali / Terra)",
+        static_cast<int>(stageCanvasArea.getX() + 12.0f),
+        static_cast<int>(stageCanvasArea.getY() + 6.0f),
+        450, 20, juce::Justification::centredLeft, true);
+
+    auto drawZoneBox = [&g](const juce::Rectangle<float>& r, const juce::String& title, juce::Colour col)
+        {
+            g.setColour(col.withAlpha(0.10f));
+            g.fillRoundedRectangle(r, 5.0f);
+            g.setColour(col.withAlpha(0.40f));
+            g.drawRoundedRectangle(r, 5.0f, 1.2f);
+            g.setColour(col.withAlpha(0.75f));
+            g.setFont(juce::FontOptions(11.0f, juce::Font::bold));
+            g.drawText(title, r.reduced(6.0f, 4.0f), juce::Justification::topLeft, true);
+        };
+
+    drawZoneBox(airZoneRect, "ZONA ARIA (Americana Superiore: Wash, Par Front, Beam, Blinder, Strobo)", juce::Colour(0xff38bdf8));
+    drawZoneBox(floorZoneRect, "ZONA TERRA (Pavimento & Sotto-Batteria: Controluce Terra, Geyser, Fumo)", juce::Colour(0xfff59e0b));
+    drawZoneBox(leftWingRect, "QUINTA SX", juce::Colour(0xffa855f7));
+    drawZoneBox(rightWingRect, "QUINTA DX", juce::Colour(0xffa855f7));
+
+    // 2. Disegna i fari piazzati sulla Mappa Palco (NESSUN altro fillRoundedRectangle/drawText qui dentro)
+    for (const auto& item : placedUnits)
+    {
+        auto zoneCol = getZoneColour(getValidZoneForCategory(item.category));
+        drawUnitTile(item, item.screenBounds, zoneCol);
+    }
+
+    // --- 3. SMART MASKING DURANTE IL DRAG & DROP ---
+    if (isDraggingUnit && activeDragZone != ValidZone::None)
+    {
+        juce::Path maskPath;
+        maskPath.addRoundedRectangle(stageCanvasArea, 6.0f);
+        maskPath.setUsingNonZeroWinding(false);
+
+        if (activeDragZone == ValidZone::AirTruss)
+        {
+            maskPath.addRoundedRectangle(airZoneRect, 5.0f);
+        }
+        else if (activeDragZone == ValidZone::FloorStage)
+        {
+            maskPath.addRoundedRectangle(floorZoneRect, 5.0f);
+        }
+        else if (activeDragZone == ValidZone::SideWings)
+        {
+            maskPath.addRoundedRectangle(leftWingRect, 5.0f);
+            maskPath.addRoundedRectangle(rightWingRect, 5.0f);
+        }
+
+        g.setColour(juce::Colours::black.withAlpha(0.82f));
+        g.fillPath(maskPath);
+
+        g.setColour(juce::Colour(0xff10b981));
+        if (activeDragZone == ValidZone::AirTruss)
+        {
+            g.drawRoundedRectangle(airZoneRect, 5.0f, 2.8f);
+            g.drawText("RILASCIA QUI IN AMERICANA: " + activeDragLabel,
+                airZoneRect, juce::Justification::centred, true);
+        }
+        else if (activeDragZone == ValidZone::FloorStage)
+        {
+            g.drawRoundedRectangle(floorZoneRect, 5.0f, 2.8f);
+            g.drawText("RILASCIA QUI A TERRA: " + activeDragLabel,
+                floorZoneRect, juce::Justification::centred, true);
+        }
+        else if (activeDragZone == ValidZone::SideWings)
+        {
+            g.drawRoundedRectangle(leftWingRect, 5.0f, 2.8f);
+            g.drawRoundedRectangle(rightWingRect, 5.0f, 2.8f);
+        }
+    }
+
+    g.setColour(juce::Colour(0xff2a2a38));
+    g.drawRoundedRectangle(stageCanvasArea, 6.0f, 1.5f);
+}
+
+void StagePatchAndCasePanel::mouseDown(const juce::MouseEvent& e)
+{
+    hitItemIndex = -1;
+    hitWasPlaced = false;
+    auto pt = e.position;
+
+    for (size_t i = 0; i < placedUnits.size(); ++i)
+    {
+        if (placedUnits[i].screenBounds.contains(pt))
+        {
+            if (e.mods.isPopupMenu())
+            {
+                placedUnits[i].unitNode.setProperty(StateKeys::IsPlaced, false, nullptr);
+                rebuildUnitCache();
+                repaint();
+                return;
+            }
+
+            hitItemIndex = static_cast<int>(i);
+            hitWasPlaced = true;
+            if (hitItemIndex >= 0)
+            {
+                const auto& list = hitWasPlaced ? placedUnits : unplacedUnits;
+                if (hitItemIndex < static_cast<int>(list.size()))
+                {
+                    int clickedFixIdx = list[static_cast<size_t>(hitItemIndex)].fixtureIdx;
+                    setSelectedFixtureIndex(clickedFixIdx);
+                    if (onFixtureSelectedFromMap)
+                        onFixtureSelectedFromMap(clickedFixIdx);
+                }
+            }
+            return;
+        }
+    }
+
+    for (size_t i = 0; i < unplacedUnits.size(); ++i)
+    {
+        if (unplacedUnits[i].screenBounds.contains(pt))
+        {
+            hitItemIndex = static_cast<int>(i);
+            hitWasPlaced = false;
+            return;
+        }
+    }
+}
+
+void StagePatchAndCasePanel::mouseDrag(const juce::MouseEvent& e)
+{
+    if (hitItemIndex < 0 || e.getDistanceFromDragStart() < 4)
+        return;
+
+    if (!isDraggingUnit)
+    {
+        const auto& list = hitWasPlaced ? placedUnits : unplacedUnits;
+        if (hitItemIndex < static_cast<int>(list.size()))
+        {
+            const auto& item = list[static_cast<size_t>(hitItemIndex)];
+            activeDragZone = getValidZoneForCategory(item.category);
+            activeDragLabel = item.label;
+            isDraggingUnit = true;
+
+            // Crea lo snapshot solo per il singolo faro selezionato
+            const int imgW = 88;
+            const int imgH = 38;
+            juce::Image dragImg(juce::Image::ARGB, imgW, imgH, true);
+            {
+                juce::Graphics g(dragImg);
+                auto tileRect = juce::Rectangle<float>(1.0f, 1.0f,
+                    static_cast<float>(imgW - 2),
+                    static_cast<float>(imgH - 2));
+
+                juce::Colour accentCol(0xff38bdf8);
+                if (activeDragZone == ValidZone::FloorStage)     accentCol = juce::Colour(0xfff59e0b);
+                else if (activeDragZone == ValidZone::SideWings) accentCol = juce::Colour(0xffa855f7);
+
+                g.setColour(juce::Colour(0xff1e2436).withAlpha(0.95f));
+                g.fillRoundedRectangle(tileRect, 5.0f);
+                g.setColour(accentCol);
+                g.drawRoundedRectangle(tileRect, 5.0f, 1.8f);
+
+                g.setColour(juce::Colours::white);
+                g.setFont(juce::FontOptions(11.0f, juce::Font::bold));
+                g.drawText(item.label, tileRect.withHeight(18.0f).reduced(3.0f, 1.0f),
+                    juce::Justification::centred, true);
+
+                g.setColour(accentCol.brighter(0.3f));
+                g.setFont(juce::FontOptions(9.5f));
+                g.drawText("DMX " + juce::String(item.dmxAddress),
+                    tileRect.withTrimmedTop(17.0f),
+                    juce::Justification::centred, true);
+            }
+
+            juce::Point<int> imgOffset(-imgW / 2, -imgH / 2);
+            juce::String dragDesc = juce::String(item.fixtureIdx) + ":" + juce::String(item.unitIdxInChild);
+
+            if (auto* container = juce::DragAndDropContainer::findParentDragContainerFor(this))
+                container->startDragging(dragDesc, this, juce::ScaledImage(dragImg), false, &imgOffset);
+
+            repaint();
+        }
+    }
+}
+
+void StagePatchAndCasePanel::mouseUp(const juce::MouseEvent&)
+{
+    isDraggingUnit = false;
+    activeDragZone = ValidZone::None;
+    hitItemIndex = -1;
+    repaint();
+}
+
+bool StagePatchAndCasePanel::isInterestedInDragSource(const SourceDetails& dragSourceDetails)
+{
+    return dragSourceDetails.description.toString().contains(":");
+}
+
+StagePatchAndCasePanel::ValidZone StagePatchAndCasePanel::getZoneForDragDescription(
+    const juce::String& desc, juce::String& outLabel) const
+{
+    int fixIdx = desc.upToFirstOccurrenceOf(":", false, false).getIntValue();
+    int unitIdx = desc.fromFirstOccurrenceOf(":", false, false).getIntValue();
+
+    auto vNode = appState.getChildWithName(StateKeys::VenueNode);
+    if (!vNode.isValid() || fixIdx < 0 || fixIdx >= vNode.getNumChildren())
+        return ValidZone::None;
+
+    auto fixNode = vNode.getChild(fixIdx);
+    if (!fixNode.isValid())
+        return ValidZone::None;
+
+    juce::String baseName = fixNode.getProperty(StateKeys::FixtureName, "Faro").toString();
+    juce::String roleName = fixNode.getProperty(StateKeys::RoleName, "").toString();
+
+    int unitNum = 1;
+    if (unitIdx >= 0 && unitIdx < fixNode.getNumChildren())
+        unitNum = static_cast<int>(fixNode.getChild(unitIdx).getProperty(StateKeys::UnitIndex, unitIdx + 1));
+
+    outLabel = baseName + " #" + juce::String(unitNum);
+    return getValidZoneForCategory(StageRoleCatalog::classifyRole(roleName, baseName));
+}
+
+void StagePatchAndCasePanel::itemDragEnter(const SourceDetails& dragSourceDetails)
+{
+    activeDragZone = getZoneForDragDescription(dragSourceDetails.description.toString(), activeDragLabel);
+    isDraggingUnit = (activeDragZone != ValidZone::None);
+    repaint();
+}
+
+void StagePatchAndCasePanel::itemDragMove(const SourceDetails& dragSourceDetails)
+{
+    if (activeDragZone == ValidZone::None)
+        activeDragZone = getZoneForDragDescription(dragSourceDetails.description.toString(), activeDragLabel);
+
+    isDraggingUnit = (activeDragZone != ValidZone::None);
+    repaint();
+}
+
+void StagePatchAndCasePanel::itemDragExit(const SourceDetails&)
+{
+    isDraggingUnit = false;
+    activeDragZone = ValidZone::None;
+    repaint();
+}
+
+bool StagePatchAndCasePanel::isPointInsideZone(juce::Point<float> pt, ValidZone zone) const
+{
+    if (zone == ValidZone::AirTruss)   return airZoneRect.expanded(12.0f).contains(pt);
+    if (zone == ValidZone::FloorStage) return floorZoneRect.expanded(12.0f).contains(pt);
+    if (zone == ValidZone::SideWings)  return leftWingRect.expanded(12.0f).contains(pt) || rightWingRect.expanded(12.0f).contains(pt);
+    return false;
+}
+
+juce::Point<float> StagePatchAndCasePanel::clampPointToZone(juce::Point<float> pt, ValidZone zone) const
+{
+    juce::Rectangle<float> target = airZoneRect;
+    if (zone == ValidZone::FloorStage)
+        target = floorZoneRect;
+    else if (zone == ValidZone::SideWings)
+        target = (pt.x < stageCanvasArea.getCentreX()) ? leftWingRect : rightWingRect;
+
+    // Evita inversione limiti su zone strette come le Quinte Laterali
+    float padX = juce::jmin(24.0f, target.getWidth() * 0.35f);
+    float padY = juce::jmin(14.0f, target.getHeight() * 0.35f);
+    auto inner = target.reduced(padX, padY);
+
+    return {
+        juce::jlimit(inner.getX(), juce::jmax(inner.getX(), inner.getRight()), pt.x),
+        juce::jlimit(inner.getY(), juce::jmax(inner.getY(), inner.getBottom()), pt.y)
+    };
+}
+
+void StagePatchAndCasePanel::itemDropped(const SourceDetails& dragSourceDetails)
+{
+    isDraggingUnit = false;
+    activeDragZone = ValidZone::None;
+
+    juce::String desc = dragSourceDetails.description.toString();
+    juce::String dummyLabel;
+    ValidZone targetZone = getZoneForDragDescription(desc, dummyLabel);
+    if (targetZone == ValidZone::None)
+        return;
+
+    int fixIdx = desc.upToFirstOccurrenceOf(":", false, false).getIntValue();
+    int unitIdx = desc.fromFirstOccurrenceOf(":", false, false).getIntValue();
+
+    venueNode = appState.getChildWithName(StateKeys::VenueNode);
+    if (!venueNode.isValid() || fixIdx < 0 || fixIdx >= venueNode.getNumChildren())
+        return;
+
+    auto fixNode = venueNode.getChild(fixIdx);
+    if (!fixNode.isValid() || unitIdx < 0 || unitIdx >= fixNode.getNumChildren())
+        return;
+
+    auto unitNode = fixNode.getChild(unitIdx);
+    auto dropPt = dragSourceDetails.localPosition.toFloat();
+
+    if (lightCaseArea.contains(dropPt))
+    {
+        unitNode.setProperty(StateKeys::IsPlaced, false, nullptr);
+        rebuildUnitCache();
+        repaint();
+        return;
+    }
+
+    if (stageCanvasArea.contains(dropPt))
+    {
+        auto clampedPt = clampPointToZone(dropPt, targetZone);
+        double normX = juce::jlimit(0.04, 0.96, static_cast<double>((clampedPt.x - stageCanvasArea.getX()) / stageCanvasArea.getWidth()));
+        double normY = juce::jlimit(0.06, 0.94, static_cast<double>((clampedPt.y - stageCanvasArea.getY()) / stageCanvasArea.getHeight()));
+
+        unitNode.setProperty(StateKeys::IsPlaced, true, nullptr);
+        unitNode.setProperty(StateKeys::PosX, normX, nullptr);
+        unitNode.setProperty(StateKeys::PosY, normY, nullptr);
+    }
+
+    rebuildUnitCache();
+    repaint();
+}
+
+void StagePatchAndCasePanel::autoPlaceAllUnits()
+{
+    if (!venueNode.isValid()) return;
+    VenueUnitHelper::ensureVenueUnitsInitialized(venueNode);
+
+    std::vector<juce::ValueTree> airUnits, floorUnits, sideUnits;
+
+    for (int f = 0; f < venueNode.getNumChildren(); ++f)
+    {
+        auto fix = venueNode.getChild(f);
+        if (!fix.hasType(StateKeys::Fixture)) continue;
+
+        auto cat = StageRoleCatalog::classifyRole(
+            fix.getProperty(StateKeys::RoleName, "").toString(),
+            fix.getProperty(StateKeys::FixtureName, "").toString());
+        auto zone = getValidZoneForCategory(cat);
+
+        for (int u = 0; u < fix.getNumChildren(); ++u)
+        {
+            auto unit = fix.getChild(u);
+            if (!unit.hasType(StateKeys::FixtureUnit)) continue;
+            if (zone == ValidZone::AirTruss)        airUnits.push_back(unit);
+            else if (zone == ValidZone::FloorStage) floorUnits.push_back(unit);
+            else                                    sideUnits.push_back(unit);
+        }
+    }
+
+    for (size_t i = 0; i < airUnits.size(); ++i)
+    {
+        double ratio = static_cast<double>(i + 1) / static_cast<double>(airUnits.size() + 1);
+        airUnits[i].setProperty(StateKeys::IsPlaced, true, nullptr);
+        airUnits[i].setProperty(StateKeys::PosX, 0.14 + 0.72 * ratio, nullptr);
+        airUnits[i].setProperty(StateKeys::PosY, 0.14, nullptr);
+    }
+
+    for (size_t i = 0; i < floorUnits.size(); ++i)
+    {
+        double ratio = static_cast<double>(i + 1) / static_cast<double>(floorUnits.size() + 1);
+        floorUnits[i].setProperty(StateKeys::IsPlaced, true, nullptr);
+        floorUnits[i].setProperty(StateKeys::PosX, 0.16 + 0.68 * ratio, nullptr);
+        floorUnits[i].setProperty(StateKeys::PosY, 0.82, nullptr);
+    }
+
+    for (size_t i = 0; i < sideUnits.size(); ++i)
+    {
+        bool isLeft = (i % 2 == 0);
+        double yRatio = 0.40 + 0.15 * static_cast<double>(i / 2);
+        sideUnits[i].setProperty(StateKeys::IsPlaced, true, nullptr);
+        sideUnits[i].setProperty(StateKeys::PosX, isLeft ? 0.06 : 0.94, nullptr);
+        sideUnits[i].setProperty(StateKeys::PosY, juce::jmin(0.85, yRatio), nullptr);
+    }
+
+    rebuildUnitCache();
+    repaint();
+}
+
+void StagePatchAndCasePanel::returnAllUnitsToCase()
+{
+    if (!venueNode.isValid()) return;
+    for (int f = 0; f < venueNode.getNumChildren(); ++f)
+    {
+        auto fix = venueNode.getChild(f);
+        for (int u = 0; u < fix.getNumChildren(); ++u)
+        {
+            auto unit = fix.getChild(u);
+            if (unit.hasType(StateKeys::FixtureUnit))
+                unit.setProperty(StateKeys::IsPlaced, false, nullptr);
+        }
+    }
+    rebuildUnitCache();
+    repaint();
+}
+
+
+
+// =============================================================================
 // VenuePatchTab Implementation
 // =============================================================================
 VenuePatchTab::VenuePatchTab(juce::ValueTree& state)
-    : appState(state), editorPanel(state)
+    : appState(state), editorPanel(state), stageDesignerPanel(state)
 {
-    venueNode = appState.getChildWithName("VENUE");
+    stageDesignerPanel.onFixtureSelectedFromMap = [this](int fixIdx) {
+        if (fixIdx >= 0 && fixIdx < venueNode.getNumChildren())
+            fixtureList.selectRow(fixIdx);
+        };
+
+    venueNode = appState.getChildWithName(StateKeys::VenueNode);
     if (!venueNode.isValid())
     {
-        venueNode = juce::ValueTree("VENUE");
+        venueNode = juce::ValueTree(StateKeys::VenueNode);
         appState.addChild(venueNode, -1, nullptr);
     }
+    VenueUnitHelper::ensureVenueUnitsInitialized(venueNode);
     venueNode.addListener(this);
 
     fixtureList.setModel(this);
@@ -234,23 +1166,28 @@ VenuePatchTab::VenuePatchTab(juce::ValueTree& state)
     fixtureList.setColour(juce::ListBox::outlineColourId, juce::Colour(0xff2a2a32));
     addAndMakeVisible(fixtureList);
 
-    // Configurazione Pulsanti
     addFixtureBtn.setButtonText("+ Aggiungi Faro");
-    addFixtureBtn.setColour(juce::TextButton::buttonColourId, juce::Colour(0xff3a3a45));
+    addFixtureBtn.setColour(juce::TextButton::buttonColourId, juce::Colour(0xff2563eb));
     addFixtureBtn.onClick = [this] { addNewFixtureToState(); };
     addAndMakeVisible(addFixtureBtn);
 
+    removeFixtureBtn.setButtonText("- Rimuovi Selezionato");
+    removeFixtureBtn.setColour(juce::TextButton::buttonColourId, juce::Colour(0xff7f1d1d));
+    removeFixtureBtn.onClick = [this] { removeSelectedFixture(); };
+    addAndMakeVisible(removeFixtureBtn);
+
     loadBtn.setButtonText("Carica Venue...");
-    loadBtn.setColour(juce::TextButton::buttonColourId, juce::Colour(0xff3d3d29)); // Giallognolo scuro
+    loadBtn.setColour(juce::TextButton::buttonColourId, juce::Colour(0xff3d3d29));
     loadBtn.onClick = [this] { loadVenue(); };
     addAndMakeVisible(loadBtn);
 
     saveBtn.setButtonText("Salva Venue...");
-    saveBtn.setColour(juce::TextButton::buttonColourId, juce::Colour(0xff293d3d)); // Verdino scuro
+    saveBtn.setColour(juce::TextButton::buttonColourId, juce::Colour(0xff293d3d));
     saveBtn.onClick = [this] { saveVenue(); };
     addAndMakeVisible(saveBtn);
 
     addAndMakeVisible(editorPanel);
+    addAndMakeVisible(stageDesignerPanel);
 
     if (venueNode.getNumChildren() > 0)
         fixtureList.selectRow(0);
@@ -269,98 +1206,118 @@ int VenuePatchTab::getNumRows()
 void VenuePatchTab::paintListBoxItem(int rowNumber, juce::Graphics& g, int width, int height, bool rowIsSelected)
 {
     if (rowIsSelected)
-        g.fillAll(juce::Colour(0xff00d2ff).withAlpha(0.2f));
+        g.fillAll(juce::Colour(0xff00d2ff).withAlpha(0.22f));
 
     if (rowNumber < venueNode.getNumChildren())
     {
         auto fixNode = venueNode.getChild(rowNumber);
         auto name = fixNode.getProperty(StateKeys::FixtureName, "Senza Nome").toString();
-        auto role = fixNode.getProperty(StateKeys::RoleName, "NESSUNO").toString(); // ESTRAI RUOLO
+        auto role = fixNode.getProperty(StateKeys::RoleName, "NESSUNO").toString();
 
-        // Calcolo del range DMX
-        int startAddr = fixNode.getProperty(StateKeys::StartAddress, 1);
-        int chCount = fixNode.getProperty(StateKeys::ChannelCount, 1);
-        int endAddr = startAddr + chCount - 1; // Es. se parte da 9 ed ha 8 canali -> 9 + 8 - 1 = 16
+        int qty = static_cast<int>(fixNode.getProperty(StateKeys::FixtureQuantity, 1));
+        int startAddr = static_cast<int>(fixNode.getProperty(StateKeys::StartAddress, 1));
+        int chCount = static_cast<int>(fixNode.getProperty(StateKeys::ChannelCount, 1));
+        int endAddr = startAddr + chCount - 1; // Tutte le N unita' rispondono allo stesso range DMX
 
-        // Formattazione: [RUOLO] Nome Macchina (DMX: 1 - 8)
-        juce::String labelText = "[" + role + "] " + name + " (DMX: " + juce::String(startAddr) + " - " + juce::String(endAddr) + ")";
+        juce::String labelText = name + " (x" + juce::String(qty) + " in Sim)  |  DMX: "
+            + juce::String(startAddr) + "-" + juce::String(endAddr)
+            + "  [" + role + "]";
 
         g.setColour(juce::Colours::white);
-        g.setFont(14.0f);
-        g.drawText(labelText, 10, 0, width - 20, height, juce::Justification::centredLeft, true);
+        g.setFont(juce::FontOptions(13.0f));
+        g.drawText(labelText, 8, 0, width - 16, height, juce::Justification::centredLeft, true);
     }
 }
 
 void VenuePatchTab::selectedRowsChanged(int lastRowSelected)
 {
+    stageDesignerPanel.setSelectedFixtureIndex(lastRowSelected);
+
     if (lastRowSelected >= 0 && lastRowSelected < venueNode.getNumChildren())
-    {
-        auto selectedNode = venueNode.getChild(lastRowSelected);
-        editorPanel.setFixtureNode(selectedNode);
-    }
+        editorPanel.setFixtureNode(venueNode.getChild(lastRowSelected));
     else
-    {
         editorPanel.setFixtureNode(juce::ValueTree());
-    }
 }
 
 void VenuePatchTab::paint(juce::Graphics& g)
 {
     g.fillAll(juce::Colour(0xff1a1a1e));
-
-    g.setColour(juce::Colour(0xff2a2a32));
-    float divX = getLocalBounds().toFloat().proportionOfWidth(0.3f);
-    g.fillRect(juce::Rectangle<float>(divX, 0.0f, 2.0f, static_cast<float>(getHeight())));
 }
 
 void VenuePatchTab::resized()
 {
     auto bounds = getLocalBounds();
 
-    auto leftPanel = bounds.removeFromLeft(juce::roundToInt(bounds.getWidth() * 0.3f));
+    auto leftPanel = bounds.removeFromLeft(juce::roundToInt(bounds.getWidth() * 0.23f));
+    auto bottomArea = leftPanel.removeFromBottom(142).reduced(8, 4);
 
-    // Spazio per 3 pulsanti in basso
-    auto bottomArea = leftPanel.removeFromBottom(110).reduced(10, 5);
+    saveBtn.setBounds(bottomArea.removeFromBottom(28));
+    bottomArea.removeFromBottom(4);
+    loadBtn.setBounds(bottomArea.removeFromBottom(28));
+    bottomArea.removeFromBottom(4);
+    removeFixtureBtn.setBounds(bottomArea.removeFromBottom(28));
+    bottomArea.removeFromBottom(4);
+    addFixtureBtn.setBounds(bottomArea.removeFromBottom(28));
 
-    saveBtn.setBounds(bottomArea.removeFromBottom(30));
-    bottomArea.removeFromBottom(5);
+    fixtureList.setBounds(leftPanel.reduced(8));
 
-    loadBtn.setBounds(bottomArea.removeFromBottom(30));
-    bottomArea.removeFromBottom(5);
+    auto centerPanel = bounds.removeFromLeft(juce::roundToInt(bounds.getWidth() * 0.45f));
+    editorPanel.setBounds(centerPanel.reduced(4));
 
-    addFixtureBtn.setBounds(bottomArea.removeFromBottom(30));
-
-    fixtureList.setBounds(leftPanel.reduced(10));
-
-    bounds.removeFromLeft(2);
-    editorPanel.setBounds(bounds);
+    stageDesignerPanel.setBounds(bounds.reduced(4));
 }
 
 void VenuePatchTab::addNewFixtureToState()
 {
     juce::ValueTree newFix(StateKeys::Fixture);
     int newIndex = venueNode.getNumChildren() + 1;
-    newFix.setProperty(StateKeys::FixtureName, "Nuovo Faro " + juce::String(newIndex), nullptr);
+    newFix.setProperty(StateKeys::FixtureName, "Faro " + juce::String(newIndex), nullptr);
+    newFix.setProperty(StateKeys::FixtureQuantity, 2, nullptr);
     newFix.setProperty(StateKeys::StartAddress, (newIndex - 1) * 10 + 1, nullptr);
-    newFix.setProperty(StateKeys::ChannelCount, 8, nullptr); // Default: 8 Canali
-
-    // Assegna subito il primo ruolo ufficiale del catalogo ("Aria: Wash Controluce (Fondale)")
+    newFix.setProperty(StateKeys::ChannelCount, 8, nullptr);
     newFix.setProperty(StateKeys::RoleName, StageRoleCatalog::getAllRoles()[0].displayName, nullptr);
 
-    // Assegnazione di base per comodità (es. Wash classico cinese 7 canali)
     newFix.setProperty(StateKeys::getMappingKey("Dimmer"), 1, nullptr);
     newFix.setProperty(StateKeys::getMappingKey("Red"), 2, nullptr);
     newFix.setProperty(StateKeys::getMappingKey("Green"), 3, nullptr);
     newFix.setProperty(StateKeys::getMappingKey("Blue"), 4, nullptr);
+
+    
+    newFix.setProperty(StateKeys::StrobeMode, 1, nullptr);      // 1 = Canale Separato
+    newFix.setProperty(StateKeys::DimmerMaxVal, 255, nullptr);
+    newFix.setProperty(StateKeys::StrobeOpenVal, 0, nullptr);
+    newFix.setProperty(StateKeys::StrobeMinVal, 20, nullptr);
+    newFix.setProperty(StateKeys::StrobeMinHz, 1.0, nullptr);
+    newFix.setProperty(StateKeys::StrobeMaxVal, 245, nullptr);
+    newFix.setProperty(StateKeys::StrobeMaxHz, 20.0, nullptr);
+    newFix.setProperty(StateKeys::AllowDimmerStrobe, true, nullptr);
+
+    newFix.setProperty(StateKeys::PanHome, 128, nullptr);
+    newFix.setProperty(StateKeys::TiltHome, 90, nullptr);
+    newFix.setProperty(StateKeys::PanOffset, 0, nullptr);
+    newFix.setProperty(StateKeys::TiltOffset, 0, nullptr);
+    newFix.setProperty(StateKeys::PanRange, 120, nullptr);
+    newFix.setProperty(StateKeys::TiltRange, 90, nullptr);
+
+    VenueUnitHelper::syncUnitsForFixture(newFix);
 
     venueNode.addChild(newFix, -1, nullptr);
     fixtureList.updateContent();
     fixtureList.selectRow(venueNode.getNumChildren() - 1);
 }
 
-// =============================================================================
-// Gestione File
-// =============================================================================
+void VenuePatchTab::removeSelectedFixture()
+{
+    int sel = fixtureList.getSelectedRow();
+    if (sel >= 0 && sel < venueNode.getNumChildren())
+    {
+        venueNode.removeChild(sel, nullptr);
+        fixtureList.updateContent();
+        if (venueNode.getNumChildren() > 0)
+            fixtureList.selectRow(juce::jmin(sel, venueNode.getNumChildren() - 1));
+    }
+}
+
 void VenuePatchTab::saveVenue()
 {
     fileChooser = std::make_unique<juce::FileChooser>(
@@ -373,9 +1330,7 @@ void VenuePatchTab::saveVenue()
     fileChooser->launchAsync(chooserFlags, [this](const juce::FileChooser& fc) {
         auto file = fc.getResult();
         if (file != juce::File{})
-        {
             PresetManager::saveVenue(appState, file);
-        }
         });
 }
 
@@ -392,20 +1347,64 @@ void VenuePatchTab::loadVenue()
         auto file = fc.getResult();
         if (file != juce::File{})
         {
-            PresetManager::loadVenue(appState, file);
-            fixtureList.updateContent();
+            if (PresetManager::loadVenue(appState, file))
+            {
+                // Riallinea il riferimento nel caso PresetManager abbia ricreato il nodo VENUE
+                auto currentVenue = appState.getChildWithName(StateKeys::VenueNode);
+                if (currentVenue.isValid() && currentVenue != venueNode)
+                {
+                    if (venueNode.isValid())
+                        venueNode.removeListener(this);
+                    venueNode = currentVenue;
+                    venueNode.addListener(this);
+                }
 
-            if (venueNode.getNumChildren() > 0)
-                fixtureList.selectRow(0);
+                // Retrocompatibilita': se il file e' vecchio crea i FIXTURE_UNIT mancanti;
+                // se il file e' nuovo mantiene intatti isPlaced, posX e posY caricati da disco
+                VenueUnitHelper::ensureVenueUnitsInitialized(venueNode);
+
+                fixtureList.updateContent();
+                if (venueNode.getNumChildren() > 0)
+                {
+                    fixtureList.selectRow(0);
+                    editorPanel.setFixtureNode(venueNode.getChild(0));
+                }
+                else
+                {
+                    editorPanel.setFixtureNode(juce::ValueTree());
+                }
+
+                stageDesignerPanel.setSelectedFixtureIndex(venueNode.getNumChildren() > 0 ? 0 : -1);
+
+                // Ridisegna Light Case e fari piazzati nelle esatte posizioni salvate
+                stageDesignerPanel.refreshFromState();
+            }
         }
         });
 }
 
-void VenuePatchTab::valueTreeChildAdded(juce::ValueTree&, juce::ValueTree&) { fixtureList.updateContent(); }
-void VenuePatchTab::valueTreeChildRemoved(juce::ValueTree&, juce::ValueTree&, int)
+void VenuePatchTab::valueTreeChildAdded(juce::ValueTree& parentTree, juce::ValueTree&)
 {
-    fixtureList.updateContent();
-    editorPanel.setFixtureNode(juce::ValueTree());
+    if (parentTree == venueNode)
+        fixtureList.updateContent();
+    else
+        fixtureList.repaint();
 }
+
+void VenuePatchTab::valueTreeChildRemoved(juce::ValueTree& parentTree, juce::ValueTree&, int)
+{
+    if (parentTree == venueNode)
+    {
+        fixtureList.updateContent();
+        if (venueNode.getNumChildren() == 0)
+            editorPanel.setFixtureNode(juce::ValueTree());
+    }
+    else
+    {
+        // E' stata rimossa solo un'unita' FIXTURE_UNIT (cambio Quantita'): aggiorna solo il testo "(xN in Sim)"
+        fixtureList.repaint();
+    }
+}
+
 void VenuePatchTab::valueTreeChildOrderChanged(juce::ValueTree&, int, int) { fixtureList.updateContent(); }
 void VenuePatchTab::valueTreePropertyChanged(juce::ValueTree&, const juce::Identifier&) { fixtureList.repaint(); }

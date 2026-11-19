@@ -107,6 +107,7 @@ private:
     void valueTreePropertyChanged(juce::ValueTree&, const juce::Identifier&) override;
     void valueTreeParentChanged(juce::ValueTree&) override {}
     bool keyPressed(const juce::KeyPress& key, juce::Component* originatingComponent) override;
+    void importMidiTempoMap();
 
 
     juce::ValueTree& appState;
@@ -121,6 +122,8 @@ private:
     juce::TextButton insertPresetBtn; 
     juce::TextButton saveBtn;
     juce::TextButton loadBtn;
+    juce::TextButton importMidiMapBtn;
+
 
     SceneEditorPanel editorPanel;
     BeatTimeMap beatTimeMap;

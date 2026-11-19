@@ -3,6 +3,7 @@
 #include "UI/Tabs/VenuePatchTab.h"
 #include "UI/Tabs/ShowBuilderTab.h"
 #include "UI/Tabs/ExportEngineTab.h"
+#include "UI/Tabs/SceneBuilderTab.h"
 
 class MainComponent  : public juce::Component
 {
@@ -20,6 +21,7 @@ private:
 
     VenuePatchTab venueTab {mainState};
     ShowBuilderTab showBuilderTab{ mainState };
+    SceneBuilderTab sceneBuilderTab{ mainState };
     ExportEngineTab exportTab { mainState };
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (MainComponent)

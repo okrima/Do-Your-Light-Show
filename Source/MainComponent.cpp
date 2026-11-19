@@ -10,12 +10,17 @@ MainComponent::MainComponent()
                            &venueTab, 
                            false);
 
-    tabbedComponent.addTab ("2. Pattern Creator", 
+    tabbedComponent.addTab ("2. Scene Builder", 
+                            juce::Colour(0xff1e1e26), 
+                            &sceneBuilderTab, 
+                            false);
+
+    tabbedComponent.addTab ("3. Pattern Creator", 
                            juce::Colour (0xff2a2a32), 
                            &showBuilderTab,
                            false);
 
-    tabbedComponent.addTab ("3. MIDI Export", 
+    tabbedComponent.addTab ("4. MIDI Export", 
                            juce::Colour (0xff2a2a32), 
                            &exportTab, 
                            false);

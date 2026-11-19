@@ -72,17 +72,46 @@ SceneEditorPanel::SceneEditorPanel(juce::ValueTree& state) : appState(state)
     paramSelector.onChange = [this] { if (currentCommandNode.isValid() && !isUpdatingUI) currentCommandNode.setProperty(StateKeys::TargetParam, paramSelector.getText(), nullptr); };
     addAndMakeVisible(paramSelector);
 
-    curveLabel.setText("Azione/Curva:", juce::dontSendNotification); curveLabel.setColour(juce::Label::textColourId, juce::Colours::lightgrey); addAndMakeVisible(curveLabel);
-    curveSelector.addItemList({ "Step (Stato Fisso)", "LinearRamp (Transizione)", "Sine (LFO/Onda)" }, 1);
+    curveLabel.setText("Azione/Curva:", juce::dontSendNotification); 
+    curveLabel.setColour(juce::Label::textColourId, juce::Colours::lightgrey); 
+    addAndMakeVisible(curveLabel);
+    curveSelector.addItem("Static (Fisso)", 1);
+    curveSelector.addItem("Linear (Rampa sulla durata)", 2);
+    curveSelector.addItem("Decay (Decadimento)", 3);
+    curveSelector.addItem("Sine 1 Bar", 4);
+    curveSelector.addItem("Sine 2 Bars", 5);
+    curveSelector.addItem("Sine 4 Bars", 6);
+    curveSelector.addItem("Sine Durata (1 Ciclo)", 7);
+    curveSelector.addItem("Square 1/8 (Ottavi)", 8);
+    curveSelector.addItem("Square 1/8T (Terzine)", 9);
+    curveSelector.addItem("Square 1/16 (Sedicesimi)", 10);
+    curveSelector.addItem("Square 1/16T (Sestine)", 11);
+    curveSelector.addItem("Step (Cambio Finale)", 12);
     curveSelector.setColour(juce::ComboBox::backgroundColourId, juce::Colour(0xff2a2a32));
-    curveSelector.onChange = [this] { if (currentCommandNode.isValid() && !isUpdatingUI) currentCommandNode.setProperty(StateKeys::CurveType, curveSelector.getText(), nullptr); };
+    curveSelector.onChange = [this] {
+        if (currentCommandNode.isValid() && !isUpdatingUI)
+        {
+            static const char* keys[12] = {
+                "Static", "Linear", "Decay", "Sine_1Bar", "Sine_2Bars", "Sine_4Bars",
+                "Sine_Duration", "Square_1_8", "Square_1_8T", "Square_1_16", "Square_1_16T", "Step"
+            };
+            int idx = juce::jlimit(0, 11, curveSelector.getSelectedId() - 1);
+            currentCommandNode.setProperty(StateKeys::CurveType, keys[idx], nullptr);
+        }
+        };
     addAndMakeVisible(curveSelector);
 
-    setupSlider(startValSlider, startValLabel, "Valore Start (0-127):", 0.0, 127.0);
-    startValSlider.onValueChange = [this] { if (currentCommandNode.isValid() && !isUpdatingUI) currentCommandNode.setProperty(StateKeys::StartValue, static_cast<int>(startValSlider.getValue()), nullptr); };
+    setupSlider(startValSlider, startValLabel, "Valore Start (0-255):", 0.0, 255.0);
+    startValSlider.onValueChange = [this] {
+        if (currentCommandNode.isValid() && !isUpdatingUI)
+            currentCommandNode.setProperty(StateKeys::StartValue, static_cast<int>(startValSlider.getValue()), nullptr);
+        };
 
-    setupSlider(endValSlider, endValLabel, "Valore End (0-127):", 0.0, 127.0);
-    endValSlider.onValueChange = [this] { if (currentCommandNode.isValid() && !isUpdatingUI) currentCommandNode.setProperty(StateKeys::EndValue, static_cast<int>(endValSlider.getValue()), nullptr); };
+    setupSlider(endValSlider, endValLabel, "Valore End (0-255):", 0.0, 255.0);
+    endValSlider.onValueChange = [this] {
+        if (currentCommandNode.isValid() && !isUpdatingUI)
+            currentCommandNode.setProperty(StateKeys::EndValue, static_cast<int>(endValSlider.getValue()), nullptr);
+        };
 
     auto venueNode = appState.getChildWithName(StateKeys::VenueNode);
     if (venueNode.isValid()) {
@@ -223,9 +252,22 @@ void SceneEditorPanel::updateCommandUI() {
 
     roleSelector.setText(currentCommandNode.getProperty(StateKeys::TargetRole, "").toString(), juce::dontSendNotification);
     paramSelector.setText(currentCommandNode.getProperty(StateKeys::TargetParam, "Dimmer").toString(), juce::dontSendNotification);
-    curveSelector.setText(currentCommandNode.getProperty(StateKeys::CurveType, "Step (Stato Fisso)").toString(), juce::dontSendNotification);
+    juce::String c = currentCommandNode.getProperty(StateKeys::CurveType, "Static").toString();
+    if (c.startsWithIgnoreCase("Linear"))              curveSelector.setSelectedId(2, juce::dontSendNotification);
+    else if (c.equalsIgnoreCase("Decay"))              curveSelector.setSelectedId(3, juce::dontSendNotification);
+    else if (c.containsIgnoreCase("1Bar"))             curveSelector.setSelectedId(4, juce::dontSendNotification);
+    else if (c.containsIgnoreCase("2Bars"))            curveSelector.setSelectedId(5, juce::dontSendNotification);
+    else if (c.containsIgnoreCase("4Bars"))            curveSelector.setSelectedId(6, juce::dontSendNotification);
+    else if (c.containsIgnoreCase("Duration"))         curveSelector.setSelectedId(7, juce::dontSendNotification);
+    else if (c.equalsIgnoreCase("Square_1_8T"))        curveSelector.setSelectedId(9, juce::dontSendNotification);
+    else if (c.equalsIgnoreCase("Square_1_8"))         curveSelector.setSelectedId(8, juce::dontSendNotification);
+    else if (c.equalsIgnoreCase("Square_1_16T"))       curveSelector.setSelectedId(11, juce::dontSendNotification);
+    else if (c.startsWithIgnoreCase("Square"))         curveSelector.setSelectedId(10, juce::dontSendNotification);
+    else if (c.startsWithIgnoreCase("Step"))           curveSelector.setSelectedId(12, juce::dontSendNotification);
+    else                                               curveSelector.setSelectedId(1, juce::dontSendNotification);
+
     startValSlider.setValue(currentCommandNode.getProperty(StateKeys::StartValue, 0), juce::dontSendNotification);
-    endValSlider.setValue(currentCommandNode.getProperty(StateKeys::EndValue, 127), juce::dontSendNotification);
+    endValSlider.setValue(currentCommandNode.getProperty(StateKeys::EndValue, 255), juce::dontSendNotification);
     resized(); // Ridisegna per mostrare i controlli
 }
 
@@ -235,9 +277,9 @@ void SceneEditorPanel::addNewCommand() {
     juce::String defRole = roleSelector.getNumItems() > 0 ? roleSelector.getItemText(0) : "WASH_BACK";
     newCmd.setProperty(StateKeys::TargetRole, defRole, nullptr);
     newCmd.setProperty(StateKeys::TargetParam, "Dimmer", nullptr);
-    newCmd.setProperty(StateKeys::StartValue, 127, nullptr);
-    newCmd.setProperty(StateKeys::EndValue, 127, nullptr);
-    newCmd.setProperty(StateKeys::CurveType, "Step (Stato Fisso)", nullptr);
+    newCmd.setProperty(StateKeys::StartValue, 255, nullptr);
+    newCmd.setProperty(StateKeys::EndValue, 255, nullptr);
+    newCmd.setProperty(StateKeys::CurveType, "Static", nullptr);
     currentSceneNode.addChild(newCmd, -1, nullptr);
     commandList.updateContent();
     commandList.selectRow(currentSceneNode.getNumChildren() - 1);
@@ -410,7 +452,8 @@ ShowBuilderTab::ShowBuilderTab(juce::ValueTree& state) : appState(state), miniDa
     presetLibNode.addListener(this);
 
     // -> CARICA I PRESET SALVATI IN PRECEDENZA DAL DISCO
-    loadPresetLibraryFromDisk();
+    if (presetLibNode.getNumChildren() == 0)
+        loadPresetLibraryFromDisk();
 
     sceneList.setModel(this);
     sceneList.setColour(juce::ListBox::backgroundColourId, juce::Colour(0xff141417));
@@ -440,6 +483,11 @@ ShowBuilderTab::ShowBuilderTab(juce::ValueTree& state) : appState(state), miniDa
 
     saveBtn.setButtonText("Salva Show..."); saveBtn.setColour(juce::TextButton::buttonColourId, juce::Colour(0xff293d3d));
     saveBtn.onClick = [this] { saveShow(); }; addAndMakeVisible(saveBtn);
+
+    importMidiMapBtn.setButtonText("Importa Tempo/Metrica (.mid)");
+    importMidiMapBtn.setColour(juce::TextButton::buttonColourId, juce::Colour(0xff1e3a5f));
+    importMidiMapBtn.onClick = [this] { importMidiTempoMap(); };
+    addAndMakeVisible(importMidiMapBtn);
 
     // Configurazione del pulsante Elimina Preset
     deletePresetBtnUI.setButtonText("Elimina Preset...");
@@ -507,78 +555,87 @@ void ShowBuilderTab::insertPresetIntoShow()
         juce::NativeMessageBox::showMessageBoxAsync(
             juce::MessageBoxIconType::WarningIcon,
             "Libreria Vuota",
-            "Non ci sono scene salvate nei preferiti. Salva prima un preset!"
-        );
+            "Non ci sono preset disponibili. Creane uno nella Tab 2 (Scene Builder)!");
         return;
     }
 
-    // Creiamo un menu a tendina dinamico (PopupMenu) con tutti i preset disponibili
+    const juce::StringArray pools = { "Color", "Dimmer", "Strobe", "Movement", "ImpactFX" };
     juce::PopupMenu menu;
-    for (int i = 0; i < presetLibNode.getNumChildren(); ++i)
+
+    for (const auto& poolName : pools)
     {
-        auto preset = presetLibNode.getChild(i);
-        if (preset.isValid())
+        juce::PopupMenu sub;
+        int count = 0;
+        for (int i = 0; i < presetLibNode.getNumChildren(); ++i)
         {
-            juce::String name = "Preset Senza Nome";
-            if (preset.hasProperty(StateKeys::SceneName))
-            {
-                auto propVal = preset.getProperty(StateKeys::SceneName);
-                if (propVal.toString().isNotEmpty())
-                    name = propVal.toString();
-            }
-            menu.addItem(i + 1, name);
+            auto preset = presetLibNode.getChild(i);
+            if (!preset.isValid()) continue;
+
+            juce::String pPool = preset.getProperty(StateKeys::PresetPool, "Color").toString();
+            if (pPool != poolName) continue;
+
+            juce::String name = preset.getProperty(StateKeys::PresetName, "").toString();
+            if (name.isEmpty())
+                name = preset.getProperty(StateKeys::SceneName, "Preset").toString();
+
+            double dur = static_cast<double>(preset.getProperty(StateKeys::DurationBeats, 4.0));
+            sub.addItem(i + 1, name + "  [" + juce::String(dur, 1) + " Q]");
+            ++count;
         }
+        if (count > 0)
+            menu.addSubMenu(poolName, sub);
     }
 
-    // Mostra il menu a tendina sotto il bottone
     menu.showMenuAsync(juce::PopupMenu::Options().withTargetComponent(&insertPresetBtn), [this](int result) {
-        if (result > 0)
+        if (result <= 0) return;
+
+        auto chosenPreset = presetLibNode.getChild(result - 1);
+        if (!chosenPreset.isValid()) return;
+
+        juce::ValueTree newSceneInstance(StateKeys::Scene);
+        for (int i = 0; i < chosenPreset.getNumProperties(); ++i)
         {
-            int index = result - 1;
-            auto chosenPreset = presetLibNode.getChild(index);
-            if (!chosenPreset.isValid()) return;
-
-            // 1. Creiamo un nuovo nodo Scena per la timeline
-            juce::ValueTree newSceneInstance(StateKeys::Scene);
-
-            // 2. Copia protetta delle proprietà
-            for (int i = 0; i < chosenPreset.getNumProperties(); ++i)
-            {
-                auto propName = chosenPreset.getPropertyName(i);
-                if (propName.isValid())
-                {
-                    newSceneInstance.setProperty(propName, chosenPreset.getProperty(propName), nullptr);
-                }
-            }
-
-            // 3. Copia protetta dei comandi figli
-            for (int i = 0; i < chosenPreset.getNumChildren(); ++i)
-            {
-                auto child = chosenPreset.getChild(i);
-                if (child.isValid())
-                {
-                    auto childCopy = child.createCopy();
-                    newSceneInstance.addChild(childCopy, -1, nullptr);
-                }
-            }
-
-            // 4. Posizionala ad un beat di default
-            double nextBeat = 1.0;
-            if (showNode.getNumChildren() > 0) {
-                auto lastScene = showNode.getChild(showNode.getNumChildren() - 1);
-                if (lastScene.isValid()) {
-                    double lastStart = lastScene.getProperty(StateKeys::StartBeat, 1.0);
-                    double lastDuration = lastScene.getProperty(StateKeys::DurationBeats, 4.0);
-                    nextBeat = lastStart + lastDuration;
-                }
-            }
-            newSceneInstance.setProperty(StateKeys::StartBeat, nextBeat, nullptr);
-
-            // 5. Aggiungila allo show
-            showNode.addChild(newSceneInstance, -1, nullptr);
-            sceneList.updateContent();
-            sceneList.selectRow(showNode.getNumChildren() - 1);
+            auto propName = chosenPreset.getPropertyName(i);
+            if (propName.isValid())
+                newSceneInstance.setProperty(propName, chosenPreset.getProperty(propName), nullptr);
         }
+
+        // Assicura che SceneName sia popolato dal PresetName dello Scene Builder
+        juce::String pName = chosenPreset.getProperty(StateKeys::PresetName, "").toString();
+        if (pName.isNotEmpty())
+            newSceneInstance.setProperty(StateKeys::SceneName, pName, nullptr);
+
+        for (int i = 0; i < chosenPreset.getNumChildren(); ++i)
+        {
+            auto child = chosenPreset.getChild(i);
+            if (child.isValid())
+                newSceneInstance.addChild(child.createCopy(), -1, nullptr);
+        }
+
+        // Posizionamento: se il playhead e' oltre 0s usa la posizione corrente (snappata a 0.5 Q),
+        // altrimenti accoda subito dopo l'ultima scena
+        double nextBeat = 1.0;
+        double playSec = audioEngine.getCurrentPositionSeconds();
+        if (playSec > 0.05)
+        {
+            double rawBeat = beatTimeMap.secondsToBeat(playSec);
+            nextBeat = juce::jmax(1.0, std::round(rawBeat * 2.0) * 0.5);
+        }
+        else if (showNode.getNumChildren() > 0)
+        {
+            auto lastScene = showNode.getChild(showNode.getNumChildren() - 1);
+            if (lastScene.isValid())
+            {
+                double lastStart = lastScene.getProperty(StateKeys::StartBeat, 1.0);
+                double lastDuration = lastScene.getProperty(StateKeys::DurationBeats, 4.0);
+                nextBeat = lastStart + lastDuration;
+            }
+        }
+        newSceneInstance.setProperty(StateKeys::StartBeat, nextBeat, nullptr);
+
+        showNode.addChild(newSceneInstance, -1, nullptr);
+        sceneList.updateContent();
+        sceneList.selectRow(showNode.getNumChildren() - 1);
         });
 }
 
@@ -685,14 +742,15 @@ void ShowBuilderTab::resized()
 
     // 2. Parte Inferiore: Lista Scene a sinistra + SceneEditorPanel a destra
     auto leftPanel = bounds.removeFromLeft(juce::roundToInt(bounds.getWidth() * 0.30f));
-    auto bottomArea = leftPanel.removeFromBottom(240).reduced(10, 5);
+    auto bottomArea = leftPanel.removeFromBottom(272).reduced(10, 5);
 
-    saveBtn.setBounds(bottomArea.removeFromBottom(28)); bottomArea.removeFromBottom(4);
-    loadBtn.setBounds(bottomArea.removeFromBottom(28)); bottomArea.removeFromBottom(4);
+    importMidiMapBtn.setBounds(bottomArea.removeFromBottom(28)); bottomArea.removeFromBottom(4);
+    saveBtn.setBounds(bottomArea.removeFromBottom(28));          bottomArea.removeFromBottom(4);
+    loadBtn.setBounds(bottomArea.removeFromBottom(28));          bottomArea.removeFromBottom(4);
     deletePresetBtnUI.setBounds(bottomArea.removeFromBottom(28)); bottomArea.removeFromBottom(4);
-    deleteSceneBtn.setBounds(bottomArea.removeFromBottom(28)); bottomArea.removeFromBottom(4);
-    insertPresetBtn.setBounds(bottomArea.removeFromBottom(28)); bottomArea.removeFromBottom(4);
-    savePresetBtn.setBounds(bottomArea.removeFromBottom(28)); bottomArea.removeFromBottom(4);
+    deleteSceneBtn.setBounds(bottomArea.removeFromBottom(28));   bottomArea.removeFromBottom(4);
+    insertPresetBtn.setBounds(bottomArea.removeFromBottom(28));  bottomArea.removeFromBottom(4);
+    savePresetBtn.setBounds(bottomArea.removeFromBottom(28));    bottomArea.removeFromBottom(4);
     addSceneBtn.setBounds(bottomArea.removeFromBottom(28));
 
     sceneList.setBounds(leftPanel.reduced(10));
@@ -713,6 +771,45 @@ void ShowBuilderTab::resized()
     }
 }
 
+void ShowBuilderTab::importMidiTempoMap()
+{
+    fileChooser = std::make_unique<juce::FileChooser>(
+        "Importa Tempo / Meter Map MIDI (da Reaper)",
+        juce::File::getSpecialLocation(juce::File::userDocumentsDirectory),
+        "*.mid;*.midi");
+
+    auto flags = juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles;
+    fileChooser->launchAsync(flags, [this](const juce::FileChooser& fc) {
+        auto file = fc.getResult();
+        if (!file.existsAsFile()) return;
+
+        auto res = beatTimeMap.importMidiTempoAndMeterMap(file, 0.0);
+        if (!res.success)
+        {
+            juce::NativeMessageBox::showMessageBoxAsync(
+                juce::MessageBoxIconType::WarningIcon,
+                "Errore Import MIDI",
+                res.errorMessage);
+            return;
+        }
+
+        miniDawTimeline.syncWithAppState();
+        sceneList.repaint();
+        stageSimulator.repaint();
+
+        juce::String msg = "Mappa importata con successo!\n"
+            + juce::String("BPM iniziale: ") + juce::String(res.initialBpm, 1) + "\n"
+            + juce::String("Metrica iniziale: ") + juce::String(res.initialNum) + "/" + juce::String(res.initialDen) + "\n"
+            + juce::String("Cambi Tempo importati: ") + juce::String(res.tempoChangesImported) + "\n"
+            + juce::String("Cambi Metrica importati: ") + juce::String(res.meterChangesImported);
+
+        juce::NativeMessageBox::showMessageBoxAsync(
+            juce::MessageBoxIconType::InfoIcon,
+            "Tempo & Meter Map Importata",
+            msg);
+        });
+}
+
 void ShowBuilderTab::deletePresetFromLibrary()
 {
     if (!presetLibNode.isValid() || presetLibNode.getNumChildren() == 0)
@@ -730,7 +827,8 @@ void ShowBuilderTab::deletePresetFromLibrary()
     for (int i = 0; i < presetLibNode.getNumChildren(); ++i)
     {
         auto preset = presetLibNode.getChild(i);
-        juce::String name = preset.getProperty(StateKeys::SceneName, "Preset Senza Nome").toString();
+        juce::String name = preset.getProperty(StateKeys::PresetName, "").toString();
+        if (name.isEmpty()) name = preset.getProperty(StateKeys::SceneName, "Preset Senza Nome").toString();
         menu.addItem(i + 1, name);
     }
 

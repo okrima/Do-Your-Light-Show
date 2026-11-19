@@ -6,29 +6,52 @@ class PresetManager
 {
 public:
     // =========================================================================
-    // SALVATAGGIO
+    // SALVATAGGIO (JSON ricorsivo: include VENUE -> FIXTURE -> FIXTURE_UNIT)
     // =========================================================================
     static bool saveVenue(const juce::ValueTree& appState, const juce::File& file)
     {
         auto venueNode = appState.getChildWithName(StateKeys::VenueNode);
+        if (!venueNode.isValid())
+            return false;
+
         return saveValueTreeToJson(venueNode, file);
     }
 
     static bool saveShow(const juce::ValueTree& appState, const juce::File& file)
     {
         auto showNode = appState.getChildWithName(StateKeys::ShowNode);
+        if (!showNode.isValid())
+            return false;
+
         return saveValueTreeToJson(showNode, file);
     }
 
     // =========================================================================
-    // CARICAMENTO
+    // CARICAMENTO (Supporta JSON + fallback automatico XML per .venue)
     // =========================================================================
     static bool loadVenue(juce::ValueTree& appState, const juce::File& file)
     {
+        if (!file.existsAsFile())
+            return false;
+
         juce::ValueTree loadedNode = loadValueTreeFromJson(file);
+
+        // Fallback nel caso il file .venue fosse stato salvato in XML
+        if (!loadedNode.isValid())
+        {
+            if (auto xml = juce::XmlDocument::parse(file))
+                loadedNode = juce::ValueTree::fromXml(*xml);
+        }
+
         if (loadedNode.isValid() && loadedNode.hasType(StateKeys::VenueNode))
         {
             auto existingNode = appState.getChildWithName(StateKeys::VenueNode);
+            if (!existingNode.isValid())
+            {
+                existingNode = juce::ValueTree(StateKeys::VenueNode);
+                appState.addChild(existingNode, -1, nullptr);
+            }
+
             updateNodePreservingListeners(existingNode, loadedNode);
             return true;
         }
@@ -37,10 +60,19 @@ public:
 
     static bool loadShow(juce::ValueTree& appState, const juce::File& file)
     {
+        if (!file.existsAsFile())
+            return false;
+
         juce::ValueTree loadedNode = loadValueTreeFromJson(file);
         if (loadedNode.isValid() && loadedNode.hasType(StateKeys::ShowNode))
         {
             auto existingNode = appState.getChildWithName(StateKeys::ShowNode);
+            if (!existingNode.isValid())
+            {
+                existingNode = juce::ValueTree(StateKeys::ShowNode);
+                appState.addChild(existingNode, -1, nullptr);
+            }
+
             updateNodePreservingListeners(existingNode, loadedNode);
             return true;
         }
@@ -121,8 +153,8 @@ private:
             auto& props = obj->getProperties();
             for (auto& p : props)
             {
-                // MSVC Fix: estraiamo esplicitamente la stringa per rimuovere l'ambiguità
-                if (p.name.toString() == "nodeType" || p.name.toString() == "children") continue;
+                if (p.name.toString() == "nodeType" || p.name.toString() == "children")
+                    continue;
 
                 vt.setProperty(p.name, p.value, nullptr);
             }

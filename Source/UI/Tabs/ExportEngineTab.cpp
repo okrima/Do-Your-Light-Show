@@ -50,9 +50,9 @@ void ExportEngineTab::startMidiExportProcess()
         "*.mid"
     );
 
-    auto flags = juce::FileBrowserComponent::saveMode | juce::FileBrowserComponent::canSelectFiles;
+    auto chooserFlags = juce::FileBrowserComponent::saveMode | juce::FileBrowserComponent::canSelectFiles;
 
-    fileChooser->launchAsync(flags, [this](const juce::FileChooser& chooser) {
+    fileChooser->launchAsync(chooserFlags, [this](const juce::FileChooser& chooser) {
         auto file = chooser.getResult();
         if (file == juce::File{}) return; // Annullato
 

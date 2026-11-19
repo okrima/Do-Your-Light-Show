@@ -3,7 +3,8 @@
   "children": [
     {
       "nodeType": "FIXTURE",
-      "name": "Appesi Wash",
+      "name": "Wash Back Sx",
+      "quantity": 4,
       "startAddress": 1,
       "channelCount": 8,
       "role": "Aria: Wash Controluce (Fondale)",
@@ -11,105 +12,337 @@
       "map_Red": 2,
       "map_Green": 3,
       "map_Blue": 4,
-      "map_Pan": 5,
-      "map_Tilt": 6
+      "strobeMode": 0,
+      "dimmerMaxVal": 134,
+      "strobeOpenVal": 0,
+      "strobeMinVal": 135,
+      "strobeMinHz": 1.0,
+      "strobeMaxVal": 245,
+      "strobeMaxHz": 40.0,
+      "allowDimmerStrobe": true,
+      "panHome": 128,
+      "tiltHome": 90,
+      "panOffset": 0,
+      "tiltOffset": 0,
+      "panRange": 120,
+      "tiltRange": 90,
+      "map_Strobe": 1,
+      "children": [
+        {
+          "nodeType": "FIXTURE_UNIT",
+          "unitIndex": 1,
+          "isPlaced": true,
+          "posX": 0.190355330705643,
+          "posY": 0.244552060961723
+        },
+        {
+          "nodeType": "FIXTURE_UNIT",
+          "unitIndex": 2,
+          "isPlaced": true,
+          "posX": 0.275380700826645,
+          "posY": 0.242130756378174
+        },
+        {
+          "nodeType": "FIXTURE_UNIT",
+          "unitIndex": 3,
+          "isPlaced": true,
+          "posX": 0.362944155931473,
+          "posY": 0.240920096635818
+        },
+        {
+          "nodeType": "FIXTURE_UNIT",
+          "unitIndex": 4,
+          "isPlaced": true,
+          "posX": 0.449238568544388,
+          "posY": 0.238498792052269
+        }
+      ]
     },
     {
       "nodeType": "FIXTURE",
-      "name": "Appesi Beam",
+      "name": "Wash Back Dx",
+      "quantity": 4,
       "startAddress": 11,
+      "channelCount": 8,
+      "role": "Aria: Wash Controluce (Fondale)",
+      "map_Dimmer": 1,
+      "map_Red": 2,
+      "map_Green": 3,
+      "map_Blue": 4,
+      "strobeMode": 0,
+      "dimmerMaxVal": 134,
+      "strobeOpenVal": 0,
+      "strobeMinVal": 135,
+      "strobeMinHz": 1.0,
+      "strobeMaxVal": 245,
+      "strobeMaxHz": 20.0,
+      "allowDimmerStrobe": true,
+      "panHome": 128,
+      "tiltHome": 90,
+      "panOffset": 0,
+      "tiltOffset": 0,
+      "panRange": 120,
+      "tiltRange": 90,
+      "map_Strobe": 1,
+      "children": [
+        {
+          "nodeType": "FIXTURE_UNIT",
+          "unitIndex": 1,
+          "isPlaced": true,
+          "posX": 0.84517765045166,
+          "posY": 0.246973365545273
+        },
+        {
+          "nodeType": "FIXTURE_UNIT",
+          "unitIndex": 2,
+          "isPlaced": true,
+          "posX": 0.772842645645142,
+          "posY": 0.248184025287628
+        },
+        {
+          "nodeType": "FIXTURE_UNIT",
+          "unitIndex": 3,
+          "isPlaced": true,
+          "posX": 0.618020296096802,
+          "posY": 0.245762705802917
+        },
+        {
+          "nodeType": "FIXTURE_UNIT",
+          "unitIndex": 4,
+          "isPlaced": true,
+          "posX": 0.697969555854797,
+          "posY": 0.250605314970016
+        }
+      ]
+    },
+    {
+      "nodeType": "FIXTURE",
+      "name": "Beam Back",
+      "quantity": 2,
+      "startAddress": 21,
       "channelCount": 8,
       "role": "Aria: Teste Mobili / Beam",
       "map_Dimmer": 1,
       "map_Red": 2,
       "map_Green": 3,
       "map_Blue": 4,
-      "map_Pan": 5,
-      "map_Tilt": 6
+      "strobeMode": 0,
+      "dimmerMaxVal": 134,
+      "strobeOpenVal": 0,
+      "strobeMinVal": 135,
+      "strobeMinHz": 1.0,
+      "strobeMaxVal": 245,
+      "strobeMaxHz": 40.0,
+      "allowDimmerStrobe": true,
+      "panHome": 128,
+      "tiltHome": 90,
+      "panOffset": 0,
+      "tiltOffset": 0,
+      "panRange": 120,
+      "tiltRange": 90,
+      "map_Strobe": 1,
+      "children": [
+        {
+          "nodeType": "FIXTURE_UNIT",
+          "unitIndex": 1,
+          "isPlaced": true,
+          "posX": 0.312182754278183,
+          "posY": 0.180387407541275
+        },
+        {
+          "nodeType": "FIXTURE_UNIT",
+          "unitIndex": 2,
+          "isPlaced": true,
+          "posX": 0.738578677177429,
+          "posY": 0.186440676450729
+        }
+      ]
     },
     {
       "nodeType": "FIXTURE",
-      "name": "Terra Fisse Back",
-      "startAddress": 21,
-      "channelCount": 8,
-      "role": "Terra: Controluce / Sotto-Batteria",
-      "map_Dimmer": 1,
-      "map_Red": 2,
-      "map_Green": 3,
-      "map_Blue": 4
-    },
-    {
-      "nodeType": "FIXTURE",
-      "name": "Terra Barre Laterari",
+      "name": "Geysers",
+      "quantity": 2,
       "startAddress": 31,
-      "channelCount": 8,
-      "role": "Terra: Par / Barre Laterali (Taglio)",
-      "map_Dimmer": 1,
-      "map_Red": 2,
-      "map_Green": 3,
-      "map_Blue": 4,
-      "map_Pan": 0,
-      "map_Tilt": 0
-    },
-    {
-      "nodeType": "FIXTURE",
-      "name": "Terra Teste Mobili",
-      "startAddress": 41,
-      "channelCount": 8,
-      "role": "Terra: Teste Mobili a Terra",
-      "map_Dimmer": 1,
-      "map_Red": 2,
-      "map_Green": 3,
-      "map_Blue": 4,
-      "map_Pan": 5,
-      "map_Tilt": 6
-    },
-    {
-      "nodeType": "FIXTURE",
-      "name": "Blinder Crowd",
-      "startAddress": 51,
-      "channelCount": 8,
-      "role": "Impatto: Blinder Pubblico",
-      "map_Dimmer": 1,
-      "map_Red": 2,
-      "map_Green": 3,
-      "map_Blue": 4
-    },
-    {
-      "nodeType": "FIXTURE",
-      "name": "Strobo",
-      "startAddress": 61,
-      "channelCount": 8,
-      "role": "Impatto: Strobo",
-      "map_Dimmer": 1,
-      "map_Red": 2,
-      "map_Green": 3,
-      "map_Blue": 4,
-      "map_Strobe": 5
-    },
-    {
-      "nodeType": "FIXTURE",
-      "name": "Hazer",
-      "startAddress": 71,
-      "channelCount": 8,
-      "role": "FX: Macchina del Fumo / Hazer",
-      "map_Dimmer": 0,
-      "map_Red": 0,
-      "map_Green": 0,
-      "map_Blue": 0,
-      "map_GeyserBlast": 1
-    },
-    {
-      "nodeType": "FIXTURE",
-      "name": "Geyser",
-      "startAddress": 81,
       "channelCount": 8,
       "role": "FX: Geyser Verticale (Fumo + LED)",
       "map_Dimmer": 1,
       "map_Red": 2,
       "map_Green": 3,
       "map_Blue": 4,
-      "map_GeyserBlast": 5
+      "strobeMode": 0,
+      "dimmerMaxVal": 134,
+      "strobeOpenVal": 0,
+      "strobeMinVal": 135,
+      "strobeMinHz": 1.0,
+      "strobeMaxVal": 245,
+      "strobeMaxHz": 20.0,
+      "allowDimmerStrobe": true,
+      "panHome": 128,
+      "tiltHome": 90,
+      "panOffset": 0,
+      "tiltOffset": 0,
+      "panRange": 120,
+      "tiltRange": 90,
+      "map_GeyserBlast": 1,
+      "map_Strobe": 1,
+      "children": [
+        {
+          "nodeType": "FIXTURE_UNIT",
+          "unitIndex": 1,
+          "isPlaced": true,
+          "posX": 0.162030443549156,
+          "posY": 0.911573827266693
+        },
+        {
+          "nodeType": "FIXTURE_UNIT",
+          "unitIndex": 2,
+          "isPlaced": true,
+          "posX": 0.837969541549683,
+          "posY": 0.911573827266693
+        }
+      ]
+    },
+    {
+      "nodeType": "FIXTURE",
+      "name": "Hazer",
+      "quantity": 2,
+      "startAddress": 41,
+      "channelCount": 1,
+      "role": "FX: Macchina del Fumo / Hazer",
+      "map_Dimmer": 0,
+      "map_Red": 0,
+      "map_Green": 0,
+      "map_Blue": 0,
+      "strobeMode": 0,
+      "dimmerMaxVal": 255,
+      "strobeOpenVal": 0,
+      "strobeMinVal": 20,
+      "strobeMinHz": 1.0,
+      "strobeMaxVal": 245,
+      "strobeMaxHz": 20.0,
+      "allowDimmerStrobe": true,
+      "panHome": 128,
+      "tiltHome": 90,
+      "panOffset": 0,
+      "tiltOffset": 0,
+      "panRange": 120,
+      "tiltRange": 90,
+      "map_GeyserBlast": 1,
+      "children": [
+        {
+          "nodeType": "FIXTURE_UNIT",
+          "unitIndex": 1,
+          "isPlaced": true,
+          "posX": 0.295685291290283,
+          "posY": 0.910411596298218
+        },
+        {
+          "nodeType": "FIXTURE_UNIT",
+          "unitIndex": 2,
+          "isPlaced": true,
+          "posX": 0.680203020572662,
+          "posY": 0.907990336418152
+        }
+      ]
+    },
+    {
+      "nodeType": "FIXTURE",
+      "name": "Wash Back",
+      "quantity": 4,
+      "startAddress": 51,
+      "channelCount": 8,
+      "role": "Terra: Controluce / Sotto-Batteria",
+      "map_Dimmer": 1,
+      "map_Red": 2,
+      "map_Green": 3,
+      "map_Blue": 4,
+      "strobeMode": 0,
+      "dimmerMaxVal": 134,
+      "strobeOpenVal": 0,
+      "strobeMinVal": 135,
+      "strobeMinHz": 1.0,
+      "strobeMaxVal": 245,
+      "strobeMaxHz": 40.0,
+      "allowDimmerStrobe": true,
+      "panHome": 128,
+      "tiltHome": 90,
+      "panOffset": 0,
+      "tiltOffset": 0,
+      "panRange": 120,
+      "tiltRange": 90,
+      "map_Strobe": 1,
+      "children": [
+        {
+          "nodeType": "FIXTURE_UNIT",
+          "unitIndex": 1,
+          "isPlaced": true,
+          "posX": 0.837969541549683,
+          "posY": 0.698692500591278
+        },
+        {
+          "nodeType": "FIXTURE_UNIT",
+          "unitIndex": 2,
+          "isPlaced": true,
+          "posX": 0.162030443549156,
+          "posY": 0.698692500591278
+        },
+        {
+          "nodeType": "FIXTURE_UNIT",
+          "unitIndex": 3,
+          "isPlaced": true,
+          "posX": 0.36167511343956,
+          "posY": 0.698692500591278
+        },
+        {
+          "nodeType": "FIXTURE_UNIT",
+          "unitIndex": 4,
+          "isPlaced": true,
+          "posX": 0.582487285137177,
+          "posY": 0.698692500591278
+        }
+      ]
+    },
+    {
+      "nodeType": "FIXTURE",
+      "name": "Blinders",
+      "quantity": 2,
+      "startAddress": 61,
+      "channelCount": 8,
+      "role": "Impatto: Blinder Pubblico",
+      "map_Dimmer": 1,
+      "map_Red": 2,
+      "map_Green": 3,
+      "map_Blue": 4,
+      "strobeMode": 0,
+      "dimmerMaxVal": 255,
+      "strobeOpenVal": 0,
+      "strobeMinVal": 20,
+      "strobeMinHz": 1.0,
+      "strobeMaxVal": 245,
+      "strobeMaxHz": 20.0,
+      "allowDimmerStrobe": true,
+      "panHome": 128,
+      "tiltHome": 90,
+      "panOffset": 0,
+      "tiltOffset": 0,
+      "panRange": 120,
+      "tiltRange": 90,
+      "children": [
+        {
+          "nodeType": "FIXTURE_UNIT",
+          "unitIndex": 1,
+          "isPlaced": true,
+          "posX": 0.734771549701691,
+          "posY": 0.091234870254993
+        },
+        {
+          "nodeType": "FIXTURE_UNIT",
+          "unitIndex": 2,
+          "isPlaced": true,
+          "posX": 0.199238583445549,
+          "posY": 0.091234870254993
+        }
+      ]
     }
   ]
 }
