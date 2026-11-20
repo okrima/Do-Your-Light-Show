@@ -29,6 +29,13 @@
       "map_Strobe": 1,
       "map_Pan": 5,
       "map_Tilt": 6,
+      "panMin": 0,
+      "panMax": 255,
+      "tiltMin": 49,
+      "tiltMax": 211,
+      "swapPanTilt": false,
+      "invertPan": false,
+      "invertTilt": false,
       "children": [
         {
           "nodeType": "FIXTURE_UNIT",

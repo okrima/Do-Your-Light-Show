@@ -1,4 +1,5 @@
 #include "VenuePatchTab.h"
+#include "../Components/PanTiltCalibrationWizard.h"
 
 namespace
 {
@@ -210,6 +211,12 @@ FixtureEditorPanel::FixtureEditorPanel(juce::ValueTree& state) : appState(state)
     ptSectionLabel.setFont(juce::FontOptions(13.5f, juce::Font::bold));
     ptSectionLabel.setColour(juce::Label::textColourId, juce::Colour(0xffa78bfa));
     addAndMakeVisible(ptSectionLabel);
+
+    ptWizardBtn.setButtonText("Taratura Guidata...");
+    ptWizardBtn.setColour(juce::TextButton::buttonColourId, juce::Colour(0xff5b21b6));
+    ptWizardBtn.setTooltip("Apre il wizard passo-passo per tarare i limiti SX/DX/Giu/Su dal vivo");
+    ptWizardBtn.onClick = [this]() { openCalibrationWizard(); };
+    addAndMakeVisible(ptWizardBtn);
 
     auto setupSpreadBtn = [this](juce::TextButton& btn, const juce::String& txt, int id)
         {
@@ -447,8 +454,10 @@ void FixtureEditorPanel::resized()
     strobeEndHzSlider.setBounds(sRow4.removeFromLeft(105));
 
     // Sezione 4: Area di Movimento sul Palco (4 Limiti DMX + Shift + Totem)
-    bounds.removeFromTop(10);
-    ptSectionLabel.setBounds(bounds.removeFromTop(18));
+    auto ptHeaderRow = bounds.removeFromTop(22);
+    ptWizardBtn.setBounds(ptHeaderRow.removeFromRight(142));
+    ptHeaderRow.removeFromRight(8);
+    ptSectionLabel.setBounds(ptHeaderRow);
     bounds.removeFromTop(5);
 
     // Riga 1: 3 Preset Rapidi di ampiezza
@@ -550,7 +559,6 @@ void FixtureEditorPanel::updateUIFromNode()
     strobeEndDmxSlider.setValue(spec.maxVal, juce::dontSendNotification);
     strobeEndHzSlider.setValue(spec.maxHz, juce::dontSendNotification);
 
-    const bool hasPT = StageRoleCatalog::PanTiltHardwareSpec::hasPanOrTiltChannels(currentFixtureNode);
     auto ptSpec = StageRoleCatalog::PanTiltHardwareSpec::fromFixtureNode(currentFixtureNode);
     const bool hasAnyPT = ptSpec.hasPanChannel || ptSpec.hasTiltChannel;
     const bool hasBothPT = ptSpec.hasPanChannel && ptSpec.hasTiltChannel;
@@ -562,6 +570,7 @@ void FixtureEditorPanel::updateUIFromNode()
     swapPanTiltToggle.setToggleState(ptSpec.swapPanTilt, juce::dontSendNotification);
 
     ptSpreadNarrowBtn.setEnabled(hasAnyPT);
+    ptWizardBtn.setEnabled(hasAnyPT);
     ptSpreadMedBtn.setEnabled(hasAnyPT);
     ptSpreadWideBtn.setEnabled(hasAnyPT);
 
@@ -616,6 +625,29 @@ void FixtureEditorPanel::shiftPanLimits(int delta)
     spec.shiftPan(delta);
     spec.writeToFixtureNode(currentFixtureNode);
     updateUIFromNode();
+}
+
+void FixtureEditorPanel::openCalibrationWizard()
+{
+    if (!currentFixtureNode.isValid())
+        return;
+
+    auto* wizard = new PanTiltCalibrationWizard(currentFixtureNode);
+    juce::Component::SafePointer<FixtureEditorPanel> safeThis(this);
+    wizard->onCalibrationSaved = [safeThis]() {
+        if (safeThis != nullptr)
+            safeThis->updateUIFromNode();
+        };
+
+    juce::DialogWindow::LaunchOptions opts;
+    opts.content.setOwned(wizard);
+    opts.dialogTitle = "Taratura Guidata Pan/Tilt - "
+        + currentFixtureNode.getProperty(StateKeys::FixtureName, "Faro").toString();
+    opts.dialogBackgroundColour = juce::Colour(0xff11121a);
+    opts.escapeKeyTriggersCloseButton = true;
+    opts.useNativeTitleBar = true;
+    opts.resizable = false;
+    opts.launchAsync();
 }
 
 void FixtureEditorPanel::valueTreePropertyChanged(juce::ValueTree&, const juce::Identifier&)

@@ -57,7 +57,7 @@ target_sources(DoYourLightShow
         
         # Utils
         Source/Utils/PresetManager.h
- "Source/UI/Tabs/SceneBuilderTab.h" "Source/Model/CurveEvaluator.h")
+ "Source/UI/Tabs/SceneBuilderTab.h" "Source/Model/CurveEvaluator.h" "Source/UI/Components/PanTiltCalibrationWizard.h")
 
 # 4. Include directory
 target_include_directories(DoYourLightShow

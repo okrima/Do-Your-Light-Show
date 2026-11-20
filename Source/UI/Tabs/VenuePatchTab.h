@@ -85,6 +85,7 @@ private:
     void updateUIFromNode();
     void applyQuickSpreadPreset(int presetId);
     void shiftPanLimits(int delta);
+    void openCalibrationWizard();
 
     void valueTreePropertyChanged(juce::ValueTree&, const juce::Identifier&) override;
     void valueTreeChildAdded(juce::ValueTree&, juce::ValueTree&) override {}
@@ -134,6 +135,7 @@ private:
 
     // 4. Area di Movimento sul Palco (4 Limiti DMX + Shift Pan + Totem)
     juce::Label ptSectionLabel;
+    juce::TextButton ptWizardBtn;
     juce::TextButton ptSpreadNarrowBtn, ptSpreadMedBtn, ptSpreadWideBtn;
 
     juce::Label panSxLabel, panDxLabel;

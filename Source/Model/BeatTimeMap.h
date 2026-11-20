@@ -93,6 +93,9 @@ public:
         baseTimeSigNum = juce::jlimit(1, 32, static_cast<int>(beatMapNode.getProperty(StateKeys::TimeSigNum, 4)));
         baseTimeSigDen = sanitizeDenominator(static_cast<int>(beatMapNode.getProperty(StateKeys::TimeSigDen, 4)));
 
+        midiEndBeatCache = juce::jmax(1.0,
+            static_cast<double>(beatMapNode.getProperty(juce::Identifier("midiEndBeat"), 1.0)));
+
         const int numChildren = beatMapNode.getNumChildren();
         anchors.reserve(static_cast<size_t>(numChildren));
 
@@ -249,6 +252,8 @@ public:
         std::vector<RawTempo> rawTempos;
         std::vector<RawMeter> rawMeters;
 
+        double maxTickFound = 0.0;
+
         for (int t = 0; t < mf.getNumTracks(); ++t)
         {
             const auto* seq = mf.getTrack(t);
@@ -261,6 +266,9 @@ public:
 
                 const auto& msg = holder->message;
                 const double tick = juce::jmax(0.0, msg.getTimeStamp());
+
+                if (tick > maxTickFound)
+                    maxTickFound = tick;
 
                 if (msg.isTempoMetaEvent())
                 {
@@ -339,6 +347,11 @@ public:
             beatMapNode.setProperty(StateKeys::FirstDownbeatSec, juce::jmax(0.0, offsetSec), nullptr);
             beatMapNode.setProperty(StateKeys::TimeSigNum, rawMeters.front().num, nullptr);
             beatMapNode.setProperty(StateKeys::TimeSigDen, rawMeters.front().den, nullptr);
+
+            const double lastEventBeat = 1.0 + (maxTickFound / tpq);
+            const double lastAnchorBeat = newAnchors.empty() ? 1.0 : newAnchors.back().beat;
+            const double mapEndBeat = juce::jmax(lastEventBeat, lastAnchorBeat) + 16.0;
+            beatMapNode.setProperty(juce::Identifier("midiEndBeat"), mapEndBeat, nullptr);
 
             for (const auto& a : newAnchors)
             {
@@ -515,6 +528,50 @@ public:
     int getBaseTimeSigDen() const { return baseTimeSigDen; }
     const std::vector<MeterAnchor>& getMeterAnchors() const { return meterAnchors; }
 
+    const std::vector<BeatAnchor>& getBeatAnchors() const { return anchors; }
+    bool hasVariableTempoMap() const noexcept { return anchors.size() > 1; }
+    bool hasImportedMidiMap() const noexcept { return !anchors.empty() || midiEndBeatCache > 1.1; }
+
+    double getMapEndBeat() const noexcept
+    {
+        double endB = midiEndBeatCache;
+        if (!anchors.empty())
+            endB = juce::jmax(endB, anchors.back().beat + 16.0);
+        if (!meterAnchors.empty())
+            endB = juce::jmax(endB, meterAnchors.back().startBeat + meterAnchors.back().getBarLengthQ() * 4.0);
+        return juce::jmax(1.0, endB);
+    }
+
+    double getMapEndSeconds() const
+    {
+        const double endB = getMapEndBeat();
+        return (endB > 1.1) ? beatToSeconds(endB) : 0.0;
+    }
+
+    void removeMeterChangeNear(double beatQ, double toleranceQ = 0.5)
+    {
+        if (!beatMapNode.isValid() || beatQ <= 1.05)
+            return;
+
+        bool removed = false;
+        for (int i = beatMapNode.getNumChildren() - 1; i >= 0; --i)
+        {
+            auto child = beatMapNode.getChild(i);
+            if (!child.hasType(StateKeys::MeterPointNode))
+                continue;
+
+            double ptB = static_cast<double>(child.getProperty(StateKeys::PointBeat, 1.0));
+            if (ptB > 1.05 && std::abs(ptB - beatQ) <= toleranceQ)
+            {
+                beatMapNode.removeChild(i, nullptr);
+                removed = true;
+            }
+        }
+
+        if (removed)
+            rebuildCacheFromState();
+    }
+
     static int sanitizeDenominator(int den) noexcept
     {
         if (den == 2 || den == 4 || den == 8 || den == 16) return den;
@@ -587,4 +644,6 @@ private:
     int baseTimeSigDen = 4;
     std::vector<BeatAnchor> anchors;
     std::vector<MeterAnchor> meterAnchors;
+
+    double midiEndBeatCache = 1.0;
 };

@@ -1136,10 +1136,9 @@ private:
 
         if (vf.panTiltSpec.hasPanChannel)
         {
-            float u = vf.state.hasPanCmd ? vf.state.panCmd : 0.5f;
-            if (mirrorPan) u = 1.0f - u;
-            const float spanFactor = juce::jlimit(0.0f, 1.0f, static_cast<float>(vf.panTiltSpec.getPanSpan()) / 140.0f);
-            outPanSigned = juce::jlimit(-1.0f, 1.0f, (u - 0.5f) * 2.0f * spanFactor);
+            const float rawPan = vf.state.hasPanCmd ? vf.state.panCmd : 0.5f;
+            const int panDmx = vf.panTiltSpec.mapStagePanToDmx(rawPan, mirrorPan);
+            outPanSigned = juce::jlimit(-1.0f, 1.0f, (static_cast<float>(panDmx) - 127.5f) / 90.0f);
         }
         else
         {
@@ -1148,9 +1147,9 @@ private:
 
         if (vf.panTiltSpec.hasTiltChannel)
         {
-            const float u = vf.state.hasTiltCmd ? vf.state.tiltCmd : 0.5f;
-            const float spanFactor = juce::jlimit(0.0f, 1.0f, static_cast<float>(vf.panTiltSpec.getTiltSpan()) / 100.0f);
-            outTiltNorm = juce::jlimit(0.05f, 0.95f, 0.45f + (u - 0.5f) * 0.85f * spanFactor);
+            const float rawTilt = vf.state.hasTiltCmd ? vf.state.tiltCmd : 0.5f;
+            const int tiltDmx = vf.panTiltSpec.mapStageTiltToDmx(rawTilt);
+            outTiltNorm = juce::jlimit(0.05f, 0.95f, static_cast<float>(tiltDmx) / 255.0f);
         }
         else
         {
