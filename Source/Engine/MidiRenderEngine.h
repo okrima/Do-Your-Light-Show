@@ -46,12 +46,7 @@ public:
             int roleSpatialTotal = 1;
             StageRoleCatalog::StrobeHardwareSpec strobeSpec;
 
-            float panHomeNorm = 0.5f;
-            float tiltHomeNorm = 0.35f;
-            float panOffsetNorm = 0.0f;
-            float tiltOffsetNorm = 0.0f;
-            float panRangeNorm = 0.47f;
-            float tiltRangeNorm = 0.35f;
+            StageRoleCatalog::PanTiltHardwareSpec panTiltSpec;
         };
 
         std::vector<RenderFixture> fixtures;
@@ -71,13 +66,7 @@ public:
             if (rf.roleName.isEmpty()) rf.roleName = fName;
             rf.category = StageRoleCatalog::classifyRole(rf.roleName, fName);
             rf.strobeSpec = StageRoleCatalog::StrobeHardwareSpec::fromFixtureNode(fix);
-
-            rf.panHomeNorm = static_cast<float>(static_cast<int>(fix.getProperty(StateKeys::PanHome, 128))) / 255.0f;
-            rf.tiltHomeNorm = static_cast<float>(static_cast<int>(fix.getProperty(StateKeys::TiltHome, 90))) / 255.0f;
-            rf.panOffsetNorm = static_cast<float>(static_cast<int>(fix.getProperty(StateKeys::PanOffset, 0))) / 255.0f;
-            rf.tiltOffsetNorm = static_cast<float>(static_cast<int>(fix.getProperty(StateKeys::TiltOffset, 0))) / 255.0f;
-            rf.panRangeNorm = static_cast<float>(static_cast<int>(fix.getProperty(StateKeys::PanRange, 120))) / 255.0f;
-            rf.tiltRangeNorm = static_cast<float>(static_cast<int>(fix.getProperty(StateKeys::TiltRange, 90))) / 255.0f;
+            rf.panTiltSpec = StageRoleCatalog::PanTiltHardwareSpec::fromFixtureNode(fix);
 
             // Media della PosX delle unita' piazzate (per ordinamento SX->DX e Ventaglio Simmetrico)
             double sumX = 0.0;
@@ -187,7 +176,14 @@ public:
 
                     int dimOffset = static_cast<int>(rf.node.getProperty(StateKeys::getMappingKey("Dimmer"), 0));
                     int strOffset = static_cast<int>(rf.node.getProperty(StateKeys::getMappingKey("Strobe"), 0));
-                    int parOffset = static_cast<int>(rf.node.getProperty(StateKeys::getMappingKey(param), 0));
+
+                    juce::String physicalParam = param;
+                    if (rf.panTiltSpec.isSwapped())
+                    {
+                        if (param.equalsIgnoreCase("Pan"))       physicalParam = "Tilt";
+                        else if (param.equalsIgnoreCase("Tilt")) physicalParam = "Pan";
+                    }
+                    int parOffset = static_cast<int>(rf.node.getProperty(StateKeys::getMappingKey(physicalParam), 0));
 
                     double strobeHitsPerQ = param.equalsIgnoreCase("Dimmer")
                         ? CurveEvaluator::getStrobeHitsPerQuarter(curve)
@@ -231,13 +227,16 @@ public:
                             emitDmxCc(sharedCh, rf.strobeSpec.openVal, endTick - 1, lastSentCc);
                             continue;
                         }
-                        else if (!rf.strobeSpec.allowDimmerStrobe)
+                        else if (rf.strobeSpec.mode == 3)
                         {
-                            // Faro senza strobo hardware e Dimmer Flash disabilitato in Tab 1
+                            // Faro con Strobo disabilitato in Tab 1
                             continue;
                         }
-                        // Se mode == 0 && allowDimmerStrobe == true: prosegue col Dimmer Flash 0/255 sotto
+                        // Se mode == 0 (Dimmer Flash): prosegue sotto sul canale Dimmer (0/255)
                     }
+
+                    if (param.equalsIgnoreCase("Pan") && !rf.panTiltSpec.hasPanChannel)  continue;
+                    if (param.equalsIgnoreCase("Tilt") && !rf.panTiltSpec.hasTiltChannel) continue;
 
                     if (parOffset <= 0)
                         continue;
@@ -264,20 +263,14 @@ public:
                         }
                         else if (param.equalsIgnoreCase("Pan"))
                         {
-                            float delta = (normVal - 0.5f) * rf.panRangeNorm;
-                            if (phaseMode.equalsIgnoreCase("SymmetricalFan") &&
-                                rf.roleSpatialTotal > 1 && rf.normX > 0.501f)
-                            {
-                                delta = -delta;
-                            }
-                            float finalPan = juce::jlimit(0.0f, 1.0f, rf.panHomeNorm + rf.panOffsetNorm + delta);
-                            outDmx = juce::roundToInt(finalPan * 255.0f);
+                            const bool mirrorPan = phaseMode.equalsIgnoreCase("SymmetricalFan")
+                                && rf.roleSpatialTotal > 1
+                                && rf.normX > 0.501f;
+                            outDmx = rf.panTiltSpec.mapStagePanToDmx(normVal, mirrorPan);
                         }
                         else if (param.equalsIgnoreCase("Tilt"))
                         {
-                            float delta = (normVal - 0.5f) * rf.tiltRangeNorm;
-                            float finalTilt = juce::jlimit(0.0f, 1.0f, rf.tiltHomeNorm + rf.tiltOffsetNorm + delta);
-                            outDmx = juce::roundToInt(finalTilt * 255.0f);
+                            outDmx = rf.panTiltSpec.mapStageTiltToDmx(normVal);
                         }
 
                         emitDmxCc(dmxChannel, outDmx, clampedTick, lastSentCc);

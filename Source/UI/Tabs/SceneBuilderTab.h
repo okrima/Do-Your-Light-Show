@@ -29,9 +29,15 @@ public:
             if (child.hasType(StateKeys::ScenePreset))
             {
                 if (child.hasProperty(StateKeys::PresetPool))
+                {
                     hasModernPreset = true;
+                    if (child.getNumChildren() == 0)
+                        rebuildPresetCommands(child);
+                }
                 else
+                {
                     migrateLegacyPreset(child);
+                }
             }
         }
 
@@ -1183,6 +1189,11 @@ private:
                 if (sub == "1/8T")       sqCurve = "Square_1_8T";
                 else if (sub == "1/16")  sqCurve = "Square_1_16";
                 else if (sub == "1/16T") sqCurve = "Square_1_16T";
+
+                addCmd(role, "Red", c1.getRed(), c1.getRed(), "Static", c1);
+                addCmd(role, "Green", c1.getGreen(), c1.getGreen(), "Static", c1);
+                addCmd(role, "Blue", c1.getBlue(), c1.getBlue(), "Static", c1);
+                addCmd(role, "Dimmer", 0, 255, sqCurve, c1);
             }
             else if (pool == "Movement")
             {

@@ -45,8 +45,19 @@ FixtureEditorPanel::FixtureEditorPanel(juce::ValueTree& state) : appState(state)
     roleCombo.onChange = [this]() {
         if (isUpdatingUI || !currentFixtureNode.isValid())
             return;
-        currentFixtureNode.setProperty(StateKeys::RoleName, StageRoleCatalog::getRoleFromCombo(roleCombo), nullptr);
+        juce::String newRole = StageRoleCatalog::getRoleFromCombo(roleCombo);
+        currentFixtureNode.setProperty(StateKeys::RoleName, newRole, nullptr);
+
+        // Default intelligente: sulle quinte laterali abilita Scambia Pan <-> Tilt se entrambi i canali sono mappati
+        auto newCat = StageRoleCatalog::classifyRole(newRole,
+            currentFixtureNode.getProperty(StateKeys::FixtureName, "").toString());
+        int panCh = static_cast<int>(currentFixtureNode.getProperty(StateKeys::getMappingKey("Pan"), 0));
+        int tiltCh = static_cast<int>(currentFixtureNode.getProperty(StateKeys::getMappingKey("Tilt"), 0));
+        currentFixtureNode.setProperty(StateKeys::SwapPanTilt,
+            (newCat == StageRoleCatalog::Category::FloorSideWash && panCh > 0 && tiltCh > 0), nullptr);
+        updateUIFromNode();
         };
+
     roleCombo.setColour(juce::ComboBox::backgroundColourId, juce::Colour(0xff2a2a32));
     addAndMakeVisible(roleCombo);
 
@@ -114,13 +125,15 @@ FixtureEditorPanel::FixtureEditorPanel(juce::ValueTree& state) : appState(state)
     configureFieldLabel(strobeModeLabel, "Tipo Canale:");
     addAndMakeVisible(strobeModeLabel);
 
-    strobeModeCombo.addItem("Nessuno (Usa solo Dimmer 0 / 255)", 1);
-    strobeModeCombo.addItem("Canale Strobo Separato (Shutter + Hz)", 2);
-    strobeModeCombo.addItem("Condiviso con Dimmer (Sub-Range + Hz)", 3);
+    strobeModeCombo.addItem("Dimmer Flash (0 / 255)", 1);
+    strobeModeCombo.addItem("Canale Strobo Separato (HW + Hz)", 2);
+    strobeModeCombo.addItem("Condiviso con Dimmer (Mix + Hz)", 3);
+    strobeModeCombo.addItem("Disabilitato (Ignora Strobo)", 4);
     strobeModeCombo.setColour(juce::ComboBox::backgroundColourId, juce::Colour(0xff2a2a32));
+
     strobeModeCombo.onChange = [this]() {
         if (isUpdatingUI || !currentFixtureNode.isValid()) return;
-        int mode = strobeModeCombo.getSelectedId() - 1; // 0, 1, 2
+        int mode = strobeModeCombo.getSelectedId() - 1; // 0, 1, 2, 3
         currentFixtureNode.setProperty(StateKeys::StrobeMode, mode, nullptr);
 
         // Pre-imposta valori tipici sensati al cambio modalita'
@@ -151,14 +164,6 @@ FixtureEditorPanel::FixtureEditorPanel(juce::ValueTree& state) : appState(state)
             currentFixtureNode.setProperty(StateKeys::StrobeOpenVal, val, nullptr);
         };
     addAndMakeVisible(dimmerOrOpenSlider);
-
-    allowDimmerStrobeToggle.setButtonText("Consenti anche Flash Dimmer 0/255");
-    allowDimmerStrobeToggle.setColour(juce::ToggleButton::textColourId, juce::Colours::lightgrey);
-    allowDimmerStrobeToggle.onClick = [this]() {
-        if (currentFixtureNode.isValid() && !isUpdatingUI)
-            currentFixtureNode.setProperty(StateKeys::AllowDimmerStrobe, allowDimmerStrobeToggle.getToggleState(), nullptr);
-        };
-    addAndMakeVisible(allowDimmerStrobeToggle);
 
     configureFieldLabel(strobeStartDmxLabel, "Start DMX:");
     configureFieldLabel(strobeStartHzLabel, "Start Hz:");
@@ -200,58 +205,121 @@ FixtureEditorPanel::FixtureEditorPanel(juce::ValueTree& state) : appState(state)
     addAndMakeVisible(strobeStartDmxSlider); addAndMakeVisible(strobeStartHzSlider);
     addAndMakeVisible(strobeEndDmxSlider);   addAndMakeVisible(strobeEndHzSlider);
 
-    // -- CALIBRAZIONE PAN / TILT (HOME, OFFSET, RANGE) --
-    ptSectionLabel.setText("4. Posizione a Riposo (Home), Offset & Range Pan/Tilt", juce::dontSendNotification);
+    // -- 4. AREA DI MOVIMENTO SUL PALCO (4 LIMITI DMX + SHIFT + TOTEM) --
+    ptSectionLabel.setText("4. Area di Movimento sul Palco (Limiti DMX 0-255)", juce::dontSendNotification);
     ptSectionLabel.setFont(juce::FontOptions(13.5f, juce::Font::bold));
     ptSectionLabel.setColour(juce::Label::textColourId, juce::Colour(0xffa78bfa));
     addAndMakeVisible(ptSectionLabel);
 
-    configureFieldLabel(panHomeLabel, "Pan Home:");
-    configureFieldLabel(tiltHomeLabel, "Tilt Home:");
-    configureFieldLabel(panOffsetLabel, "Pan Offset:");
-    configureFieldLabel(tiltOffsetLabel, "Tilt Offset:");
-    configureFieldLabel(panRangeLabel, "Pan Range:");
-    configureFieldLabel(tiltRangeLabel, "Tilt Range:");
+    auto setupSpreadBtn = [this](juce::TextButton& btn, const juce::String& txt, int id)
+        {
+            btn.setButtonText(txt);
+            btn.setColour(juce::TextButton::buttonColourId, juce::Colour(0xff2a2640));
+            btn.onClick = [this, id]() { applyQuickSpreadPreset(id); };
+            addAndMakeVisible(btn);
+        };
+    setupSpreadBtn(ptSpreadNarrowBtn, "Stretto (Band)", 0);
+    setupSpreadBtn(ptSpreadMedBtn, "Medio (Palco)", 1);
+    setupSpreadBtn(ptSpreadWideBtn, "Ampio (Full)", 2);
 
-    addAndMakeVisible(panHomeLabel);    addAndMakeVisible(tiltHomeLabel);
-    addAndMakeVisible(panOffsetLabel);  addAndMakeVisible(tiltOffsetLabel);
-    addAndMakeVisible(panRangeLabel);   addAndMakeVisible(tiltRangeLabel);
+    configureFieldLabel(panSxLabel, "Pan SX:");
+    configureFieldLabel(panDxLabel, "DX:");
+    configureFieldLabel(tiltLowLabel, "Tilt Giu:");
+    configureFieldLabel(tiltHighLabel, "Su:");
+    addAndMakeVisible(panSxLabel);   addAndMakeVisible(panDxLabel);
+    addAndMakeVisible(tiltLowLabel); addAndMakeVisible(tiltHighLabel);
 
-    configureCompactSlider(panHomeSlider, 0, 255, 1, 38);
-    configureCompactSlider(tiltHomeSlider, 0, 255, 1, 38);
-    configureCompactSlider(panOffsetSlider, -127, 127, 1, 38);
-    configureCompactSlider(tiltOffsetSlider, -127, 127, 1, 38);
-    configureCompactSlider(panRangeSlider, 10, 255, 1, 38);
-    configureCompactSlider(tiltRangeSlider, 10, 255, 1, 38);
+    configureCompactSlider(panLeftSlider, 0, 255, 1, 38);
+    configureCompactSlider(panRightSlider, 0, 255, 1, 38);
+    configureCompactSlider(tiltLowSlider, 0, 255, 1, 38);
+    configureCompactSlider(tiltHighSlider, 0, 255, 1, 38);
 
-    panHomeSlider.onValueChange = [this]() {
-        if (currentFixtureNode.isValid() && !isUpdatingUI)
-            currentFixtureNode.setProperty(StateKeys::PanHome, static_cast<int>(panHomeSlider.getValue()), nullptr);
+    panLeftSlider.onValueChange = [this]() {
+        if (isUpdatingUI || !currentFixtureNode.isValid()) return;
+        auto s = StageRoleCatalog::PanTiltHardwareSpec::fromFixtureNode(currentFixtureNode);
+        s.panLeft = static_cast<int>(panLeftSlider.getValue());
+        s.writeToFixtureNode(currentFixtureNode);
+        updateUIFromNode();
         };
-    tiltHomeSlider.onValueChange = [this]() {
-        if (currentFixtureNode.isValid() && !isUpdatingUI)
-            currentFixtureNode.setProperty(StateKeys::TiltHome, static_cast<int>(tiltHomeSlider.getValue()), nullptr);
+    panRightSlider.onValueChange = [this]() {
+        if (isUpdatingUI || !currentFixtureNode.isValid()) return;
+        auto s = StageRoleCatalog::PanTiltHardwareSpec::fromFixtureNode(currentFixtureNode);
+        s.panRight = static_cast<int>(panRightSlider.getValue());
+        s.writeToFixtureNode(currentFixtureNode);
+        updateUIFromNode();
         };
-    panOffsetSlider.onValueChange = [this]() {
-        if (currentFixtureNode.isValid() && !isUpdatingUI)
-            currentFixtureNode.setProperty(StateKeys::PanOffset, static_cast<int>(panOffsetSlider.getValue()), nullptr);
+    tiltLowSlider.onValueChange = [this]() {
+        if (isUpdatingUI || !currentFixtureNode.isValid()) return;
+        auto s = StageRoleCatalog::PanTiltHardwareSpec::fromFixtureNode(currentFixtureNode);
+        s.tiltLow = static_cast<int>(tiltLowSlider.getValue());
+        s.writeToFixtureNode(currentFixtureNode);
+        updateUIFromNode();
         };
-    tiltOffsetSlider.onValueChange = [this]() {
-        if (currentFixtureNode.isValid() && !isUpdatingUI)
-            currentFixtureNode.setProperty(StateKeys::TiltOffset, static_cast<int>(tiltOffsetSlider.getValue()), nullptr);
-        };
-    panRangeSlider.onValueChange = [this]() {
-        if (currentFixtureNode.isValid() && !isUpdatingUI)
-            currentFixtureNode.setProperty(StateKeys::PanRange, static_cast<int>(panRangeSlider.getValue()), nullptr);
-        };
-    tiltRangeSlider.onValueChange = [this]() {
-        if (currentFixtureNode.isValid() && !isUpdatingUI)
-            currentFixtureNode.setProperty(StateKeys::TiltRange, static_cast<int>(tiltRangeSlider.getValue()), nullptr);
+    tiltHighSlider.onValueChange = [this]() {
+        if (isUpdatingUI || !currentFixtureNode.isValid()) return;
+        auto s = StageRoleCatalog::PanTiltHardwareSpec::fromFixtureNode(currentFixtureNode);
+        s.tiltHigh = static_cast<int>(tiltHighSlider.getValue());
+        s.writeToFixtureNode(currentFixtureNode);
+        updateUIFromNode();
         };
 
-    addAndMakeVisible(panHomeSlider);   addAndMakeVisible(tiltHomeSlider);
-    addAndMakeVisible(panOffsetSlider); addAndMakeVisible(tiltOffsetSlider);
-    addAndMakeVisible(panRangeSlider);  addAndMakeVisible(tiltRangeSlider);
+    addAndMakeVisible(panLeftSlider);  addAndMakeVisible(panRightSlider);
+    addAndMakeVisible(tiltLowSlider);  addAndMakeVisible(tiltHighSlider);
+
+    swapPanDirBtn.setButtonText("Scambia SX/DX");
+    swapPanDirBtn.setColour(juce::TextButton::buttonColourId, juce::Colour(0xff272736));
+    swapPanDirBtn.onClick = [this]() {
+        if (!currentFixtureNode.isValid()) return;
+        auto s = StageRoleCatalog::PanTiltHardwareSpec::fromFixtureNode(currentFixtureNode);
+        std::swap(s.panLeft, s.panRight);
+        s.writeToFixtureNode(currentFixtureNode);
+        updateUIFromNode();
+        };
+    addAndMakeVisible(swapPanDirBtn);
+
+    swapTiltDirBtn.setButtonText("Scambia Giu/Su");
+    swapTiltDirBtn.setColour(juce::TextButton::buttonColourId, juce::Colour(0xff272736));
+    swapTiltDirBtn.onClick = [this]() {
+        if (!currentFixtureNode.isValid()) return;
+        auto s = StageRoleCatalog::PanTiltHardwareSpec::fromFixtureNode(currentFixtureNode);
+        std::swap(s.tiltLow, s.tiltHigh);
+        s.writeToFixtureNode(currentFixtureNode);
+        updateUIFromNode();
+        };
+    addAndMakeVisible(swapTiltDirBtn);
+
+    configureFieldLabel(panShiftLabel, "Shift Pan:");
+    addAndMakeVisible(panShiftLabel);
+
+    auto setupShiftBtn = [this](juce::TextButton& btn, const juce::String& txt, int delta)
+        {
+            btn.setButtonText(txt);
+            btn.setColour(juce::TextButton::buttonColourId, juce::Colour(0xff1e293b));
+            btn.setTooltip("Trasla insieme SX e DX mantenendo invariata l'ampiezza (utile per basi ruotate di 90 gradi)");
+            btn.onClick = [this, delta]() { shiftPanLimits(delta); };
+            addAndMakeVisible(btn);
+        };
+    setupShiftBtn(panShiftM42Btn, "-42", -42);
+    setupShiftBtn(panShiftM10Btn, "-10", -10);
+    setupShiftBtn(panShiftP10Btn, "+10", 10);
+    setupShiftBtn(panShiftP42Btn, "+42", 42);
+
+    swapPanTiltToggle.setButtonText("Totem (Pan <-> Tilt)");
+    swapPanTiltToggle.setColour(juce::ToggleButton::textColourId, juce::Colours::lightgrey);
+    swapPanTiltToggle.setTooltip("Attiva se il faro e' montato di taglio su un traliccio/totem verticale (scambia assi Pan e Tilt)");
+    swapPanTiltToggle.onClick = [this]() {
+        if (isUpdatingUI || !currentFixtureNode.isValid()) return;
+        auto s = StageRoleCatalog::PanTiltHardwareSpec::fromFixtureNode(currentFixtureNode);
+        s.swapPanTilt = swapPanTiltToggle.getToggleState();
+        s.writeToFixtureNode(currentFixtureNode);
+        updateUIFromNode();
+        };
+    addAndMakeVisible(swapPanTiltToggle);
+
+    ptReadoutLabel.setFont(juce::FontOptions(11.5f));
+    ptReadoutLabel.setColour(juce::Label::textColourId, juce::Colour(0xff94a3b8));
+    ptReadoutLabel.setJustificationType(juce::Justification::centredLeft);
+    addAndMakeVisible(ptReadoutLabel);
 
     setVisible(false);
 }
@@ -354,9 +422,8 @@ void FixtureEditorPanel::resized()
     // Riga Strobo 2: Max Dimmer (se condiviso) o DMX Luce Fissa (se separato) + Toggle Flash Dimmer
     auto sRow2 = bounds.removeFromTop(24);
     dimmerOrOpenLabel.setBounds(sRow2.removeFromLeft(110));
-    dimmerOrOpenSlider.setBounds(sRow2.removeFromLeft(88));
+    dimmerOrOpenSlider.setBounds(sRow2.removeFromLeft(95));
     sRow2.removeFromLeft(8);
-    allowDimmerStrobeToggle.setBounds(sRow2);
 
     bounds.removeFromTop(4);
 
@@ -379,31 +446,56 @@ void FixtureEditorPanel::resized()
     strobeEndHzLabel.setBounds(sRow4.removeFromLeft(65));
     strobeEndHzSlider.setBounds(sRow4.removeFromLeft(105));
 
-    // Griglia Pan/Tilt (3 righe: Home, Offset, Range)
-    int halfW = bounds.getWidth() / 2;
+    // Sezione 4: Area di Movimento sul Palco (4 Limiti DMX + Shift + Totem)
+    bounds.removeFromTop(10);
+    ptSectionLabel.setBounds(bounds.removeFromTop(18));
+    bounds.removeFromTop(5);
 
-    auto ptRow1 = bounds.removeFromTop(24);
-    auto p1L = ptRow1.removeFromLeft(halfW);
-    panHomeLabel.setBounds(p1L.removeFromLeft(80));
-    panHomeSlider.setBounds(p1L.removeFromLeft(90));
-    tiltHomeLabel.setBounds(ptRow1.removeFromLeft(80));
-    tiltHomeSlider.setBounds(ptRow1.removeFromLeft(90));
+    // Riga 1: 3 Preset Rapidi di ampiezza
+    auto ptR1 = bounds.removeFromTop(23);
+    int thirdW = ptR1.getWidth() / 3;
+    ptSpreadNarrowBtn.setBounds(ptR1.removeFromLeft(thirdW).reduced(1, 0));
+    ptSpreadMedBtn.setBounds(ptR1.removeFromLeft(thirdW).reduced(1, 0));
+    ptSpreadWideBtn.setBounds(ptR1.reduced(1, 0));
 
-    bounds.removeFromTop(4);
-    auto ptRow2 = bounds.removeFromTop(24);
-    auto p2L = ptRow2.removeFromLeft(halfW);
-    panOffsetLabel.setBounds(p2L.removeFromLeft(80));
-    panOffsetSlider.setBounds(p2L.removeFromLeft(90));
-    tiltOffsetLabel.setBounds(ptRow2.removeFromLeft(80));
-    tiltOffsetSlider.setBounds(ptRow2.removeFromLeft(90));
+    bounds.removeFromTop(6);
 
-    bounds.removeFromTop(4);
-    auto ptRow3 = bounds.removeFromTop(24);
-    auto p3L = ptRow3.removeFromLeft(halfW);
-    panRangeLabel.setBounds(p3L.removeFromLeft(80));
-    panRangeSlider.setBounds(p3L.removeFromLeft(90));
-    tiltRangeLabel.setBounds(ptRow3.removeFromLeft(80));
-    tiltRangeSlider.setBounds(ptRow3.removeFromLeft(90));
+    // Riga 2: Pan SX -> DX + Scambia
+    auto ptR2 = bounds.removeFromTop(24);
+    panSxLabel.setBounds(ptR2.removeFromLeft(56));
+    panLeftSlider.setBounds(ptR2.removeFromLeft(98));
+    ptR2.removeFromLeft(8);
+    panDxLabel.setBounds(ptR2.removeFromLeft(30));
+    panRightSlider.setBounds(ptR2.removeFromLeft(98));
+    ptR2.removeFromLeft(8);
+    swapPanDirBtn.setBounds(ptR2);
+
+    bounds.removeFromTop(5);
+
+    // Riga 3: Tilt Giu -> Su + Scambia
+    auto ptR3 = bounds.removeFromTop(24);
+    tiltLowLabel.setBounds(ptR3.removeFromLeft(56));
+    tiltLowSlider.setBounds(ptR3.removeFromLeft(98));
+    ptR3.removeFromLeft(8);
+    tiltHighLabel.setBounds(ptR3.removeFromLeft(30));
+    tiltHighSlider.setBounds(ptR3.removeFromLeft(98));
+    ptR3.removeFromLeft(8);
+    swapTiltDirBtn.setBounds(ptR3);
+
+    bounds.removeFromTop(6);
+
+    // Riga 4: Shift Pan (-42 / -10 / +10 / +42) + Totem (Pan <-> Tilt)
+    auto ptR4 = bounds.removeFromTop(23);
+    panShiftLabel.setBounds(ptR4.removeFromLeft(62));
+    panShiftM42Btn.setBounds(ptR4.removeFromLeft(38).reduced(1, 0));
+    panShiftM10Btn.setBounds(ptR4.removeFromLeft(38).reduced(1, 0));
+    panShiftP10Btn.setBounds(ptR4.removeFromLeft(38).reduced(1, 0));
+    panShiftP42Btn.setBounds(ptR4.removeFromLeft(38).reduced(1, 0));
+    ptR4.removeFromLeft(10);
+    swapPanTiltToggle.setBounds(ptR4);
+
+    bounds.removeFromTop(5);
+    ptReadoutLabel.setBounds(bounds.removeFromTop(18));
 }
 
 void FixtureEditorPanel::updateUIFromNode()
@@ -430,7 +522,7 @@ void FixtureEditorPanel::updateUIFromNode()
     auto spec = StageRoleCatalog::StrobeHardwareSpec::fromFixtureNode(currentFixtureNode);
     strobeModeCombo.setSelectedId(spec.mode + 1, juce::dontSendNotification);
 
-    bool hasHwStrobe = (spec.mode != 0);
+    bool hasHwStrobe = (spec.mode == 1 || spec.mode == 2);
     if (spec.mode == 2)
     {
         dimmerOrOpenLabel.setText("Max Dimmer DMX:", juce::dontSendNotification);
@@ -457,14 +549,73 @@ void FixtureEditorPanel::updateUIFromNode()
     strobeStartHzSlider.setValue(spec.minHz, juce::dontSendNotification);
     strobeEndDmxSlider.setValue(spec.maxVal, juce::dontSendNotification);
     strobeEndHzSlider.setValue(spec.maxHz, juce::dontSendNotification);
-    allowDimmerStrobeToggle.setToggleState(spec.allowDimmerStrobe, juce::dontSendNotification);
 
-    panHomeSlider.setValue(static_cast<double>(currentFixtureNode.getProperty(StateKeys::PanHome, 128)), juce::dontSendNotification);
-    tiltHomeSlider.setValue(static_cast<double>(currentFixtureNode.getProperty(StateKeys::TiltHome, 90)), juce::dontSendNotification);
-    panOffsetSlider.setValue(static_cast<double>(currentFixtureNode.getProperty(StateKeys::PanOffset, 0)), juce::dontSendNotification);
-    tiltOffsetSlider.setValue(static_cast<double>(currentFixtureNode.getProperty(StateKeys::TiltOffset, 0)), juce::dontSendNotification);
-    panRangeSlider.setValue(static_cast<double>(currentFixtureNode.getProperty(StateKeys::PanRange, 120)), juce::dontSendNotification);
-    tiltRangeSlider.setValue(static_cast<double>(currentFixtureNode.getProperty(StateKeys::TiltRange, 90)), juce::dontSendNotification);
+    const bool hasPT = StageRoleCatalog::PanTiltHardwareSpec::hasPanOrTiltChannels(currentFixtureNode);
+    auto ptSpec = StageRoleCatalog::PanTiltHardwareSpec::fromFixtureNode(currentFixtureNode);
+    const bool hasAnyPT = ptSpec.hasPanChannel || ptSpec.hasTiltChannel;
+    const bool hasBothPT = ptSpec.hasPanChannel && ptSpec.hasTiltChannel;
+
+    panLeftSlider.setValue(ptSpec.panLeft, juce::dontSendNotification);
+    panRightSlider.setValue(ptSpec.panRight, juce::dontSendNotification);
+    tiltLowSlider.setValue(ptSpec.tiltLow, juce::dontSendNotification);
+    tiltHighSlider.setValue(ptSpec.tiltHigh, juce::dontSendNotification);
+    swapPanTiltToggle.setToggleState(ptSpec.swapPanTilt, juce::dontSendNotification);
+
+    ptSpreadNarrowBtn.setEnabled(hasAnyPT);
+    ptSpreadMedBtn.setEnabled(hasAnyPT);
+    ptSpreadWideBtn.setEnabled(hasAnyPT);
+
+    panSxLabel.setEnabled(ptSpec.hasPanChannel);
+    panDxLabel.setEnabled(ptSpec.hasPanChannel);
+    panLeftSlider.setEnabled(ptSpec.hasPanChannel);
+    panRightSlider.setEnabled(ptSpec.hasPanChannel);
+    swapPanDirBtn.setEnabled(ptSpec.hasPanChannel);
+    panShiftLabel.setEnabled(ptSpec.hasPanChannel);
+    panShiftM42Btn.setEnabled(ptSpec.hasPanChannel);
+    panShiftM10Btn.setEnabled(ptSpec.hasPanChannel);
+    panShiftP10Btn.setEnabled(ptSpec.hasPanChannel);
+    panShiftP42Btn.setEnabled(ptSpec.hasPanChannel);
+
+    tiltLowLabel.setEnabled(ptSpec.hasTiltChannel);
+    tiltHighLabel.setEnabled(ptSpec.hasTiltChannel);
+    tiltLowSlider.setEnabled(ptSpec.hasTiltChannel);
+    tiltHighSlider.setEnabled(ptSpec.hasTiltChannel);
+    swapTiltDirBtn.setEnabled(ptSpec.hasTiltChannel);
+
+    swapPanTiltToggle.setEnabled(hasBothPT);
+
+    if (!hasAnyPT)
+    {
+        ptReadoutLabel.setText("Faro statico (imposta Pan/Tilt Ch > 0 per attivare)", juce::dontSendNotification);
+    }
+    else
+    {
+        juce::String info = "Centro DMX: Pan " + juce::String(ptSpec.getPanCenter())
+            + ", Tilt " + juce::String(ptSpec.getTiltCenter())
+            + "  |  Corsa: Pan " + juce::String(ptSpec.getPanSpan())
+            + ", Tilt " + juce::String(ptSpec.getTiltSpan());
+        if (ptSpec.isSwapped())
+            info += "  [Totem: assi scambiati]";
+        ptReadoutLabel.setText(info, juce::dontSendNotification);
+    }
+}
+
+void FixtureEditorPanel::applyQuickSpreadPreset(int presetId)
+{
+    if (!currentFixtureNode.isValid()) return;
+    auto spec = StageRoleCatalog::PanTiltHardwareSpec::fromFixtureNode(currentFixtureNode);
+    spec.applyQuickSpread(presetId);
+    spec.writeToFixtureNode(currentFixtureNode);
+    updateUIFromNode();
+}
+
+void FixtureEditorPanel::shiftPanLimits(int delta)
+{
+    if (!currentFixtureNode.isValid()) return;
+    auto spec = StageRoleCatalog::PanTiltHardwareSpec::fromFixtureNode(currentFixtureNode);
+    spec.shiftPan(delta);
+    spec.writeToFixtureNode(currentFixtureNode);
+    updateUIFromNode();
 }
 
 void FixtureEditorPanel::valueTreePropertyChanged(juce::ValueTree&, const juce::Identifier&)
@@ -1290,14 +1441,10 @@ void VenuePatchTab::addNewFixtureToState()
     newFix.setProperty(StateKeys::StrobeMinHz, 1.0, nullptr);
     newFix.setProperty(StateKeys::StrobeMaxVal, 245, nullptr);
     newFix.setProperty(StateKeys::StrobeMaxHz, 20.0, nullptr);
-    newFix.setProperty(StateKeys::AllowDimmerStrobe, true, nullptr);
 
-    newFix.setProperty(StateKeys::PanHome, 128, nullptr);
-    newFix.setProperty(StateKeys::TiltHome, 90, nullptr);
-    newFix.setProperty(StateKeys::PanOffset, 0, nullptr);
-    newFix.setProperty(StateKeys::TiltOffset, 0, nullptr);
-    newFix.setProperty(StateKeys::PanRange, 120, nullptr);
-    newFix.setProperty(StateKeys::TiltRange, 90, nullptr);
+    StageRoleCatalog::PanTiltHardwareSpec defPt;
+    defPt.applyQuickSpread(1); // Default: Medio (Palco)
+    defPt.writeToFixtureNode(newFix);
 
     VenueUnitHelper::syncUnitsForFixture(newFix);
 

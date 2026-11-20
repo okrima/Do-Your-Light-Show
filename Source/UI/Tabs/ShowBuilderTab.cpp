@@ -293,23 +293,25 @@ void SceneEditorPanel::selectedRowsChanged(int lastRow) {
     updateCommandUI();
 }
 
-void SceneEditorPanel::paintListBoxItem(int row, juce::Graphics& g, int w, int h, bool selected) {
+void SceneEditorPanel::paintListBoxItem(int row, juce::Graphics& g, int w, int h, bool selected)
+{
     if (selected)
         g.fillAll(juce::Colour(0xff00d2ff).withAlpha(0.2f));
 
-    if (row < currentSceneNode.getNumChildren()) {
+    if (row >= 0 && row < currentSceneNode.getNumChildren())
+    {
         auto cmd = currentSceneNode.getChild(row);
         juce::String targetRole = cmd.getProperty(StateKeys::TargetRole, "?").toString();
         juce::String param = cmd.getProperty(StateKeys::TargetParam, "?").toString();
-        int startVal = cmd.getProperty(StateKeys::StartValue, 0);
-        int endVal = cmd.getProperty(StateKeys::EndValue, 127);
-        juce::String curve = cmd.getProperty(StateKeys::CurveType, "Step").toString();
+        int startVal = static_cast<int>(cmd.getProperty(StateKeys::StartValue, 0));
+        int endVal = static_cast<int>(cmd.getProperty(StateKeys::EndValue, 255));
+        juce::String curve = cmd.getProperty(StateKeys::CurveType, "Static").toString();
 
-        // Formato pulito: WASH_BACK -> Dimmer [Step] (0 -> 127)
-        juce::String text = targetRole + " -> " + param + " [" + curve.upToFirstOccurrenceOf(" ", false, false) + "] (" + juce::String(startVal) + " to " + juce::String(endVal) + ")";
+        juce::String text = targetRole + " -> " + param + " [" + curve.upToFirstOccurrenceOf(" ", false, false)
+            + "] (" + juce::String(startVal) + " to " + juce::String(endVal) + ")";
 
         g.setColour(juce::Colours::white);
-        g.setFont(14.0f);
+        g.setFont(juce::FontOptions(14.0f));
         g.drawText(text, 10, 0, w - 20, h, juce::Justification::centredLeft, true);
     }
 }
@@ -512,35 +514,40 @@ void ShowBuilderTab::saveSceneAsPreset()
     auto sourceScene = showNode.getChild(selectedRow);
     if (!sourceScene.isValid()) return;
 
+    juce::String sceneName = sourceScene.getProperty(StateKeys::SceneName, "Scena").toString().trim();
+    if (sceneName.isEmpty())
+        sceneName = "Scena";
+
     juce::ValueTree presetCopy(StateKeys::ScenePreset);
 
     for (int i = 0; i < sourceScene.getNumProperties(); ++i)
     {
         auto propName = sourceScene.getPropertyName(i);
-        if (propName.isValid())
-        {
+        if (propName.isValid() && propName != StateKeys::StartBeat)
             presetCopy.setProperty(propName, sourceScene.getProperty(propName), nullptr);
-        }
     }
+
+    // Allinea le proprieta' lette dalla Tab 2 (Scene Builder) e dal menu Inserisci Preset
+    presetCopy.setProperty(StateKeys::PresetName, sceneName, nullptr);
+    presetCopy.setProperty(StateKeys::SceneName, sceneName, nullptr);
+    if (!presetCopy.hasProperty(StateKeys::PresetPool))
+        presetCopy.setProperty(StateKeys::PresetPool, "Color", nullptr);
+    if (!presetCopy.hasProperty(StateKeys::LayerType))
+        presetCopy.setProperty(StateKeys::LayerType, "Base", nullptr);
 
     for (int i = 0; i < sourceScene.getNumChildren(); ++i)
     {
         auto child = sourceScene.getChild(i);
         if (child.isValid())
-        {
             presetCopy.addChild(child.createCopy(), -1, nullptr);
-        }
     }
 
     if (presetLibNode.isValid())
     {
         presetLibNode.addChild(presetCopy, -1, nullptr);
-
-        // -> SALVA AUTOMATICAMENTE SUL DISCO
         savePresetLibraryToDisk();
     }
 
-    juce::String sceneName = sourceScene.getProperty(StateKeys::SceneName, "Scena").toString();
     juce::NativeMessageBox::showMessageBoxAsync(
         juce::MessageBoxIconType::InfoIcon,
         "Preset Salvato",
@@ -641,14 +648,23 @@ void ShowBuilderTab::insertPresetIntoShow()
 
 int ShowBuilderTab::getNumRows() { return showNode.getNumChildren(); }
 
-void ShowBuilderTab::paintListBoxItem(int row, juce::Graphics& g, int w, int h, bool selected) {
-    if (selected) g.fillAll(juce::Colour(0xff00d2ff).withAlpha(0.2f));
-    if (row < showNode.getNumChildren()) {
+void ShowBuilderTab::paintListBoxItem(int row, juce::Graphics& g, int w, int h, bool selected)
+{
+    if (selected)
+        g.fillAll(juce::Colour(0xff00d2ff).withAlpha(0.2f));
+
+    if (row >= 0 && row < showNode.getNumChildren())
+    {
         auto scene = showNode.getChild(row);
         juce::String name = scene.getProperty(StateKeys::SceneName, "?").toString();
-        double beat = scene.getProperty(StateKeys::StartBeat, 1.0);
-        g.setColour(juce::Colours::white); g.setFont(14.0f);
-        g.drawText("[Beat " + juce::String(beat, 2) + "] " + name, 10, 0, w - 20, h, juce::Justification::centredLeft, true);
+        double beat = static_cast<double>(scene.getProperty(StateKeys::StartBeat, 1.0));
+
+        auto pos = beatTimeMap.beatToMusicalPosition(beat);
+        juce::String text = "[" + pos.formatBarString() + " | Q " + juce::String(beat, 1) + "] " + name;
+
+        g.setColour(juce::Colours::white);
+        g.setFont(juce::FontOptions(13.5f));
+        g.drawText(text, 10, 0, w - 20, h, juce::Justification::centredLeft, true);
     }
 }
 
@@ -778,8 +794,8 @@ void ShowBuilderTab::importMidiTempoMap()
         juce::File::getSpecialLocation(juce::File::userDocumentsDirectory),
         "*.mid;*.midi");
 
-    auto flags = juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles;
-    fileChooser->launchAsync(flags, [this](const juce::FileChooser& fc) {
+    auto chooserFlags = juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles;
+    fileChooser->launchAsync(chooserFlags, [this](const juce::FileChooser& fc) {
         auto file = fc.getResult();
         if (!file.existsAsFile()) return;
 
@@ -870,13 +886,35 @@ void ShowBuilderTab::saveShow() {
         if (fc.getResult() != juce::File{}) PresetManager::saveShow(appState, fc.getResult());
         });
 }
-void ShowBuilderTab::loadShow() {
-    fileChooser = std::make_unique<juce::FileChooser>("Carica Show", juce::File::getSpecialLocation(juce::File::userDocumentsDirectory), "*.show");
-    fileChooser->launchAsync(juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles, [this](const juce::FileChooser& fc) {
-        if (fc.getResult() != juce::File{}) { PresetManager::loadShow(appState, fc.getResult()); sceneList.updateContent(); if (showNode.getNumChildren() > 0) sceneList.selectRow(0); }
-        });
+void ShowBuilderTab::loadShow()
+{
+    fileChooser = std::make_unique<juce::FileChooser>(
+        "Carica Show",
+        juce::File::getSpecialLocation(juce::File::userDocumentsDirectory),
+        "*.show");
 
-    miniDawTimeline.syncWithAppState();
+    auto chooserFlags = juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles;
+    fileChooser->launchAsync(chooserFlags, [this](const juce::FileChooser& fc) {
+        auto file = fc.getResult();
+        if (file == juce::File{} || !file.existsAsFile())
+            return;
+
+        PresetManager::loadShow(appState, file);
+
+        // Riaggancia il nodo BEAT_MAP e ricostruisce la cache BPM/Metrica dal file caricato
+        beatTimeMap.bindToAppState(appState);
+
+        // Aggiorna Timeline, Lista Scene e Simulatore DOPO il caricamento reale
+        miniDawTimeline.syncWithAppState();
+        sceneList.updateContent();
+        if (showNode.getNumChildren() > 0)
+            sceneList.selectRow(0);
+        else
+            editorPanel.setSceneNode(juce::ValueTree());
+
+        sceneList.repaint();
+        stageSimulator.repaint();
+        });
 }
 
 void ShowBuilderTab::valueTreeChildAdded(juce::ValueTree& t, juce::ValueTree&) { if (t == showNode) sceneList.updateContent(); }

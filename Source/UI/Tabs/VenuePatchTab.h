@@ -83,6 +83,8 @@ public:
 
 private:
     void updateUIFromNode();
+    void applyQuickSpreadPreset(int presetId);
+    void shiftPanLimits(int delta);
 
     void valueTreePropertyChanged(juce::ValueTree&, const juce::Identifier&) override;
     void valueTreeChildAdded(juce::ValueTree&, juce::ValueTree&) override {}
@@ -123,7 +125,6 @@ private:
 
     juce::Label dimmerOrOpenLabel;
     juce::Slider dimmerOrOpenSlider;
-    juce::ToggleButton allowDimmerStrobeToggle;
 
     juce::Label strobeStartDmxLabel, strobeStartHzLabel;
     juce::Slider strobeStartDmxSlider, strobeStartHzSlider;
@@ -131,16 +132,23 @@ private:
     juce::Label strobeEndDmxLabel, strobeEndHzLabel;
     juce::Slider strobeEndDmxSlider, strobeEndHzSlider;
 
-    // 4. Calibrazione Pan/Tilt (Home, Offset, Range)
+    // 4. Area di Movimento sul Palco (4 Limiti DMX + Shift Pan + Totem)
     juce::Label ptSectionLabel;
-    juce::Label panHomeLabel, tiltHomeLabel;
-    juce::Slider panHomeSlider, tiltHomeSlider;
+    juce::TextButton ptSpreadNarrowBtn, ptSpreadMedBtn, ptSpreadWideBtn;
 
-    juce::Label panOffsetLabel, tiltOffsetLabel;
-    juce::Slider panOffsetSlider, tiltOffsetSlider;
+    juce::Label panSxLabel, panDxLabel;
+    juce::Slider panLeftSlider, panRightSlider;
+    juce::TextButton swapPanDirBtn;
 
-    juce::Label panRangeLabel, tiltRangeLabel;
-    juce::Slider panRangeSlider, tiltRangeSlider;
+    juce::Label tiltLowLabel, tiltHighLabel;
+    juce::Slider tiltLowSlider, tiltHighSlider;
+    juce::TextButton swapTiltDirBtn;
+
+    juce::Label panShiftLabel;
+    juce::TextButton panShiftM42Btn, panShiftM10Btn, panShiftP10Btn, panShiftP42Btn;
+    juce::ToggleButton swapPanTiltToggle;
+
+    juce::Label ptReadoutLabel;
 };
 
 // =============================================================================
@@ -224,6 +232,7 @@ private:
     void valueTreeChildRemoved(juce::ValueTree& parent, juce::ValueTree& child, int) override;
     void valueTreeChildOrderChanged(juce::ValueTree& parent, int, int) override;
     void valueTreeParentChanged(juce::ValueTree&) override {}
+    void applyQuickPanTiltPreset(int presetId);
 
     bool isRebuilding = false;
     int selectedFixtureIdx = -1;

@@ -147,16 +147,13 @@ public:
         drawHeaderHud(g, bounds.withHeight(26.0f));
 
         auto stageRect = getStageRect();
-        drawDragZoneGuide(g, stageRect);
-
-        stageRect.removeFromTop(24.0f);
-
         drawStageBackdrop(g, stageRect);
 
         const float trussY = stageRect.getY() + stageRect.getHeight() * 0.14f;
         const float floorY = stageRect.getY() + stageRect.getHeight() * 0.84f;
 
         drawTrussAndFloorStructure(g, stageRect, trussY, floorY);
+        drawDragZoneGuide(g, stageRect);
 
         std::vector<VisualFixture> fixtures = buildVisualFixtures(stageRect, trussY, floorY);
 
@@ -188,11 +185,61 @@ public:
         if (currentFogDensity > 0.01f)
             drawFogOverlay(g, stageRect, floorY);
 
+        int targetedCount = 0;
+        int blockedStrobeCount = 0;
+        int blockedMoveCount = 0;
+
         for (const auto& vf : fixtures)
         {
             bool isHovered = allowStageDrag && vf.unitNode.isValid() && (vf.unitNode == hoveredUnitNode);
             bool isDragged = allowStageDrag && vf.unitNode.isValid() && (vf.unitNode == draggedUnitNode);
             drawFixtureHardwareBody(g, vf, isHovered, isDragged);
+
+            if (vf.state.hasAnyCommand)            ++targetedCount;
+            if (vf.state.blockedByStrobePolicy)    ++blockedStrobeCount;
+            if (vf.state.blockedByMovePolicy)      ++blockedMoveCount;
+        }
+
+        const int blockedCount = juce::jmax(blockedStrobeCount, blockedMoveCount);
+        if (blockedCount > 0)
+        {
+            const bool isMoveBanner = (blockedMoveCount >= blockedStrobeCount);
+            const bool allBlocked = (targetedCount > 0 && blockedCount == targetedCount);
+            const float boxW = juce::jmin(490.0f, stageRect.getWidth() - 24.0f);
+            const float boxH = 30.0f;
+
+            juce::Rectangle<float> bannerRect = allBlocked
+                ? stageRect.withSizeKeepingCentre(boxW, boxH)
+                : juce::Rectangle<float>(stageRect.getCentreX() - boxW * 0.5f,
+                    stageRect.getBottom() - boxH - 8.0f,
+                    boxW,
+                    boxH);
+
+            juce::String msg;
+            if (isMoveBanner)
+            {
+                msg = allBlocked
+                    ? "Pan/Tilt non mappati (Ch = 0 in Tab 1) su tutti i fari del preset"
+                    : ("Movimento ignorato su " + juce::String(blockedMoveCount) + "/" + juce::String(targetedCount)
+                        + " fari (Pan/Tilt Ch = 0 in Tab 1)");
+            }
+            else
+            {
+                msg = allBlocked
+                    ? "Strobo disabilitato in Tab 1 su tutti i fari del preset"
+                    : ("Strobo ignorato su " + juce::String(blockedStrobeCount) + "/" + juce::String(targetedCount)
+                        + " fari (disabilitato in Tab 1)");
+            }
+
+            g.setColour(juce::Colour(0xff14110a).withAlpha(0.88f));
+            g.fillRoundedRectangle(bannerRect, 6.0f);
+            g.setColour(juce::Colour(0xfff59e0b).withAlpha(0.22f));
+            g.fillRoundedRectangle(bannerRect, 6.0f);
+            g.setColour(juce::Colour(0xfff59e0b));
+            g.drawRoundedRectangle(bannerRect, 6.0f, 1.3f);
+            g.setColour(juce::Colour(0xfffbbf24));
+            g.setFont(juce::FontOptions(12.0f, juce::Font::bold));
+            g.drawText(msg, bannerRect.reduced(8.0f, 0.0f), juce::Justification::centred, true);
         }
 
         g.setColour(juce::Colour(0xff2a2a38));
@@ -433,6 +480,8 @@ private:
     {
         bool hasAnyCommand = false;
         bool hasDimmerCmd = false;
+        bool blockedByStrobePolicy = false;
+        bool blockedByMovePolicy = false;
         float dimmer = 0.0f;
         float red = -1.0f;
         float green = -1.0f;
@@ -477,12 +526,7 @@ private:
         int roleSpatialIndex = 0;
         int roleSpatialTotal = 1;
 
-        float panHomeNorm = 0.5f;
-        float tiltHomeNorm = 0.35f;
-        float panOffsetNorm = 0.0f;
-        float tiltOffsetNorm = 0.0f;
-        float panRangeNorm = 0.47f;
-        float tiltRangeNorm = 0.35f;
+        StageRoleCatalog::PanTiltHardwareSpec panTiltSpec;
 
         StageRoleCatalog::StrobeHardwareSpec strobeSpec;
         RoleRuntimeState state;
@@ -670,6 +714,9 @@ private:
         bool hasMusicalStrobeCmd = false;
         double strobeHitsPerBeat = 2.0;
 
+        bool requestedPan = false, requestedTilt = false;
+        bool requestedActivePan = false, requestedActiveTilt = false;
+
         for (int c = 0; c < activeNode.getNumChildren(); ++c)
         {
             auto cmd = activeNode.getChild(c);
@@ -714,8 +761,30 @@ private:
             else if (param.equalsIgnoreCase("White"))   vf.state.white = val;
             else if (param.equalsIgnoreCase("UV"))      vf.state.uv = val;
             else if (param.equalsIgnoreCase("Strobe"))  vf.state.strobe = val;
-            else if (param.equalsIgnoreCase("Pan")) { vf.state.hasPanCmd = true; vf.state.panCmd = val; }
-            else if (param.equalsIgnoreCase("Tilt")) { vf.state.hasTiltCmd = true; vf.state.tiltCmd = val; }
+            else if (param.equalsIgnoreCase("Pan"))
+            {
+                requestedPan = true;
+                if (!curve.equalsIgnoreCase("Static"))
+                    requestedActivePan = true;
+
+                if (vf.panTiltSpec.hasPanChannel)
+                {
+                    vf.state.hasPanCmd = true;
+                    vf.state.panCmd = val;
+                }
+            }
+            else if (param.equalsIgnoreCase("Tilt"))
+            {
+                requestedTilt = true;
+                if (!curve.equalsIgnoreCase("Static"))
+                    requestedActiveTilt = true;
+
+                if (vf.panTiltSpec.hasTiltChannel)
+                {
+                    vf.state.hasTiltCmd = true;
+                    vf.state.tiltCmd = val;
+                }
+            }
         }
 
         if (hasMusicalStrobeCmd)
@@ -724,17 +793,27 @@ private:
 
             if (vf.strobeSpec.mode == 1 || vf.strobeSpec.mode == 2)
             {
-                // Faro con strobo hardware (separato o sub-range): usa la frequenza reale in Hz
                 vf.state.dimmer = 1.0f;
                 vf.state.strobe = 1.0f;
                 vf.state.strobeTargetHz = static_cast<float>((activeBpm / 60.0) * strobeHitsPerBeat);
             }
-            else if (!vf.strobeSpec.allowDimmerStrobe)
+            else if (vf.strobeSpec.mode == 3)
             {
-                // Faro senza strobo hardware e con Dimmer Flash disabilitato in Tab 1
                 vf.state.dimmer = 0.0f;
+                vf.state.blockedByStrobePolicy = true;
             }
-            // Se mode == 0 && allowDimmerStrobe == true: mantiene il Dimmer Flash 0/255 gia' calcolato
+            // mode == 0 (Dimmer Flash): mantiene il Dimmer Flash 0/255 gia' calcolato da CurveEvaluator
+        }
+
+        if (requestedPan || requestedTilt)
+        {
+            const bool canMoveAnyRequested = (requestedPan && vf.panTiltSpec.hasPanChannel)
+                || (requestedTilt && vf.panTiltSpec.hasTiltChannel);
+            const bool missingOnlyActiveAxis = (requestedActivePan && !vf.panTiltSpec.hasPanChannel && !requestedActiveTilt)
+                || (requestedActiveTilt && !vf.panTiltSpec.hasTiltChannel && !requestedActivePan);
+
+            if (!canMoveAnyRequested || missingOnlyActiveAxis)
+                vf.state.blockedByMovePolicy = true;
         }
 
         // 2. Cortesia in Preview Standalone: se stai testando un preset di solo Colore o solo Movimento
@@ -745,7 +824,7 @@ private:
             bool hasRgb = (vf.state.red >= 0.0f || vf.state.green >= 0.0f || vf.state.blue >= 0.0f);
             bool hasMove = (vf.state.hasPanCmd || vf.state.hasTiltCmd);
 
-            if (!vf.state.hasDimmerCmd &&
+            if (!vf.state.hasDimmerCmd && !vf.state.blockedByMovePolicy && 
                 (pool.equalsIgnoreCase("Color") || pool.equalsIgnoreCase("Movement") || hasRgb || hasMove))
             {
                 vf.state.dimmer = (hasMove && !hasRgb) ? 0.85f : 1.0f;
@@ -760,7 +839,7 @@ private:
 
     static void applyHardwareStrobeToFixture(VisualFixture& vf, double simTimeSec)
     {
-        if (vf.strobeSpec.mode == 0)
+        if (vf.strobeSpec.mode != 1 && vf.strobeSpec.mode != 2)
             return;
 
         if (vf.state.strobe <= 0.01f)
@@ -820,12 +899,7 @@ private:
                 auto cat = StageRoleCatalog::classifyRole(rName, fName);
 
                 int startAddr = static_cast<int>(fix.getProperty(StateKeys::StartAddress, 1));
-                float panH = static_cast<float>(static_cast<int>(fix.getProperty(StateKeys::PanHome, 128))) / 255.0f;
-                float tiltH = static_cast<float>(static_cast<int>(fix.getProperty(StateKeys::TiltHome, 90))) / 255.0f;
-                float panO = static_cast<float>(static_cast<int>(fix.getProperty(StateKeys::PanOffset, 0))) / 255.0f;
-                float tiltO = static_cast<float>(static_cast<int>(fix.getProperty(StateKeys::TiltOffset, 0))) / 255.0f;
-                float panR = static_cast<float>(static_cast<int>(fix.getProperty(StateKeys::PanRange, 120))) / 255.0f;
-                float tiltR = static_cast<float>(static_cast<int>(fix.getProperty(StateKeys::TiltRange, 90))) / 255.0f;
+                auto fixPanTiltSpec = StageRoleCatalog::PanTiltHardwareSpec::fromFixtureNode(fix);
                 auto fixStrobeSpec = StageRoleCatalog::StrobeHardwareSpec::fromFixtureNode(fix);
 
                 int unitCount = 0;
@@ -852,12 +926,7 @@ private:
                         stageRect.getY() + ny * stageRect.getHeight()
                     };
                     vf.unitIndex = unitCount - 1;
-                    vf.panHomeNorm = panH;
-                    vf.tiltHomeNorm = tiltH;
-                    vf.panOffsetNorm = panO;
-                    vf.tiltOffsetNorm = tiltO;
-                    vf.panRangeNorm = panR;
-                    vf.tiltRangeNorm = tiltR;
+                    vf.panTiltSpec = fixPanTiltSpec;
                     vf.strobeSpec = fixStrobeSpec;
                     vf.dmxStartAddress = startAddr;
                     vf.unitNode = unit;
@@ -901,6 +970,12 @@ private:
                            (d.ny < 0.5f) ? trussY : floorY };
                 vf.unitIndex = d.idx;
                 vf.dmxStartAddress = static_cast<int>(placedList.size()) * 10 + 1;
+
+                vf.panTiltSpec.applyQuickSpread(1);
+                const bool isMovingFallback = (d.cat == Cat::AirMovingBeam || d.cat == Cat::FloorMovingBeam);
+                vf.panTiltSpec.hasPanChannel = isMovingFallback;
+                vf.panTiltSpec.hasTiltChannel = isMovingFallback;
+
                 placedList.push_back(vf);
             }
         }
@@ -1051,26 +1126,36 @@ private:
 
     void computeEffectivePanTilt(const VisualFixture& vf, float& outPanSigned, float& outTiltNorm) const
     {
-        float rawPanDelta = vf.state.hasPanCmd ? (vf.state.panCmd - 0.5f) * vf.panRangeNorm : 0.0f;
-        float rawTiltDelta = vf.state.hasTiltCmd ? (vf.state.tiltCmd - 0.5f) * vf.tiltRangeNorm : 0.0f;
-
         juce::String phaseMode = activeNode.isValid()
             ? activeNode.getProperty(StateKeys::PhaseMode, "SymmetricalFan").toString()
             : "SymmetricalFan";
 
-        // Specchia il Pan solo se nel ruolo esistono almeno 2 indirizzi DMX distinti
-        if (phaseMode.equalsIgnoreCase("SymmetricalFan") &&
-            vf.roleSpatialTotal > 1 &&
-            vf.normX > 0.501f)
+        const bool mirrorPan = phaseMode.equalsIgnoreCase("SymmetricalFan")
+            && vf.roleSpatialTotal > 1
+            && vf.normX > 0.501f;
+
+        if (vf.panTiltSpec.hasPanChannel)
         {
-            rawPanDelta = -rawPanDelta;
+            float u = vf.state.hasPanCmd ? vf.state.panCmd : 0.5f;
+            if (mirrorPan) u = 1.0f - u;
+            const float spanFactor = juce::jlimit(0.0f, 1.0f, static_cast<float>(vf.panTiltSpec.getPanSpan()) / 140.0f);
+            outPanSigned = juce::jlimit(-1.0f, 1.0f, (u - 0.5f) * 2.0f * spanFactor);
+        }
+        else
+        {
+            outPanSigned = 0.0f;
         }
 
-        float finalPan = juce::jlimit(0.0f, 1.0f, vf.panHomeNorm + vf.panOffsetNorm + rawPanDelta);
-        float finalTilt = juce::jlimit(0.0f, 1.0f, vf.tiltHomeNorm + vf.tiltOffsetNorm + rawTiltDelta);
-
-        outPanSigned = (finalPan - 0.5f) * 2.0f;
-        outTiltNorm = finalTilt;
+        if (vf.panTiltSpec.hasTiltChannel)
+        {
+            const float u = vf.state.hasTiltCmd ? vf.state.tiltCmd : 0.5f;
+            const float spanFactor = juce::jlimit(0.0f, 1.0f, static_cast<float>(vf.panTiltSpec.getTiltSpan()) / 100.0f);
+            outTiltNorm = juce::jlimit(0.05f, 0.95f, 0.45f + (u - 0.5f) * 0.85f * spanFactor);
+        }
+        else
+        {
+            outTiltNorm = 0.35f;
+        }
     }
 
     void drawFixtureLightEffect(juce::Graphics& g,
@@ -1277,6 +1362,7 @@ private:
         bool isHovered,
         bool isDragged)
     {
+        const bool isPolicyBlocked = vf.state.blockedByStrobePolicy || vf.state.blockedByMovePolicy;
         juce::Rectangle<float> box(vf.pos.x - 8.0f, vf.pos.y - 6.0f, 16.0f, 12.0f);
 
         if (isDragged || isHovered)
@@ -1285,20 +1371,48 @@ private:
             g.setColour(hiCol.withAlpha(isDragged ? 0.35f : 0.22f));
             g.fillRoundedRectangle(box.expanded(4.0f), 5.0f);
         }
+        else if (isPolicyBlocked)
+        {
+            g.setColour(juce::Colour(0xfff59e0b).withAlpha(0.24f));
+            g.fillRoundedRectangle(box.expanded(3.5f), 5.0f);
+        }
 
         g.setColour(juce::Colour(0xff1e202b));
         g.fillRoundedRectangle(box, 3.0f);
-        g.setColour(isDragged ? juce::Colour(0xfffacc15)
-            : (isHovered ? juce::Colour(0xff38bdf8) : juce::Colour(0xff475569)));
-        g.drawRoundedRectangle(box, 3.0f, (isDragged || isHovered) ? 2.0f : 1.0f);
 
-        juce::Colour lensCol = vf.state.getEffectiveColour();
-        float dim = vf.state.dimmer;
-        g.setColour(dim > 0.02f ? lensCol.withAlpha(0.35f + 0.65f * dim) : juce::Colour(0xff0f172a));
-        g.fillEllipse(vf.pos.x - 4.5f, vf.pos.y - 4.5f, 9.0f, 9.0f);
+        juce::Colour borderCol = juce::Colour(0xff475569);
+        float borderThick = 1.0f;
+        if (isDragged) { borderCol = juce::Colour(0xfffacc15); borderThick = 2.0f; }
+        else if (isHovered) { borderCol = juce::Colour(0xff38bdf8); borderThick = 2.0f; }
+        else if (isPolicyBlocked) { borderCol = juce::Colour(0xfff59e0b); borderThick = 1.6f; }
 
-        g.setColour((isDragged ? juce::Colour(0xfffef08a) : juce::Colour(0xff94a3b8)).withAlpha(0.9f));
-        g.setFont(juce::FontOptions(9.5f, isDragged ? juce::Font::bold : juce::Font::plain));
+        g.setColour(borderCol);
+        g.drawRoundedRectangle(box, 3.0f, borderThick);
+
+        if (isPolicyBlocked && vf.state.dimmer <= 0.02f)
+        {
+            g.setColour(juce::Colour(0xff1a1408));
+            g.fillEllipse(vf.pos.x - 4.5f, vf.pos.y - 4.5f, 9.0f, 9.0f);
+
+            g.setColour(juce::Colour(0xfff59e0b));
+            g.drawEllipse(vf.pos.x - 4.2f, vf.pos.y - 4.2f, 8.4f, 8.4f, 1.3f);
+            g.drawLine(vf.pos.x - 2.8f, vf.pos.y - 2.8f,
+                vf.pos.x + 2.8f, vf.pos.y + 2.8f, 1.4f);
+        }
+        else
+        {
+            juce::Colour lensCol = vf.state.getEffectiveColour();
+            float dim = vf.state.dimmer;
+            g.setColour(dim > 0.02f ? lensCol.withAlpha(0.35f + 0.65f * dim) : juce::Colour(0xff0f172a));
+            g.fillEllipse(vf.pos.x - 4.5f, vf.pos.y - 4.5f, 9.0f, 9.0f);
+        }
+
+        juce::Colour labelCol = juce::Colour(0xff94a3b8);
+        if (isDragged)            labelCol = juce::Colour(0xfffef08a);
+        else if (isPolicyBlocked) labelCol = juce::Colour(0xfffbbf24);
+
+        g.setColour(labelCol.withAlpha(0.95f));
+        g.setFont(juce::FontOptions(9.5f, (isDragged || isPolicyBlocked) ? juce::Font::bold : juce::Font::plain));
         float textY = (vf.pos.y < 180.0f) ? (vf.pos.y - 17.0f) : (vf.pos.y + 7.0f);
         g.drawText(vf.name, static_cast<int>(vf.pos.x - 44.0f), static_cast<int>(textY),
             88, 12, juce::Justification::centred, true);

@@ -89,6 +89,15 @@ namespace StateKeys
     const juce::Identifier TiltOffset{ "tiltOffset" }; // -127..+127 (Default 0)
     const juce::Identifier PanRange{ "panRange" };     // 10..255 (Ampiezza max movimento Pan, default 120)
     const juce::Identifier TiltRange{ "tiltRange" };   // 10..255 (Ampiezza max movimento Tilt, default 90)
+    const juce::Identifier PanTiltProfile{ "ptProfile" }; // 0=540/270, 1=540/180, 2=630/270, 3=SoloTilt 180
+    const juce::Identifier MountMode{ "mountMode" };      // 0=Americana Fronte, 1=Americana Retro, 2=Terra Fronte, 3=Terra Retro
+    const juce::Identifier PanMin{ "panMin" };            // 0..255
+    const juce::Identifier PanMax{ "panMax" };            // 0..255
+    const juce::Identifier TiltMin{ "tiltMin" };          // 0..255
+    const juce::Identifier TiltMax{ "tiltMax" };          // 0..255
+    const juce::Identifier SwapPanTilt{ "swapPanTilt" }; // bool: montaggio verticale/totem (scambia Pan <-> Tilt)
+    const juce::Identifier InvertPan{ "invertPan" };      // bool
+    const juce::Identifier InvertTilt{ "invertTilt" };    // bool
 
     // Singola Unita' Fisica (nel Light Case o piazzata sul Palco 2D)
     const juce::Identifier FixtureUnit{ "FIXTURE_UNIT" };
