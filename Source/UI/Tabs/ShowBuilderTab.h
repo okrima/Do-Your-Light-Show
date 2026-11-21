@@ -86,6 +86,7 @@ public:
     int getNumRows() override;
     void paintListBoxItem(int rowNumber, juce::Graphics& g, int width, int height, bool rowIsSelected) override;
     void selectedRowsChanged(int lastRowSelected) override;
+    void listBoxItemClicked(int row, const juce::MouseEvent& e) override;
 
     void paint(juce::Graphics& g) override;
     void resized() override;
@@ -107,8 +108,11 @@ private:
     void valueTreePropertyChanged(juce::ValueTree&, const juce::Identifier&) override;
     void valueTreeParentChanged(juce::ValueTree&) override {}
     bool keyPressed(const juce::KeyPress& key, juce::Component* originatingComponent) override;
-    void importMidiTempoMap();
 
+    void duplicateScene(int rowIndex);
+    void sortScenesByStartBeat(juce::ValueTree sceneToKeepSelected = {});
+
+    bool isSortingScenes = false;
 
     juce::ValueTree& appState;
     juce::ValueTree showNode;
@@ -122,7 +126,6 @@ private:
     juce::TextButton insertPresetBtn; 
     juce::TextButton saveBtn;
     juce::TextButton loadBtn;
-    juce::TextButton importMidiMapBtn;
 
 
     SceneEditorPanel editorPanel;

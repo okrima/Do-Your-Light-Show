@@ -22,7 +22,9 @@ public:
         float endVal,
         float clipProgress0to1,
         const BeatTimeMap::MusicalPosition& pos,
-        double phaseOffsetCycles)
+        double phaseOffsetCycles,
+        bool centerAnchoredMotion = false,
+        double clipElapsedBars = -1.0)
     {
         const float progress = juce::jlimit(0.0f, 1.0f, clipProgress0to1);
 
@@ -39,7 +41,6 @@ public:
         }
 
         // LFO Sinusoidali / Coseno (Cerchio) / Doppia Frequenza (Figura a 8)
-        // Si adattano automaticamente alla metrica corrente tramite continuousBarPos
         if (curve.startsWithIgnoreCase("Sine") || curve.startsWithIgnoreCase("Cosine"))
         {
             double basePhase = 0.0;
@@ -54,15 +55,33 @@ public:
                 else if (curve.containsIgnoreCase("2Bars")) cycleBars = 2.0;
                 else if (curve.containsIgnoreCase("1Bar"))  cycleBars = 1.0;
 
-                basePhase = std::fmod(juce::jmax(0.0, pos.continuousBarPos) / cycleBars, 1.0);
+                const double barClock = (centerAnchoredMotion && clipElapsedBars >= 0.0)
+                    ? juce::jmax(0.0, clipElapsedBars)
+                    : juce::jmax(0.0, pos.continuousBarPos);
+
+                basePhase = std::fmod(barClock / cycleBars, 1.0);
             }
 
-            double freqMult = curve.startsWithIgnoreCase("Sine2x") ? 2.0 : 1.0;
+            const double freqMult = curve.startsWithIgnoreCase("Sine2x") ? 2.0 : 1.0;
             double phase = std::fmod(basePhase + phaseOffsetCycles, 1.0);
             if (phase < 0.0) phase += 1.0;
 
-            double angle = phase * juce::MathConstants<double>::twoPi * freqMult;
-            float wave = curve.startsWithIgnoreCase("Cosine")
+            const double angle = phase * juce::MathConstants<double>::twoPi * freqMult;
+
+            if (centerAnchoredMotion)
+            {
+                // Curve periodiche pure centrate sulla taratura:
+                // fine ciclo e inizio ciclo combaciano sempre (posizione e velocita' identiche)
+                const bool isCosine = curve.startsWithIgnoreCase("Cosine");
+                const double osc = isCosine ? -std::cos(angle) : std::sin(angle);
+
+                const float mid = 0.5f * (startVal + endVal);
+                const float halfAmp = 0.5f * (endVal - startVal);
+                return mid + halfAmp * static_cast<float>(osc);
+            }
+
+            // Curve unipolari (Dimmer / Respiro): partono da startVal verso endVal
+            const float wave = curve.startsWithIgnoreCase("Cosine")
                 ? 0.5f * (1.0f + static_cast<float>(std::sin(angle)))
                 : 0.5f * (1.0f - static_cast<float>(std::cos(angle)));
 

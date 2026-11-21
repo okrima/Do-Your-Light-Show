@@ -23,7 +23,19 @@ public:
         if (!showNode.isValid())
             return false;
 
-        return saveValueTreeToJson(showNode, file);
+        juce::ValueTree package(StateKeys::ShowPackageNode);
+        package.addChild(showNode.createCopy(), -1, nullptr);
+
+        if (auto stemsNode = appState.getChildWithName(StateKeys::AudioStemsNode); stemsNode.isValid())
+            package.addChild(stemsNode.createCopy(), -1, nullptr);
+
+        if (auto beatMapNode = appState.getChildWithName(StateKeys::BeatMapNode); beatMapNode.isValid())
+            package.addChild(beatMapNode.createCopy(), -1, nullptr);
+
+        if (auto aestheticNode = appState.getChildWithName(StateKeys::AestheticNode); aestheticNode.isValid())
+            package.addChild(aestheticNode.createCopy(), -1, nullptr);
+
+        return saveValueTreeToJson(package, file);
     }
 
     // =========================================================================
@@ -64,18 +76,40 @@ public:
             return false;
 
         juce::ValueTree loadedNode = loadValueTreeFromJson(file);
-        if (loadedNode.isValid() && loadedNode.hasType(StateKeys::ShowNode))
-        {
-            auto existingNode = appState.getChildWithName(StateKeys::ShowNode);
-            if (!existingNode.isValid())
-            {
-                existingNode = juce::ValueTree(StateKeys::ShowNode);
-                appState.addChild(existingNode, -1, nullptr);
-            }
+        if (!loadedNode.isValid())
+            return false;
 
-            updateNodePreservingListeners(existingNode, loadedNode);
+        auto applyChildNode = [&](const juce::Identifier& nodeType, const juce::ValueTree& src)
+            {
+                if (!src.isValid())
+                    return;
+
+                auto dst = appState.getChildWithName(nodeType);
+                if (!dst.isValid())
+                {
+                    dst = juce::ValueTree(nodeType);
+                    appState.addChild(dst, -1, nullptr);
+                }
+                updateNodePreservingListeners(dst, src);
+            };
+
+        // Nuovo formato completo (Show + Tracce Audio + Tempo/Metrica + Impostazioni AI)
+        if (loadedNode.hasType(StateKeys::ShowPackageNode))
+        {
+            applyChildNode(StateKeys::ShowNode, loadedNode.getChildWithName(StateKeys::ShowNode));
+            applyChildNode(StateKeys::AudioStemsNode, loadedNode.getChildWithName(StateKeys::AudioStemsNode));
+            applyChildNode(StateKeys::BeatMapNode, loadedNode.getChildWithName(StateKeys::BeatMapNode));
+            applyChildNode(StateKeys::AestheticNode, loadedNode.getChildWithName(StateKeys::AestheticNode));
             return true;
         }
+
+        // Fallback retrocompatibile per vecchi file .show contenenti solo SHOW_TIMELINE
+        if (loadedNode.hasType(StateKeys::ShowNode))
+        {
+            applyChildNode(StateKeys::ShowNode, loadedNode);
+            return true;
+        }
+
         return false;
     }
 

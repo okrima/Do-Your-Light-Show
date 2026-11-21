@@ -19,7 +19,7 @@ public:
     {
         double startBeat = 1.0; // Posizione in Quarti (1-based) in cui entra la nuova metrica
         int num = 4;            // Numeratore (es. 4, 3, 6, 5, 7, 12)
-        int den = 4;            // Denominatore (es. 4, 8, 16)
+        int den = 4;            // Denominatore (es. 2, 4, 8, 16)
         int startBar = 1;       // Numero di battuta calcolato automaticamente (1-based)
 
         double getBarLengthQ() const noexcept
@@ -32,7 +32,7 @@ public:
 
     struct MusicalPosition
     {
-        double totalQuarters = 1.0;    // Posizione assoluta in Quarti (1-based, standard MIDI/Timeline)
+        double totalQuarters = 1.0;    // Posizione assoluta in Quarti (1-based)
         int    barIndex = 1;           // Numero battuta reale (1-based)
         double beatInBarQ = 0.0;       // Quarti trascorsi dall'ultimo battere [0 .. barLengthQ)
         double barLengthQ = 4.0;       // Lunghezza della misura corrente in Quarti
@@ -41,7 +41,6 @@ public:
         double continuousBarPos = 0.0; // (barIndex - 1) + (beatInBarQ / barLengthQ)
         double localBpm = 120.0;
 
-        // Indice del movimento nella metrica corrente (es. 1..4 in 4/4, 1..6 in 6/8, 1..7 in 7/8)
         double getSubdivisionInBar() const noexcept
         {
             return 1.0 + beatInBarQ * (static_cast<double>(timeSigDen) / 4.0);
@@ -56,9 +55,26 @@ public:
         }
     };
 
+    struct MetronomeState
+    {
+        int barIndex = 0;       // 0 = prima di firstDownbeatSec, >= 1 = battuta attiva
+        int subdivIndex = 0;    // 1..timeSigNum (1 = battere accentato)
+        double fracInSub = 0.0; // [0..1) progresso nella suddivisione corrente
+    };
+
+    struct MidiMapImportResult
+    {
+        bool success = false;
+        int tempoChangesImported = 0;
+        int meterChangesImported = 0;
+        double initialBpm = 120.0;
+        int initialNum = 4;
+        int initialDen = 4;
+        juce::String errorMessage;
+    };
+
     BeatTimeMap() = default;
 
-    // Aggancia la mappa al ValueTree globale e ricostruisce la cache veloce
     void bindToAppState(juce::ValueTree& rootState)
     {
         if (!rootState.isValid()) return;
@@ -77,9 +93,10 @@ public:
         rebuildCacheFromState();
     }
 
-    // Ricostruisce i vettori in RAM per letture a 60 FPS nella Mini-DAW e nel Simulatore
     void rebuildCacheFromState()
     {
+        const juce::SpinLock::ScopedLockType sl(cacheLock);
+
         anchors.clear();
         meterAnchors.clear();
         if (!beatMapNode.isValid()) return;
@@ -92,7 +109,6 @@ public:
 
         baseTimeSigNum = juce::jlimit(1, 32, static_cast<int>(beatMapNode.getProperty(StateKeys::TimeSigNum, 4)));
         baseTimeSigDen = sanitizeDenominator(static_cast<int>(beatMapNode.getProperty(StateKeys::TimeSigDen, 4)));
-
         midiEndBeatCache = juce::jmax(1.0,
             static_cast<double>(beatMapNode.getProperty(juce::Identifier("midiEndBeat"), 1.0)));
 
@@ -107,9 +123,9 @@ public:
             if (child.hasType(StateKeys::BeatPointNode))
             {
                 BeatAnchor a;
-                a.beat = static_cast<double>(child.getProperty(StateKeys::PointBeat, 1.0));
-                a.timeSec = static_cast<double>(child.getProperty(StateKeys::PointTimeSec, 0.0));
-                a.localBpm = static_cast<double>(child.getProperty(StateKeys::PointBpm, baseBpm));
+                a.beat = juce::jmax(1.0, static_cast<double>(child.getProperty(StateKeys::PointBeat, 1.0)));
+                a.timeSec = juce::jmax(0.0, static_cast<double>(child.getProperty(StateKeys::PointTimeSec, 0.0)));
+                a.localBpm = juce::jlimit(20.0, 300.0, static_cast<double>(child.getProperty(StateKeys::PointBpm, baseBpm)));
                 anchors.push_back(a);
             }
             else if (child.hasType(StateKeys::MeterPointNode))
@@ -123,7 +139,7 @@ public:
         }
 
         std::sort(anchors.begin(), anchors.end(), [](const BeatAnchor& a, const BeatAnchor& b) {
-            return a.timeSec < b.timeSec;
+            return a.beat < b.beat;
             });
 
         finalizeMeterAnchors();
@@ -132,87 +148,200 @@ public:
     // Imposta un BPM fisso (rimuove solo i BEAT_POINT, preserva i METER_POINT)
     void setFixedBpm(double newBpm, double downbeatOffsetSec = 0.0)
     {
-        baseBpm = juce::jlimit(20.0, 300.0, newBpm);
-        firstDownbeatSec = juce::jmax(0.0, downbeatOffsetSec);
+        const double safeBpm = juce::jlimit(20.0, 300.0, newBpm);
+        const double safeOff = juce::jmax(0.0, downbeatOffsetSec);
 
         if (beatMapNode.isValid())
         {
-            beatMapNode.setProperty(StateKeys::BpmBase, baseBpm, nullptr);
-            beatMapNode.setProperty(StateKeys::FirstDownbeatSec, firstDownbeatSec, nullptr);
+            beatMapNode.setProperty(StateKeys::BpmBase, safeBpm, nullptr);
+            beatMapNode.setProperty(StateKeys::FirstDownbeatSec, safeOff, nullptr);
             for (int i = beatMapNode.getNumChildren() - 1; i >= 0; --i)
             {
                 if (beatMapNode.getChild(i).hasType(StateKeys::BeatPointNode))
                     beatMapNode.removeChild(i, nullptr);
             }
         }
-        anchors.clear();
+        rebuildCacheFromState();
     }
 
-    // Imposta una metrica fissa per tutto il brano
+    void setFirstDownbeatSeconds(double newOffsetSec)
+    {
+        const double safeOff = juce::jmax(0.0, newOffsetSec);
+        if (beatMapNode.isValid())
+            beatMapNode.setProperty(StateKeys::FirstDownbeatSec, safeOff, nullptr);
+
+        auto list = getEditableTempoAnchors();
+        if (list.size() > 1)
+            reintegrateAndPersistTempoAnchors(std::move(list), safeOff);
+        else
+            rebuildCacheFromState();
+    }
+
+    // --- CRUD Tempo Anchors (BPM) con re-integrazione automatica di timeSec ---
+    std::vector<BeatAnchor> getEditableTempoAnchors() const
+    {
+        const juce::SpinLock::ScopedLockType sl(cacheLock);
+        if (!anchors.empty())
+            return anchors;
+
+        BeatAnchor a;
+        a.beat = 1.0;
+        a.timeSec = firstDownbeatSec;
+        a.localBpm = baseBpm;
+        return { a };
+    }
+
+    void addOrUpdateTempoChange(double beatQ, double bpm)
+    {
+        auto list = getEditableTempoAnchors();
+        const double safeBeat = juce::jmax(1.0, beatQ);
+        const double safeBpm = juce::jlimit(20.0, 300.0, bpm);
+
+        bool updated = false;
+        for (auto& a : list)
+        {
+            if (std::abs(a.beat - safeBeat) < 1e-4)
+            {
+                a.localBpm = safeBpm;
+                updated = true;
+                break;
+            }
+        }
+        if (!updated)
+            list.push_back({ safeBeat, 0.0, safeBpm });
+
+        reintegrateAndPersistTempoAnchors(std::move(list), firstDownbeatSec);
+    }
+
+    void updateTempoAnchor(int index, double newBeatQ, double newBpm)
+    {
+        auto list = getEditableTempoAnchors();
+        if (index < 0 || index >= static_cast<int>(list.size()))
+            return;
+
+        list[static_cast<size_t>(index)].beat = (index == 0) ? 1.0 : juce::jmax(1.03125, newBeatQ);
+        list[static_cast<size_t>(index)].localBpm = juce::jlimit(20.0, 300.0, newBpm);
+        reintegrateAndPersistTempoAnchors(std::move(list), firstDownbeatSec);
+    }
+
+    void moveTempoAnchor(int index, double newBeatQ)
+    {
+        auto list = getEditableTempoAnchors();
+        if (index <= 0 || index >= static_cast<int>(list.size()))
+            return;
+
+        list[static_cast<size_t>(index)].beat = juce::jmax(1.03125, newBeatQ);
+        reintegrateAndPersistTempoAnchors(std::move(list), firstDownbeatSec);
+    }
+
+    void removeTempoAnchor(int index)
+    {
+        auto list = getEditableTempoAnchors();
+        if (index <= 0 || index >= static_cast<int>(list.size()))
+            return;
+
+        list.erase(list.begin() + index);
+        reintegrateAndPersistTempoAnchors(std::move(list), firstDownbeatSec);
+    }
+
+    // --- CRUD Meter Anchors (Cambi Metrica) ---
     void setFixedMeter(int num, int den)
     {
-        baseTimeSigNum = juce::jlimit(1, 32, num);
-        baseTimeSigDen = sanitizeDenominator(den);
+        const int safeNum = juce::jlimit(1, 32, num);
+        const int safeDen = sanitizeDenominator(den);
 
         if (beatMapNode.isValid())
         {
-            beatMapNode.setProperty(StateKeys::TimeSigNum, baseTimeSigNum, nullptr);
-            beatMapNode.setProperty(StateKeys::TimeSigDen, baseTimeSigDen, nullptr);
+            beatMapNode.setProperty(StateKeys::TimeSigNum, safeNum, nullptr);
+            beatMapNode.setProperty(StateKeys::TimeSigDen, safeDen, nullptr);
             for (int i = beatMapNode.getNumChildren() - 1; i >= 0; --i)
             {
                 if (beatMapNode.getChild(i).hasType(StateKeys::MeterPointNode))
                     beatMapNode.removeChild(i, nullptr);
             }
         }
-        meterAnchors.clear();
-        finalizeMeterAnchors();
-    }
-
-    // Aggiunge o aggiorna un cambio di metrica al quarto indicato (1-based)
-    void addOrUpdateMeterChange(double startBeatQ, int num, int den)
-    {
-        double safeBeat = juce::jmax(1.0, startBeatQ);
-        int safeNum = juce::jlimit(1, 32, num);
-        int safeDen = sanitizeDenominator(den);
-
-        if (beatMapNode.isValid())
-        {
-            for (int i = beatMapNode.getNumChildren() - 1; i >= 0; --i)
-            {
-                auto child = beatMapNode.getChild(i);
-                if (child.hasType(StateKeys::MeterPointNode) &&
-                    std::abs(static_cast<double>(child.getProperty(StateKeys::PointBeat, 1.0)) - safeBeat) < 1e-4)
-                {
-                    beatMapNode.removeChild(i, nullptr);
-                }
-            }
-
-            juce::ValueTree mp(StateKeys::MeterPointNode);
-            mp.setProperty(StateKeys::PointBeat, safeBeat, nullptr);
-            mp.setProperty(StateKeys::TimeSigNum, safeNum, nullptr);
-            mp.setProperty(StateKeys::TimeSigDen, safeDen, nullptr);
-            beatMapNode.addChild(mp, -1, nullptr);
-
-            if (safeBeat <= 1.0001)
-            {
-                beatMapNode.setProperty(StateKeys::TimeSigNum, safeNum, nullptr);
-                beatMapNode.setProperty(StateKeys::TimeSigDen, safeDen, nullptr);
-            }
-        }
-
         rebuildCacheFromState();
     }
 
-    struct MidiMapImportResult
+    void addOrUpdateMeterChange(double startBeatQ, int num, int den)
     {
-        bool success = false;
-        int tempoChangesImported = 0;
-        int meterChangesImported = 0;
-        double initialBpm = 120.0;
-        int initialNum = 4;
-        int initialDen = 4;
-        juce::String errorMessage;
-    };
+        auto list = getMeterAnchorsCopy();
+        const double safeBeat = juce::jmax(1.0, startBeatQ);
+        const int safeNum = juce::jlimit(1, 32, num);
+        const int safeDen = sanitizeDenominator(den);
+
+        bool updated = false;
+        for (auto& m : list)
+        {
+            if (std::abs(m.startBeat - safeBeat) < 1e-4)
+            {
+                m.num = safeNum;
+                m.den = safeDen;
+                updated = true;
+                break;
+            }
+        }
+        if (!updated)
+            list.push_back({ safeBeat, safeNum, safeDen, 1 });
+
+        persistMeterAnchors(std::move(list));
+    }
+
+    void updateMeterAnchor(int index, double newBeatQ, int num, int den)
+    {
+        auto list = getMeterAnchorsCopy();
+        if (index < 0 || index >= static_cast<int>(list.size()))
+            return;
+
+        list[static_cast<size_t>(index)].startBeat = (index == 0) ? 1.0 : juce::jmax(1.03125, newBeatQ);
+        list[static_cast<size_t>(index)].num = juce::jlimit(1, 32, num);
+        list[static_cast<size_t>(index)].den = sanitizeDenominator(den);
+        persistMeterAnchors(std::move(list));
+    }
+
+    void moveMeterAnchor(int index, double newBeatQ)
+    {
+        auto list = getMeterAnchorsCopy();
+        if (index <= 0 || index >= static_cast<int>(list.size()))
+            return;
+
+        list[static_cast<size_t>(index)].startBeat = juce::jmax(1.03125, newBeatQ);
+        persistMeterAnchors(std::move(list));
+    }
+
+    void removeMeterAnchor(int index)
+    {
+        auto list = getMeterAnchorsCopy();
+        if (index <= 0 || index >= static_cast<int>(list.size()))
+            return;
+
+        list.erase(list.begin() + index);
+        persistMeterAnchors(std::move(list));
+    }
+
+    void removeMeterChangeNear(double beatQ, double toleranceQ = 0.5)
+    {
+        if (!beatMapNode.isValid() || beatQ <= 1.05)
+            return;
+
+        bool removed = false;
+        for (int i = beatMapNode.getNumChildren() - 1; i >= 0; --i)
+        {
+            auto child = beatMapNode.getChild(i);
+            if (!child.hasType(StateKeys::MeterPointNode))
+                continue;
+
+            double ptB = static_cast<double>(child.getProperty(StateKeys::PointBeat, 1.0));
+            if (ptB > 1.05 && std::abs(ptB - beatQ) <= toleranceQ)
+            {
+                beatMapNode.removeChild(i, nullptr);
+                removed = true;
+            }
+        }
+
+        if (removed)
+            rebuildCacheFromState();
+    }
 
     // Importa Tempo Map (0xFF 0x51) e cambi di Metrica (0xFF 0x58) da un file .mid (es. Reaper)
     MidiMapImportResult importMidiTempoAndMeterMap(const juce::File& midiFile, double offsetSec = 0.0)
@@ -251,7 +380,6 @@ public:
         struct RawMeter { double tick; int num; int den; };
         std::vector<RawTempo> rawTempos;
         std::vector<RawMeter> rawMeters;
-
         double maxTickFound = 0.0;
 
         for (int t = 0; t < mf.getNumTracks(); ++t)
@@ -266,7 +394,6 @@ public:
 
                 const auto& msg = holder->message;
                 const double tick = juce::jmax(0.0, msg.getTimeStamp());
-
                 if (tick > maxTickFound)
                     maxTickFound = tick;
 
@@ -288,7 +415,6 @@ public:
             }
         }
 
-        // Ordina e deduplica eventuali eventi sullo stesso tick (tiene l'ultimo)
         auto sortDedup = [](auto& vec)
             {
                 std::stable_sort(vec.begin(), vec.end(),
@@ -317,7 +443,6 @@ public:
         else if (rawMeters.front().tick > 1e-3)
             rawMeters.insert(rawMeters.begin(), { 0.0, rawMeters.front().num, rawMeters.front().den });
 
-        // Integra i tempi in secondi con precisione analitica tra un cambio BPM e il successivo
         std::vector<BeatAnchor> newAnchors;
         newAnchors.reserve(rawTempos.size());
 
@@ -339,7 +464,6 @@ public:
             newAnchors.push_back(a);
         }
 
-        // Scrive nel ValueTree globale (cosi' si salva col progetto e aggiorna Timeline + Export)
         if (beatMapNode.isValid())
         {
             beatMapNode.removeAllChildren(nullptr);
@@ -383,8 +507,276 @@ public:
         return res;
     }
 
-    // Converte i SECONDI dell'audio nel QUARTO DECIMALE (es. 1.25)
+    MetronomeState queryMetronomeState(double timeSec) const
+    {
+        const juce::SpinLock::ScopedLockType sl(cacheLock);
+
+        MetronomeState st;
+        if (timeSec < firstDownbeatSec - 1e-4)
+            return st;
+
+        const double beat = secondsToBeatUnlocked(timeSec);
+        const auto pos = beatToMusicalPositionUnlocked(beat);
+        const double subFloat = pos.getSubdivisionInBar();
+        const int wholeSub = juce::jlimit(1, juce::jmax(1, pos.timeSigNum),
+            static_cast<int>(std::floor(subFloat + 1e-6)));
+
+        st.barIndex = pos.barIndex;
+        st.subdivIndex = wholeSub;
+        st.fracInSub = juce::jlimit(0.0, 0.999999, subFloat - static_cast<double>(wholeSub));
+        return st;
+    }
+
     double secondsToBeat(double timeSec) const
+    {
+        const juce::SpinLock::ScopedLockType sl(cacheLock);
+        return secondsToBeatUnlocked(timeSec);
+    }
+
+    double beatToSeconds(double beat) const
+    {
+        const juce::SpinLock::ScopedLockType sl(cacheLock);
+        return beatToSecondsUnlocked(beat);
+    }
+
+    double getBpmAtBeat(double beat) const
+    {
+        const juce::SpinLock::ScopedLockType sl(cacheLock);
+        return getBpmAtBeatUnlocked(beat);
+    }
+
+    MusicalPosition beatToMusicalPosition(double beat) const
+    {
+        const juce::SpinLock::ScopedLockType sl(cacheLock);
+        return beatToMusicalPositionUnlocked(beat);
+    }
+
+    MusicalPosition secondsToMusicalPosition(double timeSec) const
+    {
+        const juce::SpinLock::ScopedLockType sl(cacheLock);
+        return beatToMusicalPositionUnlocked(secondsToBeatUnlocked(timeSec));
+    }
+
+    // Converte una Battuta (1-based) nel Quarto assoluto (Q, 1-based).
+    // Se excludeMeterIndex > 0, calcola la battuta senza quel cambio metrica (per spostarlo sul battere esatto).
+    double barToBeat(int barIndex, double beatInBarQ = 0.0, int excludeMeterIndex = -1) const
+    {
+        const juce::SpinLock::ScopedLockType sl(cacheLock);
+        const int safeBar = juce::jmax(1, barIndex);
+        const double safeSubQ = juce::jmax(0.0, beatInBarQ);
+
+        std::vector<MeterAnchor> list = meterAnchors;
+        if (list.empty())
+            list.push_back({ 1.0, baseTimeSigNum, baseTimeSigDen, 1 });
+
+        if (excludeMeterIndex > 0 && excludeMeterIndex < static_cast<int>(list.size()))
+        {
+            list.erase(list.begin() + excludeMeterIndex);
+            int runningBar = 1;
+            for (size_t i = 0; i < list.size(); ++i)
+            {
+                list[i].startBar = runningBar;
+                if (i + 1 < list.size())
+                {
+                    const double spanQ = juce::jmax(0.0, list[i + 1].startBeat - list[i].startBeat);
+                    const double barQ = list[i].getBarLengthQ();
+                    const int barsElapsed = static_cast<int>(std::ceil((spanQ / barQ) - 1e-6));
+                    runningBar += juce::jmax(1, barsElapsed);
+                }
+            }
+        }
+
+        auto it = std::upper_bound(list.begin(), list.end(), safeBar,
+            [](int targetBar, const MeterAnchor& m) { return targetBar < m.startBar; });
+
+        const auto& active = (it == list.begin()) ? list.front() : *(it - 1);
+        const double barLenQ = active.getBarLengthQ();
+        const double q = active.startBeat
+            + static_cast<double>(safeBar - active.startBar) * barLenQ
+            + juce::jmin(safeSubQ, juce::jmax(0.0, barLenQ - 1e-4));
+        return juce::jmax(1.0, q);
+    }
+
+    static MusicalPosition makeFixedMeterPosition(double totalQuarters, int num, int den, double bpm)
+    {
+        const int safeNum = juce::jlimit(1, 32, num);
+        const int safeDen = sanitizeDenominator(den);
+        const double barLenQ = static_cast<double>(safeNum) * (4.0 / static_cast<double>(safeDen));
+        const double safeQ = juce::jmax(1.0, totalQuarters);
+        const double offsetQ = safeQ - 1.0;
+
+        int barsZeroBased = static_cast<int>(std::floor((offsetQ / barLenQ) + 1e-9));
+        double beatInBar = offsetQ - static_cast<double>(barsZeroBased) * barLenQ;
+        if (beatInBar < 0.0) beatInBar = 0.0;
+
+        MusicalPosition pos;
+        pos.totalQuarters = safeQ;
+        pos.barIndex = barsZeroBased + 1;
+        pos.beatInBarQ = beatInBar;
+        pos.barLengthQ = barLenQ;
+        pos.timeSigNum = safeNum;
+        pos.timeSigDen = safeDen;
+        pos.continuousBarPos = static_cast<double>(barsZeroBased) + (beatInBar / barLenQ);
+        pos.localBpm = juce::jlimit(20.0, 300.0, bpm);
+        return pos;
+    }
+
+    double getBaseBpm() const { return baseBpm; }
+    double getFirstDownbeatSeconds() const noexcept { return firstDownbeatSec; }
+    int getBaseTimeSigNum() const { return baseTimeSigNum; }
+    int getBaseTimeSigDen() const { return baseTimeSigDen; }
+    const std::vector<MeterAnchor>& getMeterAnchors() const { return meterAnchors; }
+    const std::vector<BeatAnchor>& getBeatAnchors() const { return anchors; }
+    bool hasVariableTempoMap() const noexcept { return anchors.size() > 1; }
+    bool hasImportedMidiMap() const noexcept { return !anchors.empty() || midiEndBeatCache > 1.1; }
+
+    double getMapEndBeat() const noexcept
+    {
+        const juce::SpinLock::ScopedLockType sl(cacheLock);
+        return getMapEndBeatUnlocked();
+    }
+
+    double getMapEndSeconds() const
+    {
+        const juce::SpinLock::ScopedLockType sl(cacheLock);
+        const double endB = getMapEndBeatUnlocked();
+        return (endB > 1.1) ? beatToSecondsUnlocked(endB) : 0.0;
+    }
+
+    static int sanitizeDenominator(int den) noexcept
+    {
+        if (den == 2 || den == 4 || den == 8 || den == 16) return den;
+        return 4;
+    }
+
+    static juce::String formatTimecode(double timeSec)
+    {
+        if (timeSec < 0.0) timeSec = 0.0;
+        int totalMs = static_cast<int>(std::round(timeSec * 1000.0));
+        int minutes = totalMs / 60000;
+        int seconds = (totalMs % 60000) / 1000;
+        int millis = totalMs % 1000;
+        return juce::String::formatted("%02d:%02d.%03d", minutes, seconds, millis);
+    }
+
+    static juce::String formatBeat(double beat)
+    {
+        return "Beat " + juce::String(beat, 2);
+    }
+
+private:
+    std::vector<MeterAnchor> getMeterAnchorsCopy() const
+    {
+        const juce::SpinLock::ScopedLockType sl(cacheLock);
+        if (!meterAnchors.empty())
+            return meterAnchors;
+        return { { 1.0, baseTimeSigNum, baseTimeSigDen, 1 } };
+    }
+
+    void reintegrateAndPersistTempoAnchors(std::vector<BeatAnchor> list, double downbeatSec)
+    {
+        std::sort(list.begin(), list.end(), [](const BeatAnchor& a, const BeatAnchor& b) {
+            return a.beat < b.beat;
+            });
+
+        std::vector<BeatAnchor> clean;
+        for (const auto& item : list)
+        {
+            if (!clean.empty() && std::abs(clean.back().beat - item.beat) < 1e-4)
+                clean.back().localBpm = item.localBpm;
+            else
+                clean.push_back(item);
+        }
+
+        if (clean.empty())
+            clean.push_back({ 1.0, downbeatSec, baseBpm });
+        else if (clean.front().beat > 1.0001)
+            clean.insert(clean.begin(), { 1.0, downbeatSec, clean.front().localBpm });
+
+        double curSec = juce::jmax(0.0, downbeatSec);
+        clean[0].beat = 1.0;
+        clean[0].timeSec = curSec;
+        clean[0].localBpm = juce::jlimit(20.0, 300.0, clean[0].localBpm);
+
+        for (size_t i = 1; i < clean.size(); ++i)
+        {
+            clean[i].localBpm = juce::jlimit(20.0, 300.0, clean[i].localBpm);
+            const double deltaQ = juce::jmax(0.0, clean[i].beat - clean[i - 1].beat);
+            curSec += deltaQ * (60.0 / clean[i - 1].localBpm);
+            clean[i].timeSec = curSec;
+        }
+
+        if (beatMapNode.isValid())
+        {
+            beatMapNode.setProperty(StateKeys::BpmBase, clean[0].localBpm, nullptr);
+            beatMapNode.setProperty(StateKeys::FirstDownbeatSec, juce::jmax(0.0, downbeatSec), nullptr);
+
+            for (int i = beatMapNode.getNumChildren() - 1; i >= 0; --i)
+            {
+                if (beatMapNode.getChild(i).hasType(StateKeys::BeatPointNode))
+                    beatMapNode.removeChild(i, nullptr);
+            }
+
+            for (const auto& a : clean)
+            {
+                juce::ValueTree bp(StateKeys::BeatPointNode);
+                bp.setProperty(StateKeys::PointBeat, a.beat, nullptr);
+                bp.setProperty(StateKeys::PointTimeSec, a.timeSec, nullptr);
+                bp.setProperty(StateKeys::PointBpm, a.localBpm, nullptr);
+                beatMapNode.addChild(bp, -1, nullptr);
+            }
+        }
+
+        rebuildCacheFromState();
+    }
+
+    void persistMeterAnchors(std::vector<MeterAnchor> list)
+    {
+        std::sort(list.begin(), list.end(), [](const MeterAnchor& a, const MeterAnchor& b) {
+            return a.startBeat < b.startBeat;
+            });
+
+        std::vector<MeterAnchor> clean;
+        for (const auto& m : list)
+        {
+            if (!clean.empty() && std::abs(clean.back().startBeat - m.startBeat) < 1e-4)
+                clean.back() = m;
+            else
+                clean.push_back(m);
+        }
+
+        if (clean.empty())
+            clean.push_back({ 1.0, baseTimeSigNum, baseTimeSigDen, 1 });
+        else if (clean.front().startBeat > 1.0001)
+            clean.insert(clean.begin(), { 1.0, baseTimeSigNum, baseTimeSigDen, 1 });
+
+        clean[0].startBeat = 1.0;
+
+        if (beatMapNode.isValid())
+        {
+            beatMapNode.setProperty(StateKeys::TimeSigNum, clean[0].num, nullptr);
+            beatMapNode.setProperty(StateKeys::TimeSigDen, clean[0].den, nullptr);
+
+            for (int i = beatMapNode.getNumChildren() - 1; i >= 0; --i)
+            {
+                if (beatMapNode.getChild(i).hasType(StateKeys::MeterPointNode))
+                    beatMapNode.removeChild(i, nullptr);
+            }
+
+            for (const auto& m : clean)
+            {
+                juce::ValueTree mp(StateKeys::MeterPointNode);
+                mp.setProperty(StateKeys::PointBeat, m.startBeat, nullptr);
+                mp.setProperty(StateKeys::TimeSigNum, m.num, nullptr);
+                mp.setProperty(StateKeys::TimeSigDen, m.den, nullptr);
+                beatMapNode.addChild(mp, -1, nullptr);
+            }
+        }
+
+        rebuildCacheFromState();
+    }
+
+    double secondsToBeatUnlocked(double timeSec) const
     {
         if (anchors.size() < 2)
         {
@@ -419,8 +811,7 @@ public:
         return p0.beat + fraction * (p1.beat - p0.beat);
     }
 
-    // Converte il QUARTO DECIMALE (es. 14.50) nei SECONDI esatti dell'audio
-    double beatToSeconds(double beat) const
+    double beatToSecondsUnlocked(double beat) const
     {
         double safeBeat = juce::jmax(1.0, beat);
 
@@ -446,7 +837,7 @@ public:
         return p0.timeSec + fraction * (p1.timeSec - p0.timeSec);
     }
 
-    double getBpmAtBeat(double beat) const
+    double getBpmAtBeatUnlocked(double beat) const
     {
         if (anchors.empty())
             return baseBpm;
@@ -460,16 +851,14 @@ public:
         return (it - 1)->localBpm;
     }
 
-    // Converte un quarto assoluto nella posizione musicale completa (battuta, metrica, battito locale)
-    MusicalPosition beatToMusicalPosition(double beat) const
+    MusicalPosition beatToMusicalPositionUnlocked(double beat) const
     {
         double safeBeat = juce::jmax(1.0, beat);
-        double bpmNow = getBpmAtBeat(safeBeat);
+        double bpmNow = getBpmAtBeatUnlocked(safeBeat);
 
         if (meterAnchors.empty())
             return makeFixedMeterPosition(safeBeat, baseTimeSigNum, baseTimeSigDen, bpmNow);
 
-        // Trova l'ultimo cambio di metrica con startBeat <= safeBeat
         auto it = std::upper_bound(meterAnchors.begin(), meterAnchors.end(), safeBeat,
             [](double val, const MeterAnchor& m) { return val < m.startBeat; });
 
@@ -493,46 +882,7 @@ public:
         return pos;
     }
 
-    MusicalPosition secondsToMusicalPosition(double timeSec) const
-    {
-        return beatToMusicalPosition(secondsToBeat(timeSec));
-    }
-
-    // Helper statico per la Preview Standalone nello Scene Builder
-    static MusicalPosition makeFixedMeterPosition(double totalQuarters, int num, int den, double bpm)
-    {
-        const int safeNum = juce::jlimit(1, 32, num);
-        const int safeDen = sanitizeDenominator(den);
-        const double barLenQ = static_cast<double>(safeNum) * (4.0 / static_cast<double>(safeDen));
-        const double safeQ = juce::jmax(1.0, totalQuarters);
-        const double offsetQ = safeQ - 1.0;
-
-        int barsZeroBased = static_cast<int>(std::floor((offsetQ / barLenQ) + 1e-9));
-        double beatInBar = offsetQ - static_cast<double>(barsZeroBased) * barLenQ;
-        if (beatInBar < 0.0) beatInBar = 0.0;
-
-        MusicalPosition pos;
-        pos.totalQuarters = safeQ;
-        pos.barIndex = barsZeroBased + 1;
-        pos.beatInBarQ = beatInBar;
-        pos.barLengthQ = barLenQ;
-        pos.timeSigNum = safeNum;
-        pos.timeSigDen = safeDen;
-        pos.continuousBarPos = static_cast<double>(barsZeroBased) + (beatInBar / barLenQ);
-        pos.localBpm = juce::jlimit(20.0, 300.0, bpm);
-        return pos;
-    }
-
-    double getBaseBpm() const { return baseBpm; }
-    int getBaseTimeSigNum() const { return baseTimeSigNum; }
-    int getBaseTimeSigDen() const { return baseTimeSigDen; }
-    const std::vector<MeterAnchor>& getMeterAnchors() const { return meterAnchors; }
-
-    const std::vector<BeatAnchor>& getBeatAnchors() const { return anchors; }
-    bool hasVariableTempoMap() const noexcept { return anchors.size() > 1; }
-    bool hasImportedMidiMap() const noexcept { return !anchors.empty() || midiEndBeatCache > 1.1; }
-
-    double getMapEndBeat() const noexcept
+    double getMapEndBeatUnlocked() const noexcept
     {
         double endB = midiEndBeatCache;
         if (!anchors.empty())
@@ -542,66 +892,12 @@ public:
         return juce::jmax(1.0, endB);
     }
 
-    double getMapEndSeconds() const
-    {
-        const double endB = getMapEndBeat();
-        return (endB > 1.1) ? beatToSeconds(endB) : 0.0;
-    }
-
-    void removeMeterChangeNear(double beatQ, double toleranceQ = 0.5)
-    {
-        if (!beatMapNode.isValid() || beatQ <= 1.05)
-            return;
-
-        bool removed = false;
-        for (int i = beatMapNode.getNumChildren() - 1; i >= 0; --i)
-        {
-            auto child = beatMapNode.getChild(i);
-            if (!child.hasType(StateKeys::MeterPointNode))
-                continue;
-
-            double ptB = static_cast<double>(child.getProperty(StateKeys::PointBeat, 1.0));
-            if (ptB > 1.05 && std::abs(ptB - beatQ) <= toleranceQ)
-            {
-                beatMapNode.removeChild(i, nullptr);
-                removed = true;
-            }
-        }
-
-        if (removed)
-            rebuildCacheFromState();
-    }
-
-    static int sanitizeDenominator(int den) noexcept
-    {
-        if (den == 2 || den == 4 || den == 8 || den == 16) return den;
-        return 4;
-    }
-
-    // Helper di formattazione per l'interfaccia della Mini-DAW
-    static juce::String formatTimecode(double timeSec)
-    {
-        if (timeSec < 0.0) timeSec = 0.0;
-        int totalMs = static_cast<int>(std::round(timeSec * 1000.0));
-        int minutes = totalMs / 60000;
-        int seconds = (totalMs % 60000) / 1000;
-        int millis = totalMs % 1000;
-        return juce::String::formatted("%02d:%02d.%03d", minutes, seconds, millis);
-    }
-
-    static juce::String formatBeat(double beat)
-    {
-        return "Beat " + juce::String(beat, 2);
-    }
-
-private:
     void finalizeMeterAnchors()
     {
         std::sort(meterAnchors.begin(), meterAnchors.end(), [](const MeterAnchor& a, const MeterAnchor& b) {
             return a.startBeat < b.startBeat;
             });
 
-        // Deduplica cambi di metrica sullo stesso quarto (mantiene l'ultimo inserito)
         std::vector<MeterAnchor> deduped;
         for (const auto& m : meterAnchors)
         {
@@ -612,7 +908,6 @@ private:
         }
         meterAnchors = std::move(deduped);
 
-        // Garantisce sempre una metrica di partenza al quarto 1.0
         if (meterAnchors.empty() || meterAnchors.front().startBeat > 1.0001)
         {
             MeterAnchor def;
@@ -622,7 +917,6 @@ private:
             meterAnchors.insert(meterAnchors.begin(), def);
         }
 
-        // Pre-calcola il numero di battuta di ogni cambio metrica
         int runningBar = 1;
         for (size_t i = 0; i < meterAnchors.size(); ++i)
         {
@@ -637,13 +931,13 @@ private:
         }
     }
 
+    mutable juce::SpinLock cacheLock;
     juce::ValueTree beatMapNode;
     double baseBpm = 120.0;
     double firstDownbeatSec = 0.0;
     int baseTimeSigNum = 4;
     int baseTimeSigDen = 4;
+    double midiEndBeatCache = 1.0;
     std::vector<BeatAnchor> anchors;
     std::vector<MeterAnchor> meterAnchors;
-
-    double midiEndBeatCache = 1.0;
 };

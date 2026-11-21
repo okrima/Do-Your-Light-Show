@@ -381,6 +381,10 @@ ShowBuilderTab::ShowBuilderTab(juce::ValueTree& state) : appState(state), miniDa
     miniDawTimeline.onSceneSelectedFromTimeline = [this](int sceneIndex) {
         sceneList.selectRow(sceneIndex);
         };
+
+    miniDawTimeline.onSceneDragFinished = [this](juce::ValueTree editedScene) {
+        sortScenesByStartBeat(editedScene);
+        };
     addAndMakeVisible(miniDawTimeline);
     miniDawTimeline.syncWithAppState();
 
@@ -413,7 +417,8 @@ ShowBuilderTab::ShowBuilderTab(juce::ValueTree& state) : appState(state), miniDa
 
                 // 3. Aggiorna la UI (Mini-DAW, Lista Scene e seleziona la prima scena)
                 miniDawTimeline.syncWithAppState();
-                sceneList.updateContent();
+                sortScenesByStartBeat();
+
                 if (showNode.getNumChildren() > 0)
                     sceneList.selectRow(0);
                 repaint();
@@ -485,11 +490,6 @@ ShowBuilderTab::ShowBuilderTab(juce::ValueTree& state) : appState(state), miniDa
 
     saveBtn.setButtonText("Salva Show..."); saveBtn.setColour(juce::TextButton::buttonColourId, juce::Colour(0xff293d3d));
     saveBtn.onClick = [this] { saveShow(); }; addAndMakeVisible(saveBtn);
-
-    importMidiMapBtn.setButtonText("Importa Tempo/Metrica (.mid)");
-    importMidiMapBtn.setColour(juce::TextButton::buttonColourId, juce::Colour(0xff1e3a5f));
-    importMidiMapBtn.onClick = [this] { importMidiTempoMap(); };
-    addAndMakeVisible(importMidiMapBtn);
 
     // Configurazione del pulsante Elimina Preset
     deletePresetBtnUI.setButtonText("Elimina Preset...");
@@ -641,8 +641,7 @@ void ShowBuilderTab::insertPresetIntoShow()
         newSceneInstance.setProperty(StateKeys::StartBeat, nextBeat, nullptr);
 
         showNode.addChild(newSceneInstance, -1, nullptr);
-        sceneList.updateContent();
-        sceneList.selectRow(showNode.getNumChildren() - 1);
+        sortScenesByStartBeat(newSceneInstance);
         });
 }
 
@@ -681,7 +680,7 @@ void ShowBuilderTab::paint(juce::Graphics& g)
     g.fillAll(juce::Colour(0xff1a1a1e));
     g.setColour(juce::Colour(0xff2a2a32));
 
-    const float topOffset = 257.0f;
+    const float topOffset = 285.0f;
     const float dividerX = getLocalBounds().toFloat().proportionOfWidth(0.30f);
     g.fillRect(juce::Rectangle<float>(dividerX, topOffset, 2.0f, static_cast<float>(getHeight()) - topOffset));
 }
@@ -698,7 +697,7 @@ bool ShowBuilderTab::keyPressed(const juce::KeyPress& key, juce::Component* orig
     // 1. BARRA SPAZIATRICE -> Play / Pausa immediato della Mini-DAW
     if (key == juce::KeyPress::spaceKey)
     {
-        audioEngine.togglePlayPause();
+        miniDawTimeline.togglePlayPause();
         miniDawTimeline.repaint();
         return true;
     }
@@ -753,20 +752,19 @@ void ShowBuilderTab::resized()
 
     // 1. Fascia Superiore: Mini-DAW (145 px) + AI Wizard & Slot Stem (108 px)
     miniDawTimeline.setBounds(bounds.removeFromTop(145));
-    aiWizardPanel.setBounds(bounds.removeFromTop(108));
+    aiWizardPanel.setBounds(bounds.removeFromTop(136));
     bounds.removeFromTop(4);
 
     // 2. Parte Inferiore: Lista Scene a sinistra + SceneEditorPanel a destra
     auto leftPanel = bounds.removeFromLeft(juce::roundToInt(bounds.getWidth() * 0.30f));
-    auto bottomArea = leftPanel.removeFromBottom(272).reduced(10, 5);
+    auto bottomArea = leftPanel.removeFromBottom(240).reduced(10, 5);
 
-    importMidiMapBtn.setBounds(bottomArea.removeFromBottom(28)); bottomArea.removeFromBottom(4);
-    saveBtn.setBounds(bottomArea.removeFromBottom(28));          bottomArea.removeFromBottom(4);
-    loadBtn.setBounds(bottomArea.removeFromBottom(28));          bottomArea.removeFromBottom(4);
+    saveBtn.setBounds(bottomArea.removeFromBottom(28));           bottomArea.removeFromBottom(4);
+    loadBtn.setBounds(bottomArea.removeFromBottom(28));           bottomArea.removeFromBottom(4);
     deletePresetBtnUI.setBounds(bottomArea.removeFromBottom(28)); bottomArea.removeFromBottom(4);
-    deleteSceneBtn.setBounds(bottomArea.removeFromBottom(28));   bottomArea.removeFromBottom(4);
-    insertPresetBtn.setBounds(bottomArea.removeFromBottom(28));  bottomArea.removeFromBottom(4);
-    savePresetBtn.setBounds(bottomArea.removeFromBottom(28));    bottomArea.removeFromBottom(4);
+    deleteSceneBtn.setBounds(bottomArea.removeFromBottom(28));    bottomArea.removeFromBottom(4);
+    insertPresetBtn.setBounds(bottomArea.removeFromBottom(28));   bottomArea.removeFromBottom(4);
+    savePresetBtn.setBounds(bottomArea.removeFromBottom(28));     bottomArea.removeFromBottom(4);
     addSceneBtn.setBounds(bottomArea.removeFromBottom(28));
 
     sceneList.setBounds(leftPanel.reduced(10));
@@ -787,43 +785,92 @@ void ShowBuilderTab::resized()
     }
 }
 
-void ShowBuilderTab::importMidiTempoMap()
+void ShowBuilderTab::listBoxItemClicked(int row, const juce::MouseEvent& e)
 {
-    fileChooser = std::make_unique<juce::FileChooser>(
-        "Importa Tempo / Meter Map MIDI (da Reaper)",
-        juce::File::getSpecialLocation(juce::File::userDocumentsDirectory),
-        "*.mid;*.midi");
+    if (!e.mods.isPopupMenu() || row < 0 || row >= showNode.getNumChildren())
+        return;
 
-    auto chooserFlags = juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles;
-    fileChooser->launchAsync(chooserFlags, [this](const juce::FileChooser& fc) {
-        auto file = fc.getResult();
-        if (!file.existsAsFile()) return;
+    sceneList.selectRow(row);
 
-        auto res = beatTimeMap.importMidiTempoAndMeterMap(file, 0.0);
-        if (!res.success)
-        {
-            juce::NativeMessageBox::showMessageBoxAsync(
-                juce::MessageBoxIconType::WarningIcon,
-                "Errore Import MIDI",
-                res.errorMessage);
-            return;
-        }
+    juce::PopupMenu menu;
+    menu.addItem(1, "Duplica Scena");
+    menu.addItem(2, "Elimina Scena");
 
-        miniDawTimeline.syncWithAppState();
-        sceneList.repaint();
-        stageSimulator.repaint();
-
-        juce::String msg = "Mappa importata con successo!\n"
-            + juce::String("BPM iniziale: ") + juce::String(res.initialBpm, 1) + "\n"
-            + juce::String("Metrica iniziale: ") + juce::String(res.initialNum) + "/" + juce::String(res.initialDen) + "\n"
-            + juce::String("Cambi Tempo importati: ") + juce::String(res.tempoChangesImported) + "\n"
-            + juce::String("Cambi Metrica importati: ") + juce::String(res.meterChangesImported);
-
-        juce::NativeMessageBox::showMessageBoxAsync(
-            juce::MessageBoxIconType::InfoIcon,
-            "Tempo & Meter Map Importata",
-            msg);
+    juce::Component::SafePointer<ShowBuilderTab> safeThis(this);
+    menu.showMenuAsync(juce::PopupMenu::Options(), [safeThis, row](int res) {
+        if (safeThis == nullptr || res == 0) return;
+        if (res == 1)      safeThis->duplicateScene(row);
+        else if (res == 2) safeThis->deleteSelectedScene();
         });
+}
+
+void ShowBuilderTab::duplicateScene(int rowIndex)
+{
+    if (rowIndex < 0 || rowIndex >= showNode.getNumChildren())
+        return;
+
+    auto src = showNode.getChild(rowIndex);
+    if (!src.isValid())
+        return;
+
+    auto copy = src.createCopy();
+    const juce::String origName = src.getProperty(StateKeys::SceneName, "Scena").toString();
+    const double startB = static_cast<double>(src.getProperty(StateKeys::StartBeat, 1.0));
+    const double durB = juce::jmax(0.25, static_cast<double>(src.getProperty(StateKeys::DurationBeats, 4.0)));
+
+    copy.setProperty(StateKeys::SceneName, origName + " (Copia)", nullptr);
+    copy.setProperty(StateKeys::StartBeat, startB + durB, nullptr);
+
+    showNode.addChild(copy, -1, nullptr);
+    sortScenesByStartBeat(copy);
+}
+
+void ShowBuilderTab::sortScenesByStartBeat(juce::ValueTree sceneToKeepSelected)
+{
+    if (isSortingScenes || !showNode.isValid())
+        return;
+
+    juce::ScopedValueSetter<bool> guard(isSortingScenes, true);
+
+    if (!sceneToKeepSelected.isValid())
+    {
+        const int sel = sceneList.getSelectedRow();
+        if (sel >= 0 && sel < showNode.getNumChildren())
+            sceneToKeepSelected = showNode.getChild(sel);
+    }
+
+    struct SceneStartComparator
+    {
+        static int compareElements(const juce::ValueTree& a, const juce::ValueTree& b) noexcept
+        {
+            const double sa = static_cast<double>(a.getProperty(StateKeys::StartBeat, 1.0));
+            const double sb = static_cast<double>(b.getProperty(StateKeys::StartBeat, 1.0));
+            if (sa < sb - 1e-6) return -1;
+            if (sa > sb + 1e-6) return 1;
+
+            const double da = static_cast<double>(a.getProperty(StateKeys::DurationBeats, 4.0));
+            const double db = static_cast<double>(b.getProperty(StateKeys::DurationBeats, 4.0));
+            if (da < db - 1e-6) return -1;
+            if (da > db + 1e-6) return 1;
+            return 0;
+        }
+    } comparator;
+
+    showNode.sort(comparator, nullptr, false);
+    sceneList.updateContent();
+
+    if (sceneToKeepSelected.isValid())
+    {
+        const int newIdx = showNode.indexOf(sceneToKeepSelected);
+        if (newIdx >= 0)
+        {
+            sceneList.selectRow(newIdx);
+            miniDawTimeline.setSelectedSceneIndex(newIdx);
+        }
+    }
+
+    sceneList.repaint();
+    miniDawTimeline.repaint();
 }
 
 void ShowBuilderTab::deletePresetFromLibrary()
@@ -877,7 +924,7 @@ void ShowBuilderTab::addNewSceneToState() {
     newScene.setProperty(StateKeys::StartBeat, 1.0, nullptr);
     newScene.setProperty(StateKeys::DurationBeats, 4.0, nullptr);
     showNode.addChild(newScene, -1, nullptr);
-    sceneList.updateContent(); sceneList.selectRow(showNode.getNumChildren() - 1);
+    sortScenesByStartBeat(newScene);
 }
 
 void ShowBuilderTab::saveShow() {
@@ -901,12 +948,16 @@ void ShowBuilderTab::loadShow()
 
         PresetManager::loadShow(appState, file);
 
-        // Riaggancia il nodo BEAT_MAP e ricostruisce la cache BPM/Metrica dal file caricato
+        ShowArchiveManager::ensureValidAppStateStructure(appState);
         beatTimeMap.bindToAppState(appState);
 
-        // Aggiorna Timeline, Lista Scene e Simulatore DOPO il caricamento reale
         miniDawTimeline.syncWithAppState();
+        aiWizardPanel.syncUIFromState();
+
+        sortScenesByStartBeat();
+
         sceneList.updateContent();
+
         if (showNode.getNumChildren() > 0)
             sceneList.selectRow(0);
         else
@@ -920,7 +971,16 @@ void ShowBuilderTab::loadShow()
 void ShowBuilderTab::valueTreeChildAdded(juce::ValueTree& t, juce::ValueTree&) { if (t == showNode) sceneList.updateContent(); }
 void ShowBuilderTab::valueTreeChildRemoved(juce::ValueTree& t, juce::ValueTree&, int) { if (t == showNode) { sceneList.updateContent(); editorPanel.setSceneNode(juce::ValueTree()); } }
 void ShowBuilderTab::valueTreeChildOrderChanged(juce::ValueTree&, int, int) { sceneList.updateContent(); }
-void ShowBuilderTab::valueTreePropertyChanged(juce::ValueTree& tree, const juce::Identifier&) { if (tree.hasType(StateKeys::Scene)) sceneList.repaint(); }
+void ShowBuilderTab::valueTreePropertyChanged(juce::ValueTree& tree, const juce::Identifier& prop)
+{
+    if (!tree.hasType(StateKeys::Scene))
+        return;
+
+    if (prop == StateKeys::StartBeat && !isSortingScenes && !miniDawTimeline.isDraggingAnyScene())
+        sortScenesByStartBeat(tree);
+    else
+        sceneList.repaint();
+}
 
 juce::File getPresetLibraryFile()
 {

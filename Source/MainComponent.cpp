@@ -3,27 +3,36 @@
 MainComponent::MainComponent()
     : tabbedComponent (juce::TabbedButtonBar::TabsAtTop)
 {
-    tabbedComponent.setTabBarDepth (40);
+    tabbedComponent.setTabBarDepth(40);
 
-    tabbedComponent.addTab ("1. Venue Patch", 
-                           juce::Colour (0xff2a2a32), 
-                           &venueTab, 
-                           false);
+    timeMetricBeatMap.bindToAppState(mainState);
+    timeMetricTab.refreshTables();
 
-    tabbedComponent.addTab ("2. Scene Builder", 
-                            juce::Colour(0xff1e1e26), 
-                            &sceneBuilderTab, 
-                            false);
+    tabbedComponent.addTab("1. Venue Patch",
+        juce::Colour(0xff2a2a32),
+        &venueTab,
+        false);
 
-    tabbedComponent.addTab ("3. Pattern Creator", 
-                           juce::Colour (0xff2a2a32), 
-                           &showBuilderTab,
-                           false);
+    tabbedComponent.addTab("2. Scene Builder",
+        juce::Colour(0xff1e1e26),
+        &sceneBuilderTab,
+        false);
 
-    tabbedComponent.addTab ("4. MIDI Export", 
-                           juce::Colour (0xff2a2a32), 
-                           &exportTab, 
-                           false);
+    tabbedComponent.addTab("3. Pattern Creator",
+        juce::Colour(0xff2a2a32),
+        &showBuilderTab,
+        false);
+
+    tabbedComponent.addTab("4. Time & Metric",
+        juce::Colour(0xff1e1e26),
+        &timeMetricTab,
+        false);
+
+    tabbedComponent.addTab("5. MIDI Export",
+        juce::Colour(0xff2a2a32),
+        &exportTab,
+        false);
+
 
     addAndMakeVisible (tabbedComponent);
     setSize(1600, 950);

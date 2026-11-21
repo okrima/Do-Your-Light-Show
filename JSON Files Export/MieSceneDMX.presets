@@ -1,0 +1,1582 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<PRESET_LIBRARY>
+  <SCENE_PRESET sceneName="Blast Beat White - BACK UP" startBeat="33.0" durationBeats="32.0"
+                presetName="Blast Beat White - BACK UP" targetRolesCsv="Aria: Wash Controluce (Fondale)|Aria: Teste Mobili / Beam"
+                presetPool="Strobe" layerType="OverlayFX" presetColor1="ffffffff"
+                presetColor2="ffffffff" presetDimmerMin="0" presetDimmerMax="255"
+                presetCurve="Static" presetStrobeUseHw="1" presetStrobeSubdiv="1/16">
+    <ROLE_COMMAND roleName="Aria: Wash Controluce (Fondale)" parameter="Red" startValue="255"
+                  endValue="255" curve="Static" commandColor="ffffffff"/>
+    <ROLE_COMMAND roleName="Aria: Wash Controluce (Fondale)" parameter="Green"
+                  startValue="255" endValue="255" curve="Static" commandColor="ffffffff"/>
+    <ROLE_COMMAND roleName="Aria: Wash Controluce (Fondale)" parameter="Blue" startValue="255"
+                  endValue="255" curve="Static" commandColor="ffffffff"/>
+    <ROLE_COMMAND roleName="Aria: Wash Controluce (Fondale)" parameter="Dimmer"
+                  startValue="0" endValue="255" curve="Square_1_16" commandColor="ffffffff"/>
+    <ROLE_COMMAND roleName="Aria: Teste Mobili / Beam" parameter="Red" startValue="255"
+                  endValue="255" curve="Static" commandColor="ffffffff"/>
+    <ROLE_COMMAND roleName="Aria: Teste Mobili / Beam" parameter="Green" startValue="255"
+                  endValue="255" curve="Static" commandColor="ffffffff"/>
+    <ROLE_COMMAND roleName="Aria: Teste Mobili / Beam" parameter="Blue" startValue="255"
+                  endValue="255" curve="Static" commandColor="ffffffff"/>
+    <ROLE_COMMAND roleName="Aria: Teste Mobili / Beam" parameter="Dimmer" startValue="0"
+                  endValue="255" curve="Square_1_16" commandColor="ffffffff"/>
+  </SCENE_PRESET>
+  <SCENE_PRESET sceneName="Blast Beat Red - FLOOR" startBeat="65.0" durationBeats="4.0"
+                presetName="Orange Floor" targetRolesCsv="Terra: Controluce / Sotto-Batteria|Terra: Par / Barre Laterali (Taglio)|Terra: Teste Mobili a Terra"
+                presetPool="Color" layerType="Base" presetColor1="ffdc2626" presetColor2="fff59e0b"
+                presetDimmerMin="0" presetDimmerMax="255" presetCurve="Static"
+                presetStrobeUseHw="1" presetStrobeSubdiv="1/16" presetMoveShape="Fixed">
+    <ROLE_COMMAND roleName="Terra: Controluce / Sotto-Batteria" parameter="Red"
+                  startValue="245" endValue="245" curve="Static" commandColor="fff59e0b"/>
+    <ROLE_COMMAND roleName="Terra: Controluce / Sotto-Batteria" parameter="Green"
+                  startValue="158" endValue="158" curve="Static" commandColor="fff59e0b"/>
+    <ROLE_COMMAND roleName="Terra: Controluce / Sotto-Batteria" parameter="Blue"
+                  startValue="11" endValue="11" curve="Static" commandColor="fff59e0b"/>
+    <ROLE_COMMAND roleName="Terra: Controluce / Sotto-Batteria" parameter="Dimmer"
+                  startValue="255" endValue="255" curve="Static" commandColor="fff59e0b"/>
+    <ROLE_COMMAND roleName="Terra: Par / Barre Laterali (Taglio)" parameter="Red"
+                  startValue="245" endValue="245" curve="Static" commandColor="fff59e0b"/>
+    <ROLE_COMMAND roleName="Terra: Par / Barre Laterali (Taglio)" parameter="Green"
+                  startValue="158" endValue="158" curve="Static" commandColor="fff59e0b"/>
+    <ROLE_COMMAND roleName="Terra: Par / Barre Laterali (Taglio)" parameter="Blue"
+                  startValue="11" endValue="11" curve="Static" commandColor="fff59e0b"/>
+    <ROLE_COMMAND roleName="Terra: Par / Barre Laterali (Taglio)" parameter="Dimmer"
+                  startValue="255" endValue="255" curve="Static" commandColor="fff59e0b"/>
+    <ROLE_COMMAND roleName="Terra: Teste Mobili a Terra" parameter="Red" startValue="245"
+                  endValue="245" curve="Static" commandColor="fff59e0b"/>
+    <ROLE_COMMAND roleName="Terra: Teste Mobili a Terra" parameter="Green" startValue="158"
+                  endValue="158" curve="Static" commandColor="fff59e0b"/>
+    <ROLE_COMMAND roleName="Terra: Teste Mobili a Terra" parameter="Blue" startValue="11"
+                  endValue="11" curve="Static" commandColor="fff59e0b"/>
+    <ROLE_COMMAND roleName="Terra: Teste Mobili a Terra" parameter="Dimmer" startValue="255"
+                  endValue="255" curve="Static" commandColor="fff59e0b"/>
+  </SCENE_PRESET>
+  <SCENE_PRESET presetName="[F] Split Blu Notte / Ghiaccio" presetPool="Color"
+                layerType="Base" durationBeats="8.0" isOneShot="0" phaseMode="Sync"
+                targetRolesCsv="Aria: Wash Controluce (Fondale)|Aria: Par / Spot Frontali (Band)|Terra: Controluce / Sotto-Batteria"
+                presetColor1="ff1d4ed8" presetColor2="ff38bdf8" presetDimmerMin="0"
+                presetDimmerMax="255" presetCurve="Static" presetStrobeUseHw="0"
+                presetStrobeSubdiv="1/8" presetMoveShape="Fixed" presetMoveSpeed="Sine_4Bars"
+                presetMoveAmpPan="0" presetMoveAmpTilt="0" sceneName="[F] Split Blu Notte / Ghiaccio">
+    <ROLE_COMMAND roleName="Aria: Wash Controluce (Fondale)" parameter="Red" startValue="29"
+                  endValue="29" curve="Static" commandColor="ff1d4ed8"/>
+    <ROLE_COMMAND roleName="Aria: Wash Controluce (Fondale)" parameter="Green"
+                  startValue="78" endValue="78" curve="Static" commandColor="ff1d4ed8"/>
+    <ROLE_COMMAND roleName="Aria: Wash Controluce (Fondale)" parameter="Blue" startValue="216"
+                  endValue="216" curve="Static" commandColor="ff1d4ed8"/>
+    <ROLE_COMMAND roleName="Aria: Par / Spot Frontali (Band)" parameter="Red" startValue="29"
+                  endValue="29" curve="Static" commandColor="ff1d4ed8"/>
+    <ROLE_COMMAND roleName="Aria: Par / Spot Frontali (Band)" parameter="Green"
+                  startValue="78" endValue="78" curve="Static" commandColor="ff1d4ed8"/>
+    <ROLE_COMMAND roleName="Aria: Par / Spot Frontali (Band)" parameter="Blue"
+                  startValue="216" endValue="216" curve="Static" commandColor="ff1d4ed8"/>
+    <ROLE_COMMAND roleName="Terra: Controluce / Sotto-Batteria" parameter="Red"
+                  startValue="56" endValue="56" curve="Static" commandColor="ff38bdf8"/>
+    <ROLE_COMMAND roleName="Terra: Controluce / Sotto-Batteria" parameter="Green"
+                  startValue="189" endValue="189" curve="Static" commandColor="ff38bdf8"/>
+    <ROLE_COMMAND roleName="Terra: Controluce / Sotto-Batteria" parameter="Blue"
+                  startValue="248" endValue="248" curve="Static" commandColor="ff38bdf8"/>
+  </SCENE_PRESET>
+  <SCENE_PRESET presetName="Rosso Sangue / Ambra Terra" presetPool="Color" layerType="Base"
+                durationBeats="8.0" isOneShot="0" phaseMode="Sync" targetRolesCsv="Aria: Wash Controluce (Fondale)|Aria: Teste Mobili / Beam|Terra: Controluce / Sotto-Batteria"
+                presetColor1="ffdc2626" presetColor2="fff59e0b" presetDimmerMin="0"
+                presetDimmerMax="255" presetCurve="Static" presetStrobeUseHw="0"
+                presetStrobeSubdiv="1/8" presetMoveShape="Fixed" presetMoveSpeed="Sine_4Bars"
+                presetMoveAmpPan="0" presetMoveAmpTilt="0">
+    <ROLE_COMMAND roleName="Aria: Wash Controluce (Fondale)" parameter="Red" startValue="220"
+                  endValue="220" curve="Static" commandColor="ffdc2626"/>
+    <ROLE_COMMAND roleName="Aria: Wash Controluce (Fondale)" parameter="Green"
+                  startValue="38" endValue="38" curve="Static" commandColor="ffdc2626"/>
+    <ROLE_COMMAND roleName="Aria: Wash Controluce (Fondale)" parameter="Blue" startValue="38"
+                  endValue="38" curve="Static" commandColor="ffdc2626"/>
+    <ROLE_COMMAND roleName="Aria: Teste Mobili / Beam" parameter="Red" startValue="220"
+                  endValue="220" curve="Static" commandColor="ffdc2626"/>
+    <ROLE_COMMAND roleName="Aria: Teste Mobili / Beam" parameter="Green" startValue="38"
+                  endValue="38" curve="Static" commandColor="ffdc2626"/>
+    <ROLE_COMMAND roleName="Aria: Teste Mobili / Beam" parameter="Blue" startValue="38"
+                  endValue="38" curve="Static" commandColor="ffdc2626"/>
+    <ROLE_COMMAND roleName="Terra: Controluce / Sotto-Batteria" parameter="Red"
+                  startValue="245" endValue="245" curve="Static" commandColor="fff59e0b"/>
+    <ROLE_COMMAND roleName="Terra: Controluce / Sotto-Batteria" parameter="Green"
+                  startValue="158" endValue="158" curve="Static" commandColor="fff59e0b"/>
+    <ROLE_COMMAND roleName="Terra: Controluce / Sotto-Batteria" parameter="Blue"
+                  startValue="11" endValue="11" curve="Static" commandColor="fff59e0b"/>
+  </SCENE_PRESET>
+  <SCENE_PRESET presetName="[F] Respiro Atmosferico (4 Bars / 16 Q)" presetPool="Dimmer"
+                layerType="Base" durationBeats="16.0" isOneShot="0" phaseMode="Sync"
+                targetRolesCsv="Aria: Wash Controluce (Fondale)|Terra: Controluce / Sotto-Batteria"
+                presetColor1="ff38bdf8" presetColor2="ff1d4ed8" presetDimmerMin="40"
+                presetDimmerMax="240" presetCurve="Sine_4Bars" presetStrobeUseHw="0"
+                presetStrobeSubdiv="1/8" presetMoveShape="Fixed" presetMoveSpeed="Sine_4Bars"
+                presetMoveAmpPan="0" presetMoveAmpTilt="0" sceneName="[F] Respiro Atmosferico (4 Bars / 16 Q)">
+    <ROLE_COMMAND roleName="Aria: Wash Controluce (Fondale)" parameter="Dimmer"
+                  startValue="40" endValue="240" curve="Sine_4Bars" commandColor="ff38bdf8"/>
+    <ROLE_COMMAND roleName="Terra: Controluce / Sotto-Batteria" parameter="Dimmer"
+                  startValue="40" endValue="240" curve="Sine_4Bars" commandColor="ff38bdf8"/>
+  </SCENE_PRESET>
+  <SCENE_PRESET presetName="[F] Chase Pari/Dispari (1 Bar / 4 Q)" presetPool="Dimmer"
+                layerType="Base" durationBeats="4.0" isOneShot="0" phaseMode="OddEven"
+                targetRolesCsv="Aria: Wash Controluce (Fondale)|Aria: Par / Spot Frontali (Band)"
+                presetColor1="fff59e0b" presetColor2="ffdc2626" presetDimmerMin="15"
+                presetDimmerMax="255" presetCurve="Sine_1Bar" presetStrobeUseHw="0"
+                presetStrobeSubdiv="1/8" presetMoveShape="Fixed" presetMoveSpeed="Sine_1Bar"
+                presetMoveAmpPan="0" presetMoveAmpTilt="0" sceneName="[F] Chase Pari/Dispari (1 Bar / 4 Q)">
+    <ROLE_COMMAND roleName="Aria: Wash Controluce (Fondale)" parameter="Dimmer"
+                  startValue="15" endValue="255" curve="Sine_1Bar" commandColor="fff59e0b"/>
+    <ROLE_COMMAND roleName="Aria: Par / Spot Frontali (Band)" parameter="Dimmer"
+                  startValue="15" endValue="255" curve="Sine_1Bar" commandColor="fff59e0b"/>
+  </SCENE_PRESET>
+  <SCENE_PRESET presetName="Strobo 1/8 (Ottavi Full-Rig)" presetPool="Strobe"
+                layerType="OverlayFX" durationBeats="4.0" isOneShot="0" phaseMode="Sync"
+                targetRolesCsv="Aria: Wash Controluce (Fondale)|Aria: Par / Spot Frontali (Band)|Aria: Teste Mobili / Beam|Terra: Controluce / Sotto-Batteria|Terra: Par / Barre Laterali (Taglio)|Terra: Teste Mobili a Terra"
+                presetColor1="ffffffff" presetColor2="ffffffff" presetDimmerMin="0"
+                presetDimmerMax="255" presetCurve="Square_1_8" presetStrobeUseHw="0"
+                presetStrobeSubdiv="1/8" presetMoveShape="Fixed" presetMoveSpeed="Sine_1Bar"
+                presetMoveAmpPan="0" presetMoveAmpTilt="0">
+    <ROLE_COMMAND roleName="Aria: Wash Controluce (Fondale)" parameter="Red" startValue="255"
+                  endValue="255" curve="Static" commandColor="ffffffff"/>
+    <ROLE_COMMAND roleName="Aria: Wash Controluce (Fondale)" parameter="Green"
+                  startValue="255" endValue="255" curve="Static" commandColor="ffffffff"/>
+    <ROLE_COMMAND roleName="Aria: Wash Controluce (Fondale)" parameter="Blue" startValue="255"
+                  endValue="255" curve="Static" commandColor="ffffffff"/>
+    <ROLE_COMMAND roleName="Aria: Wash Controluce (Fondale)" parameter="Dimmer"
+                  startValue="0" endValue="255" curve="Square_1_8" commandColor="ffffffff"/>
+    <ROLE_COMMAND roleName="Aria: Par / Spot Frontali (Band)" parameter="Red" startValue="255"
+                  endValue="255" curve="Static" commandColor="ffffffff"/>
+    <ROLE_COMMAND roleName="Aria: Par / Spot Frontali (Band)" parameter="Green"
+                  startValue="255" endValue="255" curve="Static" commandColor="ffffffff"/>
+    <ROLE_COMMAND roleName="Aria: Par / Spot Frontali (Band)" parameter="Blue"
+                  startValue="255" endValue="255" curve="Static" commandColor="ffffffff"/>
+    <ROLE_COMMAND roleName="Aria: Par / Spot Frontali (Band)" parameter="Dimmer"
+                  startValue="0" endValue="255" curve="Square_1_8" commandColor="ffffffff"/>
+    <ROLE_COMMAND roleName="Aria: Teste Mobili / Beam" parameter="Red" startValue="255"
+                  endValue="255" curve="Static" commandColor="ffffffff"/>
+    <ROLE_COMMAND roleName="Aria: Teste Mobili / Beam" parameter="Green" startValue="255"
+                  endValue="255" curve="Static" commandColor="ffffffff"/>
+    <ROLE_COMMAND roleName="Aria: Teste Mobili / Beam" parameter="Blue" startValue="255"
+                  endValue="255" curve="Static" commandColor="ffffffff"/>
+    <ROLE_COMMAND roleName="Aria: Teste Mobili / Beam" parameter="Dimmer" startValue="0"
+                  endValue="255" curve="Square_1_8" commandColor="ffffffff"/>
+    <ROLE_COMMAND roleName="Terra: Controluce / Sotto-Batteria" parameter="Red"
+                  startValue="255" endValue="255" curve="Static" commandColor="ffffffff"/>
+    <ROLE_COMMAND roleName="Terra: Controluce / Sotto-Batteria" parameter="Green"
+                  startValue="255" endValue="255" curve="Static" commandColor="ffffffff"/>
+    <ROLE_COMMAND roleName="Terra: Controluce / Sotto-Batteria" parameter="Blue"
+                  startValue="255" endValue="255" curve="Static" commandColor="ffffffff"/>
+    <ROLE_COMMAND roleName="Terra: Controluce / Sotto-Batteria" parameter="Dimmer"
+                  startValue="0" endValue="255" curve="Square_1_8" commandColor="ffffffff"/>
+    <ROLE_COMMAND roleName="Terra: Par / Barre Laterali (Taglio)" parameter="Red"
+                  startValue="255" endValue="255" curve="Static" commandColor="ffffffff"/>
+    <ROLE_COMMAND roleName="Terra: Par / Barre Laterali (Taglio)" parameter="Green"
+                  startValue="255" endValue="255" curve="Static" commandColor="ffffffff"/>
+    <ROLE_COMMAND roleName="Terra: Par / Barre Laterali (Taglio)" parameter="Blue"
+                  startValue="255" endValue="255" curve="Static" commandColor="ffffffff"/>
+    <ROLE_COMMAND roleName="Terra: Par / Barre Laterali (Taglio)" parameter="Dimmer"
+                  startValue="0" endValue="255" curve="Square_1_8" commandColor="ffffffff"/>
+    <ROLE_COMMAND roleName="Terra: Teste Mobili a Terra" parameter="Red" startValue="255"
+                  endValue="255" curve="Static" commandColor="ffffffff"/>
+    <ROLE_COMMAND roleName="Terra: Teste Mobili a Terra" parameter="Green" startValue="255"
+                  endValue="255" curve="Static" commandColor="ffffffff"/>
+    <ROLE_COMMAND roleName="Terra: Teste Mobili a Terra" parameter="Blue" startValue="255"
+                  endValue="255" curve="Static" commandColor="ffffffff"/>
+    <ROLE_COMMAND roleName="Terra: Teste Mobili a Terra" parameter="Dimmer" startValue="0"
+                  endValue="255" curve="Square_1_8" commandColor="ffffffff"/>
+  </SCENE_PRESET>
+  <SCENE_PRESET presetName="Strobo 1/16 (Sedicesimi)" presetPool="Strobe" layerType="OverlayFX"
+                durationBeats="4.0" isOneShot="0" phaseMode="Sync" targetRolesCsv="Impatto: Strobo|Aria: Teste Mobili / Beam"
+                presetColor1="ffffffff" presetColor2="ffffffff" presetDimmerMin="0"
+                presetDimmerMax="255" presetCurve="Square_1_16" presetStrobeUseHw="1"
+                presetStrobeSubdiv="1/16" presetMoveShape="Fixed" presetMoveSpeed="Sine_1Bar"
+                presetMoveAmpPan="0" presetMoveAmpTilt="0">
+    <ROLE_COMMAND roleName="Impatto: Strobo" parameter="Red" startValue="255" endValue="255"
+                  curve="Static" commandColor="ffffffff"/>
+    <ROLE_COMMAND roleName="Impatto: Strobo" parameter="Green" startValue="255"
+                  endValue="255" curve="Static" commandColor="ffffffff"/>
+    <ROLE_COMMAND roleName="Impatto: Strobo" parameter="Blue" startValue="255"
+                  endValue="255" curve="Static" commandColor="ffffffff"/>
+    <ROLE_COMMAND roleName="Impatto: Strobo" parameter="Dimmer" startValue="0"
+                  endValue="255" curve="Square_1_16" commandColor="ffffffff"/>
+    <ROLE_COMMAND roleName="Aria: Teste Mobili / Beam" parameter="Red" startValue="255"
+                  endValue="255" curve="Static" commandColor="ffffffff"/>
+    <ROLE_COMMAND roleName="Aria: Teste Mobili / Beam" parameter="Green" startValue="255"
+                  endValue="255" curve="Static" commandColor="ffffffff"/>
+    <ROLE_COMMAND roleName="Aria: Teste Mobili / Beam" parameter="Blue" startValue="255"
+                  endValue="255" curve="Static" commandColor="ffffffff"/>
+    <ROLE_COMMAND roleName="Aria: Teste Mobili / Beam" parameter="Dimmer" startValue="0"
+                  endValue="255" curve="Square_1_16" commandColor="ffffffff"/>
+  </SCENE_PRESET>
+  <SCENE_PRESET presetName="[F] Sweep Lento Ventaglio (4 Bars / 16 Q)" presetPool="Movement"
+                layerType="Movement" durationBeats="16.0" isOneShot="0" phaseMode="SymmetricalFan"
+                targetRolesCsv="Aria: Teste Mobili / Beam|Terra: Teste Mobili a Terra"
+                presetColor1="ff38bdf8" presetColor2="ff38bdf8" presetDimmerMin="0"
+                presetDimmerMax="255" presetCurve="Sine_4Bars" presetStrobeUseHw="0"
+                presetStrobeSubdiv="1/8" presetMoveShape="PanSweep" presetMoveSpeed="Sine_4Bars"
+                presetMoveAmpPan="85" presetMoveAmpTilt="40" sceneName="[F] Sweep Lento Ventaglio (4 Bars / 16 Q)">
+    <ROLE_COMMAND roleName="Aria: Teste Mobili / Beam" parameter="Red" startValue="56"
+                  endValue="56" curve="Static" commandColor="ff38bdf8"/>
+    <ROLE_COMMAND roleName="Aria: Teste Mobili / Beam" parameter="Green" startValue="189"
+                  endValue="189" curve="Static" commandColor="ff38bdf8"/>
+    <ROLE_COMMAND roleName="Aria: Teste Mobili / Beam" parameter="Blue" startValue="248"
+                  endValue="248" curve="Static" commandColor="ff38bdf8"/>
+    <ROLE_COMMAND roleName="Aria: Teste Mobili / Beam" parameter="Dimmer" startValue="0"
+                  endValue="255" curve="Sine_4Bars" commandColor="ff38bdf8"/>
+    <ROLE_COMMAND roleName="Aria: Teste Mobili / Beam" parameter="Pan" startValue="20"
+                  endValue="236" curve="Sine_4Bars" commandColor="ff38bdf8"/>
+    <ROLE_COMMAND roleName="Aria: Teste Mobili / Beam" parameter="Tilt" startValue="128"
+                  endValue="128" curve="Static" commandColor="ff38bdf8"/>
+    <ROLE_COMMAND roleName="Terra: Teste Mobili a Terra" parameter="Red" startValue="56"
+                  endValue="56" curve="Static" commandColor="ff38bdf8"/>
+    <ROLE_COMMAND roleName="Terra: Teste Mobili a Terra" parameter="Green" startValue="189"
+                  endValue="189" curve="Static" commandColor="ff38bdf8"/>
+    <ROLE_COMMAND roleName="Terra: Teste Mobili a Terra" parameter="Blue" startValue="248"
+                  endValue="248" curve="Static" commandColor="ff38bdf8"/>
+    <ROLE_COMMAND roleName="Terra: Teste Mobili a Terra" parameter="Dimmer" startValue="0"
+                  endValue="255" curve="Sine_4Bars" commandColor="ff38bdf8"/>
+    <ROLE_COMMAND roleName="Terra: Teste Mobili a Terra" parameter="Pan" startValue="20"
+                  endValue="236" curve="Sine_4Bars" commandColor="ff38bdf8"/>
+    <ROLE_COMMAND roleName="Terra: Teste Mobili a Terra" parameter="Tilt" startValue="128"
+                  endValue="128" curve="Static" commandColor="ff38bdf8"/>
+  </SCENE_PRESET>
+  <SCENE_PRESET presetName="[F] Cerchio Ipnotico (2 Bars / 8 Q)" presetPool="Movement"
+                layerType="Movement" durationBeats="8.0" isOneShot="0" phaseMode="SymmetricalFan"
+                targetRolesCsv="Aria: Teste Mobili / Beam|Terra: Teste Mobili a Terra"
+                presetColor1="ff38bdf8" presetColor2="ff38bdf8" presetDimmerMin="0"
+                presetDimmerMax="255" presetCurve="Sine_2Bars" presetStrobeUseHw="0"
+                presetStrobeSubdiv="1/8" presetMoveShape="Circle" presetMoveSpeed="Sine_2Bars"
+                presetMoveAmpPan="75" presetMoveAmpTilt="70" sceneName="[F] Cerchio Ipnotico (2 Bars / 8 Q)">
+    <ROLE_COMMAND roleName="Aria: Teste Mobili / Beam" parameter="Pan" startValue="33"
+                  endValue="223" curve="Sine_2Bars" commandColor="ff38bdf8"/>
+    <ROLE_COMMAND roleName="Aria: Teste Mobili / Beam" parameter="Tilt" startValue="39"
+                  endValue="217" curve="Cosine_2Bars" commandColor="ff38bdf8"/>
+    <ROLE_COMMAND roleName="Terra: Teste Mobili a Terra" parameter="Pan" startValue="33"
+                  endValue="223" curve="Sine_2Bars" commandColor="ff38bdf8"/>
+    <ROLE_COMMAND roleName="Terra: Teste Mobili a Terra" parameter="Tilt" startValue="39"
+                  endValue="217" curve="Cosine_2Bars" commandColor="ff38bdf8"/>
+  </SCENE_PRESET>
+  <SCENE_PRESET presetName="[F] Blinder Decay Impatto (4 Q)" presetPool="ImpactFX"
+                layerType="OverlayFX" durationBeats="4.0" isOneShot="1" phaseMode="Sync"
+                targetRolesCsv="Impatto: Blinder Pubblico" presetColor1="ffffedd5"
+                presetColor2="ffffedd5" presetDimmerMin="0" presetDimmerMax="255"
+                presetCurve="Decay" presetStrobeUseHw="0" presetStrobeSubdiv="1/8"
+                presetMoveShape="Fixed" presetMoveSpeed="Sine_1Bar" presetMoveAmpPan="0"
+                presetMoveAmpTilt="0" sceneName="[F] Blinder Decay Impatto (4 Q)">
+    <ROLE_COMMAND roleName="Impatto: Blinder Pubblico" parameter="Red" startValue="255"
+                  endValue="255" curve="Static" commandColor="ffffedd5"/>
+    <ROLE_COMMAND roleName="Impatto: Blinder Pubblico" parameter="Green" startValue="237"
+                  endValue="237" curve="Static" commandColor="ffffedd5"/>
+    <ROLE_COMMAND roleName="Impatto: Blinder Pubblico" parameter="Blue" startValue="213"
+                  endValue="213" curve="Static" commandColor="ffffedd5"/>
+    <ROLE_COMMAND roleName="Impatto: Blinder Pubblico" parameter="Dimmer" startValue="255"
+                  endValue="0" curve="Decay" commandColor="ffffedd5"/>
+  </SCENE_PRESET>
+  <SCENE_PRESET presetName="[F] Geyser Drop Rosso (4 Q)" presetPool="ImpactFX"
+                layerType="OverlayFX" durationBeats="16.0" isOneShot="1" phaseMode="Sync"
+                targetRolesCsv="FX: Geyser Verticale (Fumo + LED)" presetColor1="ffdc2626"
+                presetColor2="ffdc2626" presetDimmerMin="255" presetDimmerMax="255"
+                presetCurve="Decay" presetStrobeUseHw="0" presetStrobeSubdiv="1/8"
+                presetMoveShape="Fixed" presetMoveSpeed="Sine_1Bar" presetMoveAmpPan="0"
+                presetMoveAmpTilt="0" sceneName="[F] Geyser Drop Rosso (4 Q)">
+    <ROLE_COMMAND roleName="FX: Geyser Verticale (Fumo + LED)" parameter="Red"
+                  startValue="220" endValue="220" curve="Static" commandColor="ffdc2626"/>
+    <ROLE_COMMAND roleName="FX: Geyser Verticale (Fumo + LED)" parameter="Green"
+                  startValue="38" endValue="38" curve="Static" commandColor="ffdc2626"/>
+    <ROLE_COMMAND roleName="FX: Geyser Verticale (Fumo + LED)" parameter="Blue"
+                  startValue="38" endValue="38" curve="Static" commandColor="ffdc2626"/>
+    <ROLE_COMMAND roleName="FX: Geyser Verticale (Fumo + LED)" parameter="Dimmer"
+                  startValue="255" endValue="255" curve="Decay" commandColor="ffdc2626"/>
+  </SCENE_PRESET>
+  <SCENE_PRESET presetName="Pre-Carica Nebbia Hazer" presetPool="ImpactFX" layerType="OverlayFX"
+                durationBeats="8.0" isOneShot="0" phaseMode="Sync" targetRolesCsv="FX: Macchina del Fumo / Hazer"
+                presetColor1="ffcbd5e1" presetColor2="ffcbd5e1" presetDimmerMin="180"
+                presetDimmerMax="180" presetCurve="Static" presetStrobeUseHw="0"
+                presetStrobeSubdiv="1/8" presetMoveShape="Fixed" presetMoveSpeed="Sine_1Bar"
+                presetMoveAmpPan="0" presetMoveAmpTilt="0">
+    <ROLE_COMMAND roleName="FX: Macchina del Fumo / Hazer" parameter="Red" startValue="203"
+                  endValue="203" curve="Static" commandColor="ffcbd5e1"/>
+    <ROLE_COMMAND roleName="FX: Macchina del Fumo / Hazer" parameter="Green" startValue="213"
+                  endValue="213" curve="Static" commandColor="ffcbd5e1"/>
+    <ROLE_COMMAND roleName="FX: Macchina del Fumo / Hazer" parameter="Blue" startValue="225"
+                  endValue="225" curve="Static" commandColor="ffcbd5e1"/>
+    <ROLE_COMMAND roleName="FX: Macchina del Fumo / Hazer" parameter="Dimmer" startValue="180"
+                  endValue="180" curve="Static" commandColor="ffcbd5e1"/>
+  </SCENE_PRESET>
+  <SCENE_PRESET presetName="Crescendo Bianco" presetPool="Dimmer" layerType="Base"
+                durationBeats="64.0" isOneShot="1" phaseMode="Sync" targetRolesCsv="Aria: Wash Controluce (Fondale)|Terra: Controluce / Sotto-Batteria"
+                presetColor1="ffffffff" presetColor2="ffffffff" presetDimmerMin="0"
+                presetDimmerMax="255" presetCurve="Linear" presetStrobeUseHw="0"
+                presetStrobeSubdiv="1/8" presetMoveShape="PanSweep" presetMoveSpeed="Sine_4Bars"
+                presetMoveAmpPan="80" presetMoveAmpTilt="60">
+    <ROLE_COMMAND roleName="Aria: Wash Controluce (Fondale)" parameter="Dimmer"
+                  startValue="0" endValue="255" curve="Linear" commandColor="ffffffff"/>
+    <ROLE_COMMAND roleName="Terra: Controluce / Sotto-Batteria" parameter="Dimmer"
+                  startValue="0" endValue="255" curve="Linear" commandColor="ffffffff"/>
+  </SCENE_PRESET>
+  <SCENE_PRESET presetName="Decrescendo Bianco 4Q" presetPool="Dimmer" layerType="Base"
+                durationBeats="4.0" isOneShot="1" phaseMode="Sync" targetRolesCsv="Aria: Wash Controluce (Fondale)|Terra: Controluce / Sotto-Batteria"
+                presetColor1="ffffffff" presetColor2="ffffffff" presetDimmerMin="255"
+                presetDimmerMax="0" presetCurve="Decay" presetStrobeUseHw="0"
+                presetStrobeSubdiv="1/8" presetMoveShape="PanSweep" presetMoveSpeed="Sine_4Bars"
+                presetMoveAmpPan="80" presetMoveAmpTilt="60">
+    <ROLE_COMMAND roleName="Aria: Wash Controluce (Fondale)" parameter="Dimmer"
+                  startValue="255" endValue="0" curve="Decay" commandColor="ffffffff"/>
+    <ROLE_COMMAND roleName="Terra: Controluce / Sotto-Batteria" parameter="Dimmer"
+                  startValue="255" endValue="0" curve="Decay" commandColor="ffffffff"/>
+  </SCENE_PRESET>
+  <SCENE_PRESET presetName="Cerchio Rosso Sangue / Ambra" presetPool="Movement"
+                layerType="Movement" durationBeats="32.0" isOneShot="0" phaseMode="SymmetricalFan"
+                targetRolesCsv="Aria: Wash Controluce (Fondale)|Aria: Teste Mobili / Beam|Terra: Controluce / Sotto-Batteria"
+                presetColor1="ffdc2626" presetColor2="fff59e0b" presetDimmerMin="0"
+                presetDimmerMax="255" presetCurve="Static" presetStrobeUseHw="0"
+                presetStrobeSubdiv="1/8" presetMoveShape="Circle" presetMoveSpeed="Sine_2Bars"
+                presetMoveAmpPan="74" presetMoveAmpTilt="70">
+    <ROLE_COMMAND roleName="Aria: Wash Controluce (Fondale)" parameter="Red" startValue="220"
+                  endValue="220" curve="Static" commandColor="ffdc2626"/>
+    <ROLE_COMMAND roleName="Aria: Wash Controluce (Fondale)" parameter="Green"
+                  startValue="38" endValue="38" curve="Static" commandColor="ffdc2626"/>
+    <ROLE_COMMAND roleName="Aria: Wash Controluce (Fondale)" parameter="Blue" startValue="38"
+                  endValue="38" curve="Static" commandColor="ffdc2626"/>
+    <ROLE_COMMAND roleName="Aria: Wash Controluce (Fondale)" parameter="Dimmer"
+                  startValue="255" endValue="255" curve="Static" commandColor="ffdc2626"/>
+    <ROLE_COMMAND roleName="Aria: Wash Controluce (Fondale)" parameter="Pan" startValue="34"
+                  endValue="222" curve="Sine_2Bars" commandColor="ffdc2626"/>
+    <ROLE_COMMAND roleName="Aria: Wash Controluce (Fondale)" parameter="Tilt" startValue="39"
+                  endValue="217" curve="Cosine_2Bars" commandColor="ffdc2626"/>
+    <ROLE_COMMAND roleName="Aria: Teste Mobili / Beam" parameter="Red" startValue="220"
+                  endValue="220" curve="Static" commandColor="ffdc2626"/>
+    <ROLE_COMMAND roleName="Aria: Teste Mobili / Beam" parameter="Green" startValue="38"
+                  endValue="38" curve="Static" commandColor="ffdc2626"/>
+    <ROLE_COMMAND roleName="Aria: Teste Mobili / Beam" parameter="Blue" startValue="38"
+                  endValue="38" curve="Static" commandColor="ffdc2626"/>
+    <ROLE_COMMAND roleName="Aria: Teste Mobili / Beam" parameter="Dimmer" startValue="255"
+                  endValue="255" curve="Static" commandColor="ffdc2626"/>
+    <ROLE_COMMAND roleName="Aria: Teste Mobili / Beam" parameter="Pan" startValue="34"
+                  endValue="222" curve="Sine_2Bars" commandColor="ffdc2626"/>
+    <ROLE_COMMAND roleName="Aria: Teste Mobili / Beam" parameter="Tilt" startValue="39"
+                  endValue="217" curve="Cosine_2Bars" commandColor="ffdc2626"/>
+    <ROLE_COMMAND roleName="Terra: Controluce / Sotto-Batteria" parameter="Red"
+                  startValue="245" endValue="245" curve="Static" commandColor="fff59e0b"/>
+    <ROLE_COMMAND roleName="Terra: Controluce / Sotto-Batteria" parameter="Green"
+                  startValue="158" endValue="158" curve="Static" commandColor="fff59e0b"/>
+    <ROLE_COMMAND roleName="Terra: Controluce / Sotto-Batteria" parameter="Blue"
+                  startValue="11" endValue="11" curve="Static" commandColor="fff59e0b"/>
+    <ROLE_COMMAND roleName="Terra: Controluce / Sotto-Batteria" parameter="Dimmer"
+                  startValue="255" endValue="255" curve="Static" commandColor="fff59e0b"/>
+    <ROLE_COMMAND roleName="Terra: Controluce / Sotto-Batteria" parameter="Pan"
+                  startValue="34" endValue="222" curve="Sine_2Bars" commandColor="fff59e0b"/>
+    <ROLE_COMMAND roleName="Terra: Controluce / Sotto-Batteria" parameter="Tilt"
+                  startValue="39" endValue="217" curve="Cosine_2Bars" commandColor="fff59e0b"/>
+  </SCENE_PRESET>
+  <SCENE_PRESET presetName="Cerchio Rosso Sangue / Ambra + Strobo" presetPool="Strobe"
+                layerType="OverlayFX" durationBeats="32.0" isOneShot="0" phaseMode="SymmetricalFan"
+                targetRolesCsv="Aria: Wash Controluce (Fondale)|Aria: Teste Mobili / Beam|Terra: Controluce / Sotto-Batteria"
+                presetColor1="ffdc2626" presetColor2="fff59e0b" presetDimmerMin="0"
+                presetDimmerMax="255" presetCurve="Static" presetStrobeUseHw="0"
+                presetStrobeSubdiv="1/8" presetMoveShape="Circle" presetMoveSpeed="Sine_2Bars"
+                presetMoveAmpPan="74" presetMoveAmpTilt="70">
+    <ROLE_COMMAND roleName="Aria: Wash Controluce (Fondale)" parameter="Red" startValue="220"
+                  endValue="220" curve="Static" commandColor="ffdc2626"/>
+    <ROLE_COMMAND roleName="Aria: Wash Controluce (Fondale)" parameter="Green"
+                  startValue="38" endValue="38" curve="Static" commandColor="ffdc2626"/>
+    <ROLE_COMMAND roleName="Aria: Wash Controluce (Fondale)" parameter="Blue" startValue="38"
+                  endValue="38" curve="Static" commandColor="ffdc2626"/>
+    <ROLE_COMMAND roleName="Aria: Wash Controluce (Fondale)" parameter="Dimmer"
+                  startValue="0" endValue="255" curve="Square_1_8" commandColor="ffdc2626"/>
+    <ROLE_COMMAND roleName="Aria: Wash Controluce (Fondale)" parameter="Pan" startValue="34"
+                  endValue="222" curve="Sine_2Bars" commandColor="ffdc2626"/>
+    <ROLE_COMMAND roleName="Aria: Wash Controluce (Fondale)" parameter="Tilt" startValue="39"
+                  endValue="217" curve="Cosine_2Bars" commandColor="ffdc2626"/>
+    <ROLE_COMMAND roleName="Aria: Teste Mobili / Beam" parameter="Red" startValue="220"
+                  endValue="220" curve="Static" commandColor="ffdc2626"/>
+    <ROLE_COMMAND roleName="Aria: Teste Mobili / Beam" parameter="Green" startValue="38"
+                  endValue="38" curve="Static" commandColor="ffdc2626"/>
+    <ROLE_COMMAND roleName="Aria: Teste Mobili / Beam" parameter="Blue" startValue="38"
+                  endValue="38" curve="Static" commandColor="ffdc2626"/>
+    <ROLE_COMMAND roleName="Aria: Teste Mobili / Beam" parameter="Dimmer" startValue="0"
+                  endValue="255" curve="Square_1_8" commandColor="ffdc2626"/>
+    <ROLE_COMMAND roleName="Aria: Teste Mobili / Beam" parameter="Pan" startValue="34"
+                  endValue="222" curve="Sine_2Bars" commandColor="ffdc2626"/>
+    <ROLE_COMMAND roleName="Aria: Teste Mobili / Beam" parameter="Tilt" startValue="39"
+                  endValue="217" curve="Cosine_2Bars" commandColor="ffdc2626"/>
+    <ROLE_COMMAND roleName="Terra: Controluce / Sotto-Batteria" parameter="Red"
+                  startValue="245" endValue="245" curve="Static" commandColor="fff59e0b"/>
+    <ROLE_COMMAND roleName="Terra: Controluce / Sotto-Batteria" parameter="Green"
+                  startValue="158" endValue="158" curve="Static" commandColor="fff59e0b"/>
+    <ROLE_COMMAND roleName="Terra: Controluce / Sotto-Batteria" parameter="Blue"
+                  startValue="11" endValue="11" curve="Static" commandColor="fff59e0b"/>
+    <ROLE_COMMAND roleName="Terra: Controluce / Sotto-Batteria" parameter="Dimmer"
+                  startValue="0" endValue="255" curve="Square_1_8" commandColor="fff59e0b"/>
+    <ROLE_COMMAND roleName="Terra: Controluce / Sotto-Batteria" parameter="Pan"
+                  startValue="34" endValue="222" curve="Sine_2Bars" commandColor="fff59e0b"/>
+    <ROLE_COMMAND roleName="Terra: Controluce / Sotto-Batteria" parameter="Tilt"
+                  startValue="39" endValue="217" curve="Cosine_2Bars" commandColor="fff59e0b"/>
+  </SCENE_PRESET>
+  <SCENE_PRESET presetName="Strobo 1/8 Up" presetPool="Strobe" layerType="OverlayFX"
+                durationBeats="4.0" isOneShot="0" phaseMode="Sync" targetRolesCsv="Aria: Wash Controluce (Fondale)|Aria: Teste Mobili / Beam"
+                presetColor1="ffffffff" presetColor2="ffffffff" presetDimmerMin="0"
+                presetDimmerMax="255" presetCurve="Square_1_8" presetStrobeUseHw="0"
+                presetStrobeSubdiv="1/8" presetMoveShape="Fixed" presetMoveSpeed="Sine_1Bar"
+                presetMoveAmpPan="0" presetMoveAmpTilt="0">
+    <ROLE_COMMAND roleName="Aria: Wash Controluce (Fondale)" parameter="Red" startValue="255"
+                  endValue="255" curve="Static" commandColor="ffffffff"/>
+    <ROLE_COMMAND roleName="Aria: Wash Controluce (Fondale)" parameter="Green"
+                  startValue="255" endValue="255" curve="Static" commandColor="ffffffff"/>
+    <ROLE_COMMAND roleName="Aria: Wash Controluce (Fondale)" parameter="Blue" startValue="255"
+                  endValue="255" curve="Static" commandColor="ffffffff"/>
+    <ROLE_COMMAND roleName="Aria: Wash Controluce (Fondale)" parameter="Dimmer"
+                  startValue="0" endValue="255" curve="Square_1_8" commandColor="ffffffff"/>
+    <ROLE_COMMAND roleName="Aria: Teste Mobili / Beam" parameter="Red" startValue="255"
+                  endValue="255" curve="Static" commandColor="ffffffff"/>
+    <ROLE_COMMAND roleName="Aria: Teste Mobili / Beam" parameter="Green" startValue="255"
+                  endValue="255" curve="Static" commandColor="ffffffff"/>
+    <ROLE_COMMAND roleName="Aria: Teste Mobili / Beam" parameter="Blue" startValue="255"
+                  endValue="255" curve="Static" commandColor="ffffffff"/>
+    <ROLE_COMMAND roleName="Aria: Teste Mobili / Beam" parameter="Dimmer" startValue="0"
+                  endValue="255" curve="Square_1_8" commandColor="ffffffff"/>
+  </SCENE_PRESET>
+  <SCENE_PRESET presetName="Strobo 1/8 Down" presetPool="Strobe" layerType="OverlayFX"
+                durationBeats="4.0" isOneShot="0" phaseMode="Sync" targetRolesCsv="Terra: Controluce / Sotto-Batteria"
+                presetColor1="ffdc2626" presetColor2="ffdc2626" presetDimmerMin="0"
+                presetDimmerMax="255" presetCurve="Square_1_8" presetStrobeUseHw="0"
+                presetStrobeSubdiv="1/8" presetMoveShape="Fixed" presetMoveSpeed="Sine_1Bar"
+                presetMoveAmpPan="0" presetMoveAmpTilt="0">
+    <ROLE_COMMAND roleName="Terra: Controluce / Sotto-Batteria" parameter="Red"
+                  startValue="220" endValue="220" curve="Static" commandColor="ffdc2626"/>
+    <ROLE_COMMAND roleName="Terra: Controluce / Sotto-Batteria" parameter="Green"
+                  startValue="38" endValue="38" curve="Static" commandColor="ffdc2626"/>
+    <ROLE_COMMAND roleName="Terra: Controluce / Sotto-Batteria" parameter="Blue"
+                  startValue="38" endValue="38" curve="Static" commandColor="ffdc2626"/>
+    <ROLE_COMMAND roleName="Terra: Controluce / Sotto-Batteria" parameter="Dimmer"
+                  startValue="0" endValue="255" curve="Square_1_8" commandColor="ffdc2626"/>
+  </SCENE_PRESET>
+  <SCENE_PRESET sceneName="Blast Beat Red - FLOOR" startBeat="65.0" durationBeats="32.0"
+                presetName="Blast Beat Red - FLOOR (Copia)" targetRolesCsv="Terra: Controluce / Sotto-Batteria|Terra: Par / Barre Laterali (Taglio)|Terra: Teste Mobili a Terra"
+                presetPool="Strobe" layerType="OverlayFX" presetColor1="ffdc2626"
+                presetColor2="ffdc2626" presetDimmerMin="0" presetDimmerMax="255"
+                presetCurve="Static" presetStrobeUseHw="1" presetStrobeSubdiv="1/16">
+    <ROLE_COMMAND roleName="Terra: Controluce / Sotto-Batteria" parameter="Red"
+                  startValue="220" endValue="220" curve="Static" commandColor="ffdc2626"/>
+    <ROLE_COMMAND roleName="Terra: Controluce / Sotto-Batteria" parameter="Green"
+                  startValue="38" endValue="38" curve="Static" commandColor="ffdc2626"/>
+    <ROLE_COMMAND roleName="Terra: Controluce / Sotto-Batteria" parameter="Blue"
+                  startValue="38" endValue="38" curve="Static" commandColor="ffdc2626"/>
+    <ROLE_COMMAND roleName="Terra: Controluce / Sotto-Batteria" parameter="Dimmer"
+                  startValue="0" endValue="255" curve="Square_1_16" commandColor="ffdc2626"/>
+    <ROLE_COMMAND roleName="Terra: Par / Barre Laterali (Taglio)" parameter="Red"
+                  startValue="220" endValue="220" curve="Static" commandColor="ffdc2626"/>
+    <ROLE_COMMAND roleName="Terra: Par / Barre Laterali (Taglio)" parameter="Green"
+                  startValue="38" endValue="38" curve="Static" commandColor="ffdc2626"/>
+    <ROLE_COMMAND roleName="Terra: Par / Barre Laterali (Taglio)" parameter="Blue"
+                  startValue="38" endValue="38" curve="Static" commandColor="ffdc2626"/>
+    <ROLE_COMMAND roleName="Terra: Par / Barre Laterali (Taglio)" parameter="Dimmer"
+                  startValue="0" endValue="255" curve="Square_1_16" commandColor="ffdc2626"/>
+    <ROLE_COMMAND roleName="Terra: Teste Mobili a Terra" parameter="Red" startValue="220"
+                  endValue="220" curve="Static" commandColor="ffdc2626"/>
+    <ROLE_COMMAND roleName="Terra: Teste Mobili a Terra" parameter="Green" startValue="38"
+                  endValue="38" curve="Static" commandColor="ffdc2626"/>
+    <ROLE_COMMAND roleName="Terra: Teste Mobili a Terra" parameter="Blue" startValue="38"
+                  endValue="38" curve="Static" commandColor="ffdc2626"/>
+    <ROLE_COMMAND roleName="Terra: Teste Mobili a Terra" parameter="Dimmer" startValue="0"
+                  endValue="255" curve="Square_1_16" commandColor="ffdc2626"/>
+  </SCENE_PRESET>
+  <SCENE_PRESET presetName="Respiro Atmosferico (4 Bars / 16 Q) UP" presetPool="Dimmer"
+                layerType="Base" durationBeats="16.0" isOneShot="0" phaseMode="Sync"
+                targetRolesCsv="Aria: Wash Controluce (Fondale)" presetColor1="ff38bdf8"
+                presetColor2="ff1d4ed8" presetDimmerMin="40" presetDimmerMax="240"
+                presetCurve="Sine_4Bars" presetStrobeUseHw="0" presetStrobeSubdiv="1/8"
+                presetMoveShape="Fixed" presetMoveSpeed="Sine_4Bars" presetMoveAmpPan="0"
+                presetMoveAmpTilt="0">
+    <ROLE_COMMAND roleName="Aria: Wash Controluce (Fondale)" parameter="Red" startValue="56"
+                  endValue="56" curve="Static" commandColor="ff38bdf8"/>
+    <ROLE_COMMAND roleName="Aria: Wash Controluce (Fondale)" parameter="Green"
+                  startValue="189" endValue="189" curve="Static" commandColor="ff38bdf8"/>
+    <ROLE_COMMAND roleName="Aria: Wash Controluce (Fondale)" parameter="Blue" startValue="248"
+                  endValue="248" curve="Static" commandColor="ff38bdf8"/>
+    <ROLE_COMMAND roleName="Aria: Wash Controluce (Fondale)" parameter="Dimmer"
+                  startValue="40" endValue="240" curve="Sine_4Bars" commandColor="ff38bdf8"/>
+  </SCENE_PRESET>
+  <SCENE_PRESET presetName="[F] Colore: Bianco Freddo (Daylight)" sceneName="[F] Colore: Bianco Freddo (Daylight)"
+                presetPool="Color" layerType="Base" durationBeats="8.0" isOneShot="0"
+                phaseMode="Sync" targetRolesCsv="Aria: Wash Controluce (Fondale)|Aria: Par / Spot Frontali (Band)|Aria: Teste Mobili / Beam|Terra: Controluce / Sotto-Batteria|Terra: Par / Barre Laterali (Taglio)|Terra: Teste Mobili a Terra"
+                presetUseColor="1" presetUseDimmer="0" presetUseMove="0" presetUseStrobe="0"
+                presetColor1="ffe0f2fe" presetColor2="ffbae6fd" presetDimmerMin="0"
+                presetDimmerMax="255" presetCurve="Static" presetStrobeUseHw="0"
+                presetStrobeSubdiv="1/8" presetMoveShape="Fixed" presetMoveSpeed="Sine_4Bars"
+                presetMoveAmpPan="0" presetMoveAmpTilt="0">
+    <ROLE_COMMAND roleName="Aria: Wash Controluce (Fondale)" parameter="Red" startValue="224"
+                  endValue="224" curve="Static" commandColor="ffe0f2fe"/>
+    <ROLE_COMMAND roleName="Aria: Wash Controluce (Fondale)" parameter="Green"
+                  startValue="242" endValue="242" curve="Static" commandColor="ffe0f2fe"/>
+    <ROLE_COMMAND roleName="Aria: Wash Controluce (Fondale)" parameter="Blue" startValue="254"
+                  endValue="254" curve="Static" commandColor="ffe0f2fe"/>
+    <ROLE_COMMAND roleName="Aria: Par / Spot Frontali (Band)" parameter="Red" startValue="224"
+                  endValue="224" curve="Static" commandColor="ffe0f2fe"/>
+    <ROLE_COMMAND roleName="Aria: Par / Spot Frontali (Band)" parameter="Green"
+                  startValue="242" endValue="242" curve="Static" commandColor="ffe0f2fe"/>
+    <ROLE_COMMAND roleName="Aria: Par / Spot Frontali (Band)" parameter="Blue"
+                  startValue="254" endValue="254" curve="Static" commandColor="ffe0f2fe"/>
+    <ROLE_COMMAND roleName="Aria: Teste Mobili / Beam" parameter="Red" startValue="224"
+                  endValue="224" curve="Static" commandColor="ffe0f2fe"/>
+    <ROLE_COMMAND roleName="Aria: Teste Mobili / Beam" parameter="Green" startValue="242"
+                  endValue="242" curve="Static" commandColor="ffe0f2fe"/>
+    <ROLE_COMMAND roleName="Aria: Teste Mobili / Beam" parameter="Blue" startValue="254"
+                  endValue="254" curve="Static" commandColor="ffe0f2fe"/>
+    <ROLE_COMMAND roleName="Terra: Controluce / Sotto-Batteria" parameter="Red"
+                  startValue="186" endValue="186" curve="Static" commandColor="ffbae6fd"/>
+    <ROLE_COMMAND roleName="Terra: Controluce / Sotto-Batteria" parameter="Green"
+                  startValue="230" endValue="230" curve="Static" commandColor="ffbae6fd"/>
+    <ROLE_COMMAND roleName="Terra: Controluce / Sotto-Batteria" parameter="Blue"
+                  startValue="253" endValue="253" curve="Static" commandColor="ffbae6fd"/>
+    <ROLE_COMMAND roleName="Terra: Par / Barre Laterali (Taglio)" parameter="Red"
+                  startValue="186" endValue="186" curve="Static" commandColor="ffbae6fd"/>
+    <ROLE_COMMAND roleName="Terra: Par / Barre Laterali (Taglio)" parameter="Green"
+                  startValue="230" endValue="230" curve="Static" commandColor="ffbae6fd"/>
+    <ROLE_COMMAND roleName="Terra: Par / Barre Laterali (Taglio)" parameter="Blue"
+                  startValue="253" endValue="253" curve="Static" commandColor="ffbae6fd"/>
+    <ROLE_COMMAND roleName="Terra: Teste Mobili a Terra" parameter="Red" startValue="186"
+                  endValue="186" curve="Static" commandColor="ffbae6fd"/>
+    <ROLE_COMMAND roleName="Terra: Teste Mobili a Terra" parameter="Green" startValue="230"
+                  endValue="230" curve="Static" commandColor="ffbae6fd"/>
+    <ROLE_COMMAND roleName="Terra: Teste Mobili a Terra" parameter="Blue" startValue="253"
+                  endValue="253" curve="Static" commandColor="ffbae6fd"/>
+  </SCENE_PRESET>
+  <SCENE_PRESET presetName="[F] Colore: Tungsteno Caldo (Ambra)" sceneName="[F] Colore: Tungsteno Caldo (Ambra)"
+                presetPool="Color" layerType="Base" durationBeats="8.0" isOneShot="0"
+                phaseMode="Sync" targetRolesCsv="Aria: Wash Controluce (Fondale)|Aria: Par / Spot Frontali (Band)|Aria: Teste Mobili / Beam|Terra: Controluce / Sotto-Batteria|Terra: Par / Barre Laterali (Taglio)|Terra: Teste Mobili a Terra"
+                presetUseColor="1" presetUseDimmer="0" presetUseMove="0" presetUseStrobe="0"
+                presetColor1="ffffedd5" presetColor2="fff59e0b" presetDimmerMin="0"
+                presetDimmerMax="255" presetCurve="Static" presetStrobeUseHw="0"
+                presetStrobeSubdiv="1/8" presetMoveShape="Fixed" presetMoveSpeed="Sine_4Bars"
+                presetMoveAmpPan="0" presetMoveAmpTilt="0">
+    <ROLE_COMMAND roleName="Aria: Wash Controluce (Fondale)" parameter="Red" startValue="255"
+                  endValue="255" curve="Static" commandColor="ffffedd5"/>
+    <ROLE_COMMAND roleName="Aria: Wash Controluce (Fondale)" parameter="Green"
+                  startValue="237" endValue="237" curve="Static" commandColor="ffffedd5"/>
+    <ROLE_COMMAND roleName="Aria: Wash Controluce (Fondale)" parameter="Blue" startValue="213"
+                  endValue="213" curve="Static" commandColor="ffffedd5"/>
+    <ROLE_COMMAND roleName="Aria: Par / Spot Frontali (Band)" parameter="Red" startValue="255"
+                  endValue="255" curve="Static" commandColor="ffffedd5"/>
+    <ROLE_COMMAND roleName="Aria: Par / Spot Frontali (Band)" parameter="Green"
+                  startValue="237" endValue="237" curve="Static" commandColor="ffffedd5"/>
+    <ROLE_COMMAND roleName="Aria: Par / Spot Frontali (Band)" parameter="Blue"
+                  startValue="213" endValue="213" curve="Static" commandColor="ffffedd5"/>
+    <ROLE_COMMAND roleName="Aria: Teste Mobili / Beam" parameter="Red" startValue="255"
+                  endValue="255" curve="Static" commandColor="ffffedd5"/>
+    <ROLE_COMMAND roleName="Aria: Teste Mobili / Beam" parameter="Green" startValue="237"
+                  endValue="237" curve="Static" commandColor="ffffedd5"/>
+    <ROLE_COMMAND roleName="Aria: Teste Mobili / Beam" parameter="Blue" startValue="213"
+                  endValue="213" curve="Static" commandColor="ffffedd5"/>
+    <ROLE_COMMAND roleName="Terra: Controluce / Sotto-Batteria" parameter="Red"
+                  startValue="245" endValue="245" curve="Static" commandColor="fff59e0b"/>
+    <ROLE_COMMAND roleName="Terra: Controluce / Sotto-Batteria" parameter="Green"
+                  startValue="158" endValue="158" curve="Static" commandColor="fff59e0b"/>
+    <ROLE_COMMAND roleName="Terra: Controluce / Sotto-Batteria" parameter="Blue"
+                  startValue="11" endValue="11" curve="Static" commandColor="fff59e0b"/>
+    <ROLE_COMMAND roleName="Terra: Par / Barre Laterali (Taglio)" parameter="Red"
+                  startValue="245" endValue="245" curve="Static" commandColor="fff59e0b"/>
+    <ROLE_COMMAND roleName="Terra: Par / Barre Laterali (Taglio)" parameter="Green"
+                  startValue="158" endValue="158" curve="Static" commandColor="fff59e0b"/>
+    <ROLE_COMMAND roleName="Terra: Par / Barre Laterali (Taglio)" parameter="Blue"
+                  startValue="11" endValue="11" curve="Static" commandColor="fff59e0b"/>
+    <ROLE_COMMAND roleName="Terra: Teste Mobili a Terra" parameter="Red" startValue="245"
+                  endValue="245" curve="Static" commandColor="fff59e0b"/>
+    <ROLE_COMMAND roleName="Terra: Teste Mobili a Terra" parameter="Green" startValue="158"
+                  endValue="158" curve="Static" commandColor="fff59e0b"/>
+    <ROLE_COMMAND roleName="Terra: Teste Mobili a Terra" parameter="Blue" startValue="11"
+                  endValue="11" curve="Static" commandColor="fff59e0b"/>
+  </SCENE_PRESET>
+  <SCENE_PRESET presetName="[F] Colore: Blu Notte Profondo" sceneName="[F] Colore: Blu Notte Profondo"
+                presetPool="Color" layerType="Base" durationBeats="8.0" isOneShot="0"
+                phaseMode="Sync" targetRolesCsv="Aria: Wash Controluce (Fondale)|Aria: Par / Spot Frontali (Band)|Aria: Teste Mobili / Beam|Terra: Controluce / Sotto-Batteria|Terra: Par / Barre Laterali (Taglio)|Terra: Teste Mobili a Terra"
+                presetUseColor="1" presetUseDimmer="0" presetUseMove="0" presetUseStrobe="0"
+                presetColor1="ff1d4ed8" presetColor2="ff1e3a8a" presetDimmerMin="0"
+                presetDimmerMax="255" presetCurve="Static" presetStrobeUseHw="0"
+                presetStrobeSubdiv="1/8" presetMoveShape="Fixed" presetMoveSpeed="Sine_4Bars"
+                presetMoveAmpPan="0" presetMoveAmpTilt="0">
+    <ROLE_COMMAND roleName="Aria: Wash Controluce (Fondale)" parameter="Red" startValue="29"
+                  endValue="29" curve="Static" commandColor="ff1d4ed8"/>
+    <ROLE_COMMAND roleName="Aria: Wash Controluce (Fondale)" parameter="Green"
+                  startValue="78" endValue="78" curve="Static" commandColor="ff1d4ed8"/>
+    <ROLE_COMMAND roleName="Aria: Wash Controluce (Fondale)" parameter="Blue" startValue="216"
+                  endValue="216" curve="Static" commandColor="ff1d4ed8"/>
+    <ROLE_COMMAND roleName="Aria: Par / Spot Frontali (Band)" parameter="Red" startValue="29"
+                  endValue="29" curve="Static" commandColor="ff1d4ed8"/>
+    <ROLE_COMMAND roleName="Aria: Par / Spot Frontali (Band)" parameter="Green"
+                  startValue="78" endValue="78" curve="Static" commandColor="ff1d4ed8"/>
+    <ROLE_COMMAND roleName="Aria: Par / Spot Frontali (Band)" parameter="Blue"
+                  startValue="216" endValue="216" curve="Static" commandColor="ff1d4ed8"/>
+    <ROLE_COMMAND roleName="Aria: Teste Mobili / Beam" parameter="Red" startValue="29"
+                  endValue="29" curve="Static" commandColor="ff1d4ed8"/>
+    <ROLE_COMMAND roleName="Aria: Teste Mobili / Beam" parameter="Green" startValue="78"
+                  endValue="78" curve="Static" commandColor="ff1d4ed8"/>
+    <ROLE_COMMAND roleName="Aria: Teste Mobili / Beam" parameter="Blue" startValue="216"
+                  endValue="216" curve="Static" commandColor="ff1d4ed8"/>
+    <ROLE_COMMAND roleName="Terra: Controluce / Sotto-Batteria" parameter="Red"
+                  startValue="30" endValue="30" curve="Static" commandColor="ff1e3a8a"/>
+    <ROLE_COMMAND roleName="Terra: Controluce / Sotto-Batteria" parameter="Green"
+                  startValue="58" endValue="58" curve="Static" commandColor="ff1e3a8a"/>
+    <ROLE_COMMAND roleName="Terra: Controluce / Sotto-Batteria" parameter="Blue"
+                  startValue="138" endValue="138" curve="Static" commandColor="ff1e3a8a"/>
+    <ROLE_COMMAND roleName="Terra: Par / Barre Laterali (Taglio)" parameter="Red"
+                  startValue="30" endValue="30" curve="Static" commandColor="ff1e3a8a"/>
+    <ROLE_COMMAND roleName="Terra: Par / Barre Laterali (Taglio)" parameter="Green"
+                  startValue="58" endValue="58" curve="Static" commandColor="ff1e3a8a"/>
+    <ROLE_COMMAND roleName="Terra: Par / Barre Laterali (Taglio)" parameter="Blue"
+                  startValue="138" endValue="138" curve="Static" commandColor="ff1e3a8a"/>
+    <ROLE_COMMAND roleName="Terra: Teste Mobili a Terra" parameter="Red" startValue="30"
+                  endValue="30" curve="Static" commandColor="ff1e3a8a"/>
+    <ROLE_COMMAND roleName="Terra: Teste Mobili a Terra" parameter="Green" startValue="58"
+                  endValue="58" curve="Static" commandColor="ff1e3a8a"/>
+    <ROLE_COMMAND roleName="Terra: Teste Mobili a Terra" parameter="Blue" startValue="138"
+                  endValue="138" curve="Static" commandColor="ff1e3a8a"/>
+  </SCENE_PRESET>
+  <SCENE_PRESET presetName="[F] Colore: Rosso Sangue" sceneName="[F] Colore: Rosso Sangue"
+                presetPool="Color" layerType="Base" durationBeats="8.0" isOneShot="0"
+                phaseMode="Sync" targetRolesCsv="Aria: Wash Controluce (Fondale)|Aria: Par / Spot Frontali (Band)|Aria: Teste Mobili / Beam|Terra: Controluce / Sotto-Batteria|Terra: Par / Barre Laterali (Taglio)|Terra: Teste Mobili a Terra"
+                presetUseColor="1" presetUseDimmer="0" presetUseMove="0" presetUseStrobe="0"
+                presetColor1="ffdc2626" presetColor2="ff7f1d1d" presetDimmerMin="0"
+                presetDimmerMax="255" presetCurve="Static" presetStrobeUseHw="0"
+                presetStrobeSubdiv="1/8" presetMoveShape="Fixed" presetMoveSpeed="Sine_4Bars"
+                presetMoveAmpPan="0" presetMoveAmpTilt="0">
+    <ROLE_COMMAND roleName="Aria: Wash Controluce (Fondale)" parameter="Red" startValue="220"
+                  endValue="220" curve="Static" commandColor="ffdc2626"/>
+    <ROLE_COMMAND roleName="Aria: Wash Controluce (Fondale)" parameter="Green"
+                  startValue="38" endValue="38" curve="Static" commandColor="ffdc2626"/>
+    <ROLE_COMMAND roleName="Aria: Wash Controluce (Fondale)" parameter="Blue" startValue="38"
+                  endValue="38" curve="Static" commandColor="ffdc2626"/>
+    <ROLE_COMMAND roleName="Aria: Par / Spot Frontali (Band)" parameter="Red" startValue="220"
+                  endValue="220" curve="Static" commandColor="ffdc2626"/>
+    <ROLE_COMMAND roleName="Aria: Par / Spot Frontali (Band)" parameter="Green"
+                  startValue="38" endValue="38" curve="Static" commandColor="ffdc2626"/>
+    <ROLE_COMMAND roleName="Aria: Par / Spot Frontali (Band)" parameter="Blue"
+                  startValue="38" endValue="38" curve="Static" commandColor="ffdc2626"/>
+    <ROLE_COMMAND roleName="Aria: Teste Mobili / Beam" parameter="Red" startValue="220"
+                  endValue="220" curve="Static" commandColor="ffdc2626"/>
+    <ROLE_COMMAND roleName="Aria: Teste Mobili / Beam" parameter="Green" startValue="38"
+                  endValue="38" curve="Static" commandColor="ffdc2626"/>
+    <ROLE_COMMAND roleName="Aria: Teste Mobili / Beam" parameter="Blue" startValue="38"
+                  endValue="38" curve="Static" commandColor="ffdc2626"/>
+    <ROLE_COMMAND roleName="Terra: Controluce / Sotto-Batteria" parameter="Red"
+                  startValue="127" endValue="127" curve="Static" commandColor="ff7f1d1d"/>
+    <ROLE_COMMAND roleName="Terra: Controluce / Sotto-Batteria" parameter="Green"
+                  startValue="29" endValue="29" curve="Static" commandColor="ff7f1d1d"/>
+    <ROLE_COMMAND roleName="Terra: Controluce / Sotto-Batteria" parameter="Blue"
+                  startValue="29" endValue="29" curve="Static" commandColor="ff7f1d1d"/>
+    <ROLE_COMMAND roleName="Terra: Par / Barre Laterali (Taglio)" parameter="Red"
+                  startValue="127" endValue="127" curve="Static" commandColor="ff7f1d1d"/>
+    <ROLE_COMMAND roleName="Terra: Par / Barre Laterali (Taglio)" parameter="Green"
+                  startValue="29" endValue="29" curve="Static" commandColor="ff7f1d1d"/>
+    <ROLE_COMMAND roleName="Terra: Par / Barre Laterali (Taglio)" parameter="Blue"
+                  startValue="29" endValue="29" curve="Static" commandColor="ff7f1d1d"/>
+    <ROLE_COMMAND roleName="Terra: Teste Mobili a Terra" parameter="Red" startValue="127"
+                  endValue="127" curve="Static" commandColor="ff7f1d1d"/>
+    <ROLE_COMMAND roleName="Terra: Teste Mobili a Terra" parameter="Green" startValue="29"
+                  endValue="29" curve="Static" commandColor="ff7f1d1d"/>
+    <ROLE_COMMAND roleName="Terra: Teste Mobili a Terra" parameter="Blue" startValue="29"
+                  endValue="29" curve="Static" commandColor="ff7f1d1d"/>
+  </SCENE_PRESET>
+  <SCENE_PRESET presetName="[F] Colore: UV / Viola Profondo" sceneName="[F] Colore: UV / Viola Profondo"
+                presetPool="Color" layerType="Base" durationBeats="8.0" isOneShot="0"
+                phaseMode="Sync" targetRolesCsv="Aria: Wash Controluce (Fondale)|Aria: Par / Spot Frontali (Band)|Aria: Teste Mobili / Beam|Terra: Controluce / Sotto-Batteria|Terra: Par / Barre Laterali (Taglio)|Terra: Teste Mobili a Terra"
+                presetUseColor="1" presetUseDimmer="0" presetUseMove="0" presetUseStrobe="0"
+                presetColor1="ff7c3aed" presetColor2="ff3b0764" presetDimmerMin="0"
+                presetDimmerMax="255" presetCurve="Static" presetStrobeUseHw="0"
+                presetStrobeSubdiv="1/8" presetMoveShape="Fixed" presetMoveSpeed="Sine_4Bars"
+                presetMoveAmpPan="0" presetMoveAmpTilt="0">
+    <ROLE_COMMAND roleName="Aria: Wash Controluce (Fondale)" parameter="Red" startValue="124"
+                  endValue="124" curve="Static" commandColor="ff7c3aed"/>
+    <ROLE_COMMAND roleName="Aria: Wash Controluce (Fondale)" parameter="Green"
+                  startValue="58" endValue="58" curve="Static" commandColor="ff7c3aed"/>
+    <ROLE_COMMAND roleName="Aria: Wash Controluce (Fondale)" parameter="Blue" startValue="237"
+                  endValue="237" curve="Static" commandColor="ff7c3aed"/>
+    <ROLE_COMMAND roleName="Aria: Par / Spot Frontali (Band)" parameter="Red" startValue="124"
+                  endValue="124" curve="Static" commandColor="ff7c3aed"/>
+    <ROLE_COMMAND roleName="Aria: Par / Spot Frontali (Band)" parameter="Green"
+                  startValue="58" endValue="58" curve="Static" commandColor="ff7c3aed"/>
+    <ROLE_COMMAND roleName="Aria: Par / Spot Frontali (Band)" parameter="Blue"
+                  startValue="237" endValue="237" curve="Static" commandColor="ff7c3aed"/>
+    <ROLE_COMMAND roleName="Aria: Teste Mobili / Beam" parameter="Red" startValue="124"
+                  endValue="124" curve="Static" commandColor="ff7c3aed"/>
+    <ROLE_COMMAND roleName="Aria: Teste Mobili / Beam" parameter="Green" startValue="58"
+                  endValue="58" curve="Static" commandColor="ff7c3aed"/>
+    <ROLE_COMMAND roleName="Aria: Teste Mobili / Beam" parameter="Blue" startValue="237"
+                  endValue="237" curve="Static" commandColor="ff7c3aed"/>
+    <ROLE_COMMAND roleName="Terra: Controluce / Sotto-Batteria" parameter="Red"
+                  startValue="59" endValue="59" curve="Static" commandColor="ff3b0764"/>
+    <ROLE_COMMAND roleName="Terra: Controluce / Sotto-Batteria" parameter="Green"
+                  startValue="7" endValue="7" curve="Static" commandColor="ff3b0764"/>
+    <ROLE_COMMAND roleName="Terra: Controluce / Sotto-Batteria" parameter="Blue"
+                  startValue="100" endValue="100" curve="Static" commandColor="ff3b0764"/>
+    <ROLE_COMMAND roleName="Terra: Par / Barre Laterali (Taglio)" parameter="Red"
+                  startValue="59" endValue="59" curve="Static" commandColor="ff3b0764"/>
+    <ROLE_COMMAND roleName="Terra: Par / Barre Laterali (Taglio)" parameter="Green"
+                  startValue="7" endValue="7" curve="Static" commandColor="ff3b0764"/>
+    <ROLE_COMMAND roleName="Terra: Par / Barre Laterali (Taglio)" parameter="Blue"
+                  startValue="100" endValue="100" curve="Static" commandColor="ff3b0764"/>
+    <ROLE_COMMAND roleName="Terra: Teste Mobili a Terra" parameter="Red" startValue="59"
+                  endValue="59" curve="Static" commandColor="ff3b0764"/>
+    <ROLE_COMMAND roleName="Terra: Teste Mobili a Terra" parameter="Green" startValue="7"
+                  endValue="7" curve="Static" commandColor="ff3b0764"/>
+    <ROLE_COMMAND roleName="Terra: Teste Mobili a Terra" parameter="Blue" startValue="100"
+                  endValue="100" curve="Static" commandColor="ff3b0764"/>
+  </SCENE_PRESET>
+  <SCENE_PRESET presetName="[F] Colore: Verde Bosco / Smeraldo" sceneName="[F] Colore: Verde Bosco / Smeraldo"
+                presetPool="Color" layerType="Base" durationBeats="8.0" isOneShot="0"
+                phaseMode="Sync" targetRolesCsv="Aria: Wash Controluce (Fondale)|Aria: Par / Spot Frontali (Band)|Aria: Teste Mobili / Beam|Terra: Controluce / Sotto-Batteria|Terra: Par / Barre Laterali (Taglio)|Terra: Teste Mobili a Terra"
+                presetUseColor="1" presetUseDimmer="0" presetUseMove="0" presetUseStrobe="0"
+                presetColor1="ff15803d" presetColor2="ff064e3b" presetDimmerMin="0"
+                presetDimmerMax="255" presetCurve="Static" presetStrobeUseHw="0"
+                presetStrobeSubdiv="1/8" presetMoveShape="Fixed" presetMoveSpeed="Sine_4Bars"
+                presetMoveAmpPan="0" presetMoveAmpTilt="0">
+    <ROLE_COMMAND roleName="Aria: Wash Controluce (Fondale)" parameter="Red" startValue="21"
+                  endValue="21" curve="Static" commandColor="ff15803d"/>
+    <ROLE_COMMAND roleName="Aria: Wash Controluce (Fondale)" parameter="Green"
+                  startValue="128" endValue="128" curve="Static" commandColor="ff15803d"/>
+    <ROLE_COMMAND roleName="Aria: Wash Controluce (Fondale)" parameter="Blue" startValue="61"
+                  endValue="61" curve="Static" commandColor="ff15803d"/>
+    <ROLE_COMMAND roleName="Aria: Par / Spot Frontali (Band)" parameter="Red" startValue="21"
+                  endValue="21" curve="Static" commandColor="ff15803d"/>
+    <ROLE_COMMAND roleName="Aria: Par / Spot Frontali (Band)" parameter="Green"
+                  startValue="128" endValue="128" curve="Static" commandColor="ff15803d"/>
+    <ROLE_COMMAND roleName="Aria: Par / Spot Frontali (Band)" parameter="Blue"
+                  startValue="61" endValue="61" curve="Static" commandColor="ff15803d"/>
+    <ROLE_COMMAND roleName="Aria: Teste Mobili / Beam" parameter="Red" startValue="21"
+                  endValue="21" curve="Static" commandColor="ff15803d"/>
+    <ROLE_COMMAND roleName="Aria: Teste Mobili / Beam" parameter="Green" startValue="128"
+                  endValue="128" curve="Static" commandColor="ff15803d"/>
+    <ROLE_COMMAND roleName="Aria: Teste Mobili / Beam" parameter="Blue" startValue="61"
+                  endValue="61" curve="Static" commandColor="ff15803d"/>
+    <ROLE_COMMAND roleName="Terra: Controluce / Sotto-Batteria" parameter="Red"
+                  startValue="6" endValue="6" curve="Static" commandColor="ff064e3b"/>
+    <ROLE_COMMAND roleName="Terra: Controluce / Sotto-Batteria" parameter="Green"
+                  startValue="78" endValue="78" curve="Static" commandColor="ff064e3b"/>
+    <ROLE_COMMAND roleName="Terra: Controluce / Sotto-Batteria" parameter="Blue"
+                  startValue="59" endValue="59" curve="Static" commandColor="ff064e3b"/>
+    <ROLE_COMMAND roleName="Terra: Par / Barre Laterali (Taglio)" parameter="Red"
+                  startValue="6" endValue="6" curve="Static" commandColor="ff064e3b"/>
+    <ROLE_COMMAND roleName="Terra: Par / Barre Laterali (Taglio)" parameter="Green"
+                  startValue="78" endValue="78" curve="Static" commandColor="ff064e3b"/>
+    <ROLE_COMMAND roleName="Terra: Par / Barre Laterali (Taglio)" parameter="Blue"
+                  startValue="59" endValue="59" curve="Static" commandColor="ff064e3b"/>
+    <ROLE_COMMAND roleName="Terra: Teste Mobili a Terra" parameter="Red" startValue="6"
+                  endValue="6" curve="Static" commandColor="ff064e3b"/>
+    <ROLE_COMMAND roleName="Terra: Teste Mobili a Terra" parameter="Green" startValue="78"
+                  endValue="78" curve="Static" commandColor="ff064e3b"/>
+    <ROLE_COMMAND roleName="Terra: Teste Mobili a Terra" parameter="Blue" startValue="59"
+                  endValue="59" curve="Static" commandColor="ff064e3b"/>
+  </SCENE_PRESET>
+  <SCENE_PRESET presetName="[F] Split Rosso Sangue / Ambra Terra" sceneName="[F] Split Rosso Sangue / Ambra Terra"
+                presetPool="Color" layerType="Base" durationBeats="8.0" isOneShot="0"
+                phaseMode="Sync" targetRolesCsv="Aria: Wash Controluce (Fondale)|Aria: Par / Spot Frontali (Band)|Aria: Teste Mobili / Beam|Terra: Controluce / Sotto-Batteria|Terra: Par / Barre Laterali (Taglio)|Terra: Teste Mobili a Terra"
+                presetUseColor="1" presetUseDimmer="0" presetUseMove="0" presetUseStrobe="0"
+                presetColor1="ffdc2626" presetColor2="fff59e0b" presetDimmerMin="0"
+                presetDimmerMax="255" presetCurve="Static" presetStrobeUseHw="0"
+                presetStrobeSubdiv="1/8" presetMoveShape="Fixed" presetMoveSpeed="Sine_4Bars"
+                presetMoveAmpPan="0" presetMoveAmpTilt="0">
+    <ROLE_COMMAND roleName="Aria: Wash Controluce (Fondale)" parameter="Red" startValue="220"
+                  endValue="220" curve="Static" commandColor="ffdc2626"/>
+    <ROLE_COMMAND roleName="Aria: Wash Controluce (Fondale)" parameter="Green"
+                  startValue="38" endValue="38" curve="Static" commandColor="ffdc2626"/>
+    <ROLE_COMMAND roleName="Aria: Wash Controluce (Fondale)" parameter="Blue" startValue="38"
+                  endValue="38" curve="Static" commandColor="ffdc2626"/>
+    <ROLE_COMMAND roleName="Aria: Par / Spot Frontali (Band)" parameter="Red" startValue="220"
+                  endValue="220" curve="Static" commandColor="ffdc2626"/>
+    <ROLE_COMMAND roleName="Aria: Par / Spot Frontali (Band)" parameter="Green"
+                  startValue="38" endValue="38" curve="Static" commandColor="ffdc2626"/>
+    <ROLE_COMMAND roleName="Aria: Par / Spot Frontali (Band)" parameter="Blue"
+                  startValue="38" endValue="38" curve="Static" commandColor="ffdc2626"/>
+    <ROLE_COMMAND roleName="Aria: Teste Mobili / Beam" parameter="Red" startValue="220"
+                  endValue="220" curve="Static" commandColor="ffdc2626"/>
+    <ROLE_COMMAND roleName="Aria: Teste Mobili / Beam" parameter="Green" startValue="38"
+                  endValue="38" curve="Static" commandColor="ffdc2626"/>
+    <ROLE_COMMAND roleName="Aria: Teste Mobili / Beam" parameter="Blue" startValue="38"
+                  endValue="38" curve="Static" commandColor="ffdc2626"/>
+    <ROLE_COMMAND roleName="Terra: Controluce / Sotto-Batteria" parameter="Red"
+                  startValue="245" endValue="245" curve="Static" commandColor="fff59e0b"/>
+    <ROLE_COMMAND roleName="Terra: Controluce / Sotto-Batteria" parameter="Green"
+                  startValue="158" endValue="158" curve="Static" commandColor="fff59e0b"/>
+    <ROLE_COMMAND roleName="Terra: Controluce / Sotto-Batteria" parameter="Blue"
+                  startValue="11" endValue="11" curve="Static" commandColor="fff59e0b"/>
+    <ROLE_COMMAND roleName="Terra: Par / Barre Laterali (Taglio)" parameter="Red"
+                  startValue="245" endValue="245" curve="Static" commandColor="fff59e0b"/>
+    <ROLE_COMMAND roleName="Terra: Par / Barre Laterali (Taglio)" parameter="Green"
+                  startValue="158" endValue="158" curve="Static" commandColor="fff59e0b"/>
+    <ROLE_COMMAND roleName="Terra: Par / Barre Laterali (Taglio)" parameter="Blue"
+                  startValue="11" endValue="11" curve="Static" commandColor="fff59e0b"/>
+    <ROLE_COMMAND roleName="Terra: Teste Mobili a Terra" parameter="Red" startValue="245"
+                  endValue="245" curve="Static" commandColor="fff59e0b"/>
+    <ROLE_COMMAND roleName="Terra: Teste Mobili a Terra" parameter="Green" startValue="158"
+                  endValue="158" curve="Static" commandColor="fff59e0b"/>
+    <ROLE_COMMAND roleName="Terra: Teste Mobili a Terra" parameter="Blue" startValue="11"
+                  endValue="11" curve="Static" commandColor="fff59e0b"/>
+  </SCENE_PRESET>
+  <SCENE_PRESET presetName="[F] Split Blu Ghiaccio / Ambra Calda" sceneName="[F] Split Blu Ghiaccio / Ambra Calda"
+                presetPool="Color" layerType="Base" durationBeats="8.0" isOneShot="0"
+                phaseMode="Sync" targetRolesCsv="Aria: Wash Controluce (Fondale)|Aria: Par / Spot Frontali (Band)|Aria: Teste Mobili / Beam|Terra: Controluce / Sotto-Batteria|Terra: Par / Barre Laterali (Taglio)|Terra: Teste Mobili a Terra"
+                presetUseColor="1" presetUseDimmer="0" presetUseMove="0" presetUseStrobe="0"
+                presetColor1="ff0284c7" presetColor2="ffd97706" presetDimmerMin="0"
+                presetDimmerMax="255" presetCurve="Static" presetStrobeUseHw="0"
+                presetStrobeSubdiv="1/8" presetMoveShape="Fixed" presetMoveSpeed="Sine_4Bars"
+                presetMoveAmpPan="0" presetMoveAmpTilt="0">
+    <ROLE_COMMAND roleName="Aria: Wash Controluce (Fondale)" parameter="Red" startValue="2"
+                  endValue="2" curve="Static" commandColor="ff0284c7"/>
+    <ROLE_COMMAND roleName="Aria: Wash Controluce (Fondale)" parameter="Green"
+                  startValue="132" endValue="132" curve="Static" commandColor="ff0284c7"/>
+    <ROLE_COMMAND roleName="Aria: Wash Controluce (Fondale)" parameter="Blue" startValue="199"
+                  endValue="199" curve="Static" commandColor="ff0284c7"/>
+    <ROLE_COMMAND roleName="Aria: Par / Spot Frontali (Band)" parameter="Red" startValue="2"
+                  endValue="2" curve="Static" commandColor="ff0284c7"/>
+    <ROLE_COMMAND roleName="Aria: Par / Spot Frontali (Band)" parameter="Green"
+                  startValue="132" endValue="132" curve="Static" commandColor="ff0284c7"/>
+    <ROLE_COMMAND roleName="Aria: Par / Spot Frontali (Band)" parameter="Blue"
+                  startValue="199" endValue="199" curve="Static" commandColor="ff0284c7"/>
+    <ROLE_COMMAND roleName="Aria: Teste Mobili / Beam" parameter="Red" startValue="2"
+                  endValue="2" curve="Static" commandColor="ff0284c7"/>
+    <ROLE_COMMAND roleName="Aria: Teste Mobili / Beam" parameter="Green" startValue="132"
+                  endValue="132" curve="Static" commandColor="ff0284c7"/>
+    <ROLE_COMMAND roleName="Aria: Teste Mobili / Beam" parameter="Blue" startValue="199"
+                  endValue="199" curve="Static" commandColor="ff0284c7"/>
+    <ROLE_COMMAND roleName="Terra: Controluce / Sotto-Batteria" parameter="Red"
+                  startValue="217" endValue="217" curve="Static" commandColor="ffd97706"/>
+    <ROLE_COMMAND roleName="Terra: Controluce / Sotto-Batteria" parameter="Green"
+                  startValue="119" endValue="119" curve="Static" commandColor="ffd97706"/>
+    <ROLE_COMMAND roleName="Terra: Controluce / Sotto-Batteria" parameter="Blue"
+                  startValue="6" endValue="6" curve="Static" commandColor="ffd97706"/>
+    <ROLE_COMMAND roleName="Terra: Par / Barre Laterali (Taglio)" parameter="Red"
+                  startValue="217" endValue="217" curve="Static" commandColor="ffd97706"/>
+    <ROLE_COMMAND roleName="Terra: Par / Barre Laterali (Taglio)" parameter="Green"
+                  startValue="119" endValue="119" curve="Static" commandColor="ffd97706"/>
+    <ROLE_COMMAND roleName="Terra: Par / Barre Laterali (Taglio)" parameter="Blue"
+                  startValue="6" endValue="6" curve="Static" commandColor="ffd97706"/>
+    <ROLE_COMMAND roleName="Terra: Teste Mobili a Terra" parameter="Red" startValue="217"
+                  endValue="217" curve="Static" commandColor="ffd97706"/>
+    <ROLE_COMMAND roleName="Terra: Teste Mobili a Terra" parameter="Green" startValue="119"
+                  endValue="119" curve="Static" commandColor="ffd97706"/>
+    <ROLE_COMMAND roleName="Terra: Teste Mobili a Terra" parameter="Blue" startValue="6"
+                  endValue="6" curve="Static" commandColor="ffd97706"/>
+  </SCENE_PRESET>
+  <SCENE_PRESET presetName="[F] Split Viola / Ciano" sceneName="[F] Split Viola / Ciano"
+                presetPool="Color" layerType="Base" durationBeats="8.0" isOneShot="0"
+                phaseMode="Sync" targetRolesCsv="Aria: Wash Controluce (Fondale)|Aria: Par / Spot Frontali (Band)|Aria: Teste Mobili / Beam|Terra: Controluce / Sotto-Batteria|Terra: Par / Barre Laterali (Taglio)|Terra: Teste Mobili a Terra"
+                presetUseColor="1" presetUseDimmer="0" presetUseMove="0" presetUseStrobe="0"
+                presetColor1="ff7e22ce" presetColor2="ff06b6d4" presetDimmerMin="0"
+                presetDimmerMax="255" presetCurve="Static" presetStrobeUseHw="0"
+                presetStrobeSubdiv="1/8" presetMoveShape="Fixed" presetMoveSpeed="Sine_4Bars"
+                presetMoveAmpPan="0" presetMoveAmpTilt="0">
+    <ROLE_COMMAND roleName="Aria: Wash Controluce (Fondale)" parameter="Red" startValue="126"
+                  endValue="126" curve="Static" commandColor="ff7e22ce"/>
+    <ROLE_COMMAND roleName="Aria: Wash Controluce (Fondale)" parameter="Green"
+                  startValue="34" endValue="34" curve="Static" commandColor="ff7e22ce"/>
+    <ROLE_COMMAND roleName="Aria: Wash Controluce (Fondale)" parameter="Blue" startValue="206"
+                  endValue="206" curve="Static" commandColor="ff7e22ce"/>
+    <ROLE_COMMAND roleName="Aria: Par / Spot Frontali (Band)" parameter="Red" startValue="126"
+                  endValue="126" curve="Static" commandColor="ff7e22ce"/>
+    <ROLE_COMMAND roleName="Aria: Par / Spot Frontali (Band)" parameter="Green"
+                  startValue="34" endValue="34" curve="Static" commandColor="ff7e22ce"/>
+    <ROLE_COMMAND roleName="Aria: Par / Spot Frontali (Band)" parameter="Blue"
+                  startValue="206" endValue="206" curve="Static" commandColor="ff7e22ce"/>
+    <ROLE_COMMAND roleName="Aria: Teste Mobili / Beam" parameter="Red" startValue="126"
+                  endValue="126" curve="Static" commandColor="ff7e22ce"/>
+    <ROLE_COMMAND roleName="Aria: Teste Mobili / Beam" parameter="Green" startValue="34"
+                  endValue="34" curve="Static" commandColor="ff7e22ce"/>
+    <ROLE_COMMAND roleName="Aria: Teste Mobili / Beam" parameter="Blue" startValue="206"
+                  endValue="206" curve="Static" commandColor="ff7e22ce"/>
+    <ROLE_COMMAND roleName="Terra: Controluce / Sotto-Batteria" parameter="Red"
+                  startValue="6" endValue="6" curve="Static" commandColor="ff06b6d4"/>
+    <ROLE_COMMAND roleName="Terra: Controluce / Sotto-Batteria" parameter="Green"
+                  startValue="182" endValue="182" curve="Static" commandColor="ff06b6d4"/>
+    <ROLE_COMMAND roleName="Terra: Controluce / Sotto-Batteria" parameter="Blue"
+                  startValue="212" endValue="212" curve="Static" commandColor="ff06b6d4"/>
+    <ROLE_COMMAND roleName="Terra: Par / Barre Laterali (Taglio)" parameter="Red"
+                  startValue="6" endValue="6" curve="Static" commandColor="ff06b6d4"/>
+    <ROLE_COMMAND roleName="Terra: Par / Barre Laterali (Taglio)" parameter="Green"
+                  startValue="182" endValue="182" curve="Static" commandColor="ff06b6d4"/>
+    <ROLE_COMMAND roleName="Terra: Par / Barre Laterali (Taglio)" parameter="Blue"
+                  startValue="212" endValue="212" curve="Static" commandColor="ff06b6d4"/>
+    <ROLE_COMMAND roleName="Terra: Teste Mobili a Terra" parameter="Red" startValue="6"
+                  endValue="6" curve="Static" commandColor="ff06b6d4"/>
+    <ROLE_COMMAND roleName="Terra: Teste Mobili a Terra" parameter="Green" startValue="182"
+                  endValue="182" curve="Static" commandColor="ff06b6d4"/>
+    <ROLE_COMMAND roleName="Terra: Teste Mobili a Terra" parameter="Blue" startValue="212"
+                  endValue="212" curve="Static" commandColor="ff06b6d4"/>
+  </SCENE_PRESET>
+  <SCENE_PRESET presetName="[F] Split Rosso / Bianco Taglio" sceneName="[F] Split Rosso / Bianco Taglio"
+                presetPool="Color" layerType="Base" durationBeats="8.0" isOneShot="0"
+                phaseMode="Sync" targetRolesCsv="Aria: Wash Controluce (Fondale)|Aria: Par / Spot Frontali (Band)|Aria: Teste Mobili / Beam|Terra: Controluce / Sotto-Batteria|Terra: Par / Barre Laterali (Taglio)|Terra: Teste Mobili a Terra"
+                presetUseColor="1" presetUseDimmer="0" presetUseMove="0" presetUseStrobe="0"
+                presetColor1="ff991b1b" presetColor2="ffffffff" presetDimmerMin="0"
+                presetDimmerMax="255" presetCurve="Static" presetStrobeUseHw="0"
+                presetStrobeSubdiv="1/8" presetMoveShape="Fixed" presetMoveSpeed="Sine_4Bars"
+                presetMoveAmpPan="0" presetMoveAmpTilt="0">
+    <ROLE_COMMAND roleName="Aria: Wash Controluce (Fondale)" parameter="Red" startValue="153"
+                  endValue="153" curve="Static" commandColor="ff991b1b"/>
+    <ROLE_COMMAND roleName="Aria: Wash Controluce (Fondale)" parameter="Green"
+                  startValue="27" endValue="27" curve="Static" commandColor="ff991b1b"/>
+    <ROLE_COMMAND roleName="Aria: Wash Controluce (Fondale)" parameter="Blue" startValue="27"
+                  endValue="27" curve="Static" commandColor="ff991b1b"/>
+    <ROLE_COMMAND roleName="Aria: Par / Spot Frontali (Band)" parameter="Red" startValue="153"
+                  endValue="153" curve="Static" commandColor="ff991b1b"/>
+    <ROLE_COMMAND roleName="Aria: Par / Spot Frontali (Band)" parameter="Green"
+                  startValue="27" endValue="27" curve="Static" commandColor="ff991b1b"/>
+    <ROLE_COMMAND roleName="Aria: Par / Spot Frontali (Band)" parameter="Blue"
+                  startValue="27" endValue="27" curve="Static" commandColor="ff991b1b"/>
+    <ROLE_COMMAND roleName="Aria: Teste Mobili / Beam" parameter="Red" startValue="153"
+                  endValue="153" curve="Static" commandColor="ff991b1b"/>
+    <ROLE_COMMAND roleName="Aria: Teste Mobili / Beam" parameter="Green" startValue="27"
+                  endValue="27" curve="Static" commandColor="ff991b1b"/>
+    <ROLE_COMMAND roleName="Aria: Teste Mobili / Beam" parameter="Blue" startValue="27"
+                  endValue="27" curve="Static" commandColor="ff991b1b"/>
+    <ROLE_COMMAND roleName="Terra: Controluce / Sotto-Batteria" parameter="Red"
+                  startValue="255" endValue="255" curve="Static" commandColor="ffffffff"/>
+    <ROLE_COMMAND roleName="Terra: Controluce / Sotto-Batteria" parameter="Green"
+                  startValue="255" endValue="255" curve="Static" commandColor="ffffffff"/>
+    <ROLE_COMMAND roleName="Terra: Controluce / Sotto-Batteria" parameter="Blue"
+                  startValue="255" endValue="255" curve="Static" commandColor="ffffffff"/>
+    <ROLE_COMMAND roleName="Terra: Par / Barre Laterali (Taglio)" parameter="Red"
+                  startValue="255" endValue="255" curve="Static" commandColor="ffffffff"/>
+    <ROLE_COMMAND roleName="Terra: Par / Barre Laterali (Taglio)" parameter="Green"
+                  startValue="255" endValue="255" curve="Static" commandColor="ffffffff"/>
+    <ROLE_COMMAND roleName="Terra: Par / Barre Laterali (Taglio)" parameter="Blue"
+                  startValue="255" endValue="255" curve="Static" commandColor="ffffffff"/>
+    <ROLE_COMMAND roleName="Terra: Teste Mobili a Terra" parameter="Red" startValue="255"
+                  endValue="255" curve="Static" commandColor="ffffffff"/>
+    <ROLE_COMMAND roleName="Terra: Teste Mobili a Terra" parameter="Green" startValue="255"
+                  endValue="255" curve="Static" commandColor="ffffffff"/>
+    <ROLE_COMMAND roleName="Terra: Teste Mobili a Terra" parameter="Blue" startValue="255"
+                  endValue="255" curve="Static" commandColor="ffffffff"/>
+  </SCENE_PRESET>
+  <SCENE_PRESET presetName="[F] Dimmer: Full On 100% (Full Rig)" sceneName="[F] Dimmer: Full On 100% (Full Rig)"
+                presetPool="Dimmer" layerType="Base" durationBeats="8.0" isOneShot="0"
+                phaseMode="Sync" targetRolesCsv="Aria: Wash Controluce (Fondale)|Aria: Par / Spot Frontali (Band)|Aria: Teste Mobili / Beam|Terra: Controluce / Sotto-Batteria|Terra: Par / Barre Laterali (Taglio)|Terra: Teste Mobili a Terra"
+                presetUseColor="0" presetUseDimmer="1" presetUseMove="0" presetUseStrobe="0"
+                presetColor1="ffffffff" presetColor2="ffffffff" presetDimmerMin="255"
+                presetDimmerMax="255" presetCurve="Static" presetStrobeUseHw="0"
+                presetStrobeSubdiv="1/8" presetMoveShape="Fixed" presetMoveSpeed="Sine_4Bars"
+                presetMoveAmpPan="0" presetMoveAmpTilt="0">
+    <ROLE_COMMAND roleName="Aria: Wash Controluce (Fondale)" parameter="Dimmer"
+                  startValue="255" endValue="255" curve="Static" commandColor="ffffffff"/>
+    <ROLE_COMMAND roleName="Aria: Par / Spot Frontali (Band)" parameter="Dimmer"
+                  startValue="255" endValue="255" curve="Static" commandColor="ffffffff"/>
+    <ROLE_COMMAND roleName="Aria: Teste Mobili / Beam" parameter="Dimmer" startValue="255"
+                  endValue="255" curve="Static" commandColor="ffffffff"/>
+    <ROLE_COMMAND roleName="Terra: Controluce / Sotto-Batteria" parameter="Dimmer"
+                  startValue="255" endValue="255" curve="Static" commandColor="ffffffff"/>
+    <ROLE_COMMAND roleName="Terra: Par / Barre Laterali (Taglio)" parameter="Dimmer"
+                  startValue="255" endValue="255" curve="Static" commandColor="ffffffff"/>
+    <ROLE_COMMAND roleName="Terra: Teste Mobili a Terra" parameter="Dimmer" startValue="255"
+                  endValue="255" curve="Static" commandColor="ffffffff"/>
+  </SCENE_PRESET>
+  <SCENE_PRESET presetName="[F] Dimmer: Atmosfera 45% (Soft)" sceneName="[F] Dimmer: Atmosfera 45% (Soft)"
+                presetPool="Dimmer" layerType="Base" durationBeats="8.0" isOneShot="0"
+                phaseMode="Sync" targetRolesCsv="Aria: Wash Controluce (Fondale)|Aria: Par / Spot Frontali (Band)|Aria: Teste Mobili / Beam|Terra: Controluce / Sotto-Batteria|Terra: Par / Barre Laterali (Taglio)|Terra: Teste Mobili a Terra"
+                presetUseColor="0" presetUseDimmer="1" presetUseMove="0" presetUseStrobe="0"
+                presetColor1="ff94a3b8" presetColor2="ff94a3b8" presetDimmerMin="115"
+                presetDimmerMax="115" presetCurve="Static" presetStrobeUseHw="0"
+                presetStrobeSubdiv="1/8" presetMoveShape="Fixed" presetMoveSpeed="Sine_4Bars"
+                presetMoveAmpPan="0" presetMoveAmpTilt="0">
+    <ROLE_COMMAND roleName="Aria: Wash Controluce (Fondale)" parameter="Dimmer"
+                  startValue="115" endValue="115" curve="Static" commandColor="ff94a3b8"/>
+    <ROLE_COMMAND roleName="Aria: Par / Spot Frontali (Band)" parameter="Dimmer"
+                  startValue="115" endValue="115" curve="Static" commandColor="ff94a3b8"/>
+    <ROLE_COMMAND roleName="Aria: Teste Mobili / Beam" parameter="Dimmer" startValue="115"
+                  endValue="115" curve="Static" commandColor="ff94a3b8"/>
+    <ROLE_COMMAND roleName="Terra: Controluce / Sotto-Batteria" parameter="Dimmer"
+                  startValue="115" endValue="115" curve="Static" commandColor="ff94a3b8"/>
+    <ROLE_COMMAND roleName="Terra: Par / Barre Laterali (Taglio)" parameter="Dimmer"
+                  startValue="115" endValue="115" curve="Static" commandColor="ff94a3b8"/>
+    <ROLE_COMMAND roleName="Terra: Teste Mobili a Terra" parameter="Dimmer" startValue="115"
+                  endValue="115" curve="Static" commandColor="ff94a3b8"/>
+  </SCENE_PRESET>
+  <SCENE_PRESET presetName="[F] Dimmer: Solo Controluce Silhouette" sceneName="[F] Dimmer: Solo Controluce Silhouette"
+                presetPool="Dimmer" layerType="Base" durationBeats="8.0" isOneShot="0"
+                phaseMode="Sync" targetRolesCsv="Aria: Wash Controluce (Fondale)|Terra: Controluce / Sotto-Batteria|Terra: Par / Barre Laterali (Taglio)"
+                presetUseColor="0" presetUseDimmer="1" presetUseMove="0" presetUseStrobe="0"
+                presetColor1="ff38bdf8" presetColor2="ff38bdf8" presetDimmerMin="230"
+                presetDimmerMax="230" presetCurve="Static" presetStrobeUseHw="0"
+                presetStrobeSubdiv="1/8" presetMoveShape="Fixed" presetMoveSpeed="Sine_4Bars"
+                presetMoveAmpPan="0" presetMoveAmpTilt="0">
+    <ROLE_COMMAND roleName="Aria: Wash Controluce (Fondale)" parameter="Dimmer"
+                  startValue="230" endValue="230" curve="Static" commandColor="ff38bdf8"/>
+    <ROLE_COMMAND roleName="Terra: Controluce / Sotto-Batteria" parameter="Dimmer"
+                  startValue="230" endValue="230" curve="Static" commandColor="ff38bdf8"/>
+    <ROLE_COMMAND roleName="Terra: Par / Barre Laterali (Taglio)" parameter="Dimmer"
+                  startValue="230" endValue="230" curve="Static" commandColor="ff38bdf8"/>
+  </SCENE_PRESET>
+  <SCENE_PRESET presetName="[F] Dimmer: Blackout Totale (0%)" sceneName="[F] Dimmer: Blackout Totale (0%)"
+                presetPool="Dimmer" layerType="Base" durationBeats="4.0" isOneShot="0"
+                phaseMode="Sync" targetRolesCsv="Aria: Wash Controluce (Fondale)|Aria: Par / Spot Frontali (Band)|Aria: Teste Mobili / Beam|Terra: Controluce / Sotto-Batteria|Terra: Par / Barre Laterali (Taglio)|Terra: Teste Mobili a Terra"
+                presetUseColor="0" presetUseDimmer="1" presetUseMove="0" presetUseStrobe="0"
+                presetColor1="ff1e293b" presetColor2="ff1e293b" presetDimmerMin="0"
+                presetDimmerMax="0" presetCurve="Static" presetStrobeUseHw="0"
+                presetStrobeSubdiv="1/8" presetMoveShape="Fixed" presetMoveSpeed="Sine_4Bars"
+                presetMoveAmpPan="0" presetMoveAmpTilt="0">
+    <ROLE_COMMAND roleName="Aria: Wash Controluce (Fondale)" parameter="Dimmer"
+                  startValue="0" endValue="0" curve="Static" commandColor="ff1e293b"/>
+    <ROLE_COMMAND roleName="Aria: Par / Spot Frontali (Band)" parameter="Dimmer"
+                  startValue="0" endValue="0" curve="Static" commandColor="ff1e293b"/>
+    <ROLE_COMMAND roleName="Aria: Teste Mobili / Beam" parameter="Dimmer" startValue="0"
+                  endValue="0" curve="Static" commandColor="ff1e293b"/>
+    <ROLE_COMMAND roleName="Terra: Controluce / Sotto-Batteria" parameter="Dimmer"
+                  startValue="0" endValue="0" curve="Static" commandColor="ff1e293b"/>
+    <ROLE_COMMAND roleName="Terra: Par / Barre Laterali (Taglio)" parameter="Dimmer"
+                  startValue="0" endValue="0" curve="Static" commandColor="ff1e293b"/>
+    <ROLE_COMMAND roleName="Terra: Teste Mobili a Terra" parameter="Dimmer" startValue="0"
+                  endValue="0" curve="Static" commandColor="ff1e293b"/>
+  </SCENE_PRESET>
+  <SCENE_PRESET presetName="[F] Fade In Lento (16 Q)" sceneName="[F] Fade In Lento (16 Q)"
+                presetPool="Dimmer" layerType="Base" durationBeats="16.0" isOneShot="1"
+                phaseMode="Sync" targetRolesCsv="Aria: Wash Controluce (Fondale)|Aria: Par / Spot Frontali (Band)|Aria: Teste Mobili / Beam|Terra: Controluce / Sotto-Batteria|Terra: Par / Barre Laterali (Taglio)|Terra: Teste Mobili a Terra"
+                presetUseColor="0" presetUseDimmer="1" presetUseMove="0" presetUseStrobe="0"
+                presetColor1="ffffffff" presetColor2="ffffffff" presetDimmerMin="0"
+                presetDimmerMax="255" presetCurve="Linear" presetStrobeUseHw="0"
+                presetStrobeSubdiv="1/8" presetMoveShape="Fixed" presetMoveSpeed="Sine_4Bars"
+                presetMoveAmpPan="0" presetMoveAmpTilt="0">
+    <ROLE_COMMAND roleName="Aria: Wash Controluce (Fondale)" parameter="Dimmer"
+                  startValue="0" endValue="255" curve="Linear" commandColor="ffffffff"/>
+    <ROLE_COMMAND roleName="Aria: Par / Spot Frontali (Band)" parameter="Dimmer"
+                  startValue="0" endValue="255" curve="Linear" commandColor="ffffffff"/>
+    <ROLE_COMMAND roleName="Aria: Teste Mobili / Beam" parameter="Dimmer" startValue="0"
+                  endValue="255" curve="Linear" commandColor="ffffffff"/>
+    <ROLE_COMMAND roleName="Terra: Controluce / Sotto-Batteria" parameter="Dimmer"
+                  startValue="0" endValue="255" curve="Linear" commandColor="ffffffff"/>
+    <ROLE_COMMAND roleName="Terra: Par / Barre Laterali (Taglio)" parameter="Dimmer"
+                  startValue="0" endValue="255" curve="Linear" commandColor="ffffffff"/>
+    <ROLE_COMMAND roleName="Terra: Teste Mobili a Terra" parameter="Dimmer" startValue="0"
+                  endValue="255" curve="Linear" commandColor="ffffffff"/>
+  </SCENE_PRESET>
+  <SCENE_PRESET presetName="[F] Fade Out Lento (16 Q)" sceneName="[F] Fade Out Lento (16 Q)"
+                presetPool="Dimmer" layerType="Base" durationBeats="16.0" isOneShot="1"
+                phaseMode="Sync" targetRolesCsv="Aria: Wash Controluce (Fondale)|Aria: Par / Spot Frontali (Band)|Aria: Teste Mobili / Beam|Terra: Controluce / Sotto-Batteria|Terra: Par / Barre Laterali (Taglio)|Terra: Teste Mobili a Terra"
+                presetUseColor="0" presetUseDimmer="1" presetUseMove="0" presetUseStrobe="0"
+                presetColor1="ffffffff" presetColor2="ffffffff" presetDimmerMin="0"
+                presetDimmerMax="255" presetCurve="Decay" presetStrobeUseHw="0"
+                presetStrobeSubdiv="1/8" presetMoveShape="Fixed" presetMoveSpeed="Sine_4Bars"
+                presetMoveAmpPan="0" presetMoveAmpTilt="0">
+    <ROLE_COMMAND roleName="Aria: Wash Controluce (Fondale)" parameter="Dimmer"
+                  startValue="255" endValue="0" curve="Decay" commandColor="ffffffff"/>
+    <ROLE_COMMAND roleName="Aria: Par / Spot Frontali (Band)" parameter="Dimmer"
+                  startValue="255" endValue="0" curve="Decay" commandColor="ffffffff"/>
+    <ROLE_COMMAND roleName="Aria: Teste Mobili / Beam" parameter="Dimmer" startValue="255"
+                  endValue="0" curve="Decay" commandColor="ffffffff"/>
+    <ROLE_COMMAND roleName="Terra: Controluce / Sotto-Batteria" parameter="Dimmer"
+                  startValue="255" endValue="0" curve="Decay" commandColor="ffffffff"/>
+    <ROLE_COMMAND roleName="Terra: Par / Barre Laterali (Taglio)" parameter="Dimmer"
+                  startValue="255" endValue="0" curve="Decay" commandColor="ffffffff"/>
+    <ROLE_COMMAND roleName="Terra: Teste Mobili a Terra" parameter="Dimmer" startValue="255"
+                  endValue="0" curve="Decay" commandColor="ffffffff"/>
+  </SCENE_PRESET>
+  <SCENE_PRESET presetName="[F] Crescendo Build-Up (8 Q)" sceneName="[F] Crescendo Build-Up (8 Q)"
+                presetPool="Dimmer" layerType="Base" durationBeats="8.0" isOneShot="1"
+                phaseMode="Sync" targetRolesCsv="Aria: Wash Controluce (Fondale)|Aria: Par / Spot Frontali (Band)|Aria: Teste Mobili / Beam|Terra: Controluce / Sotto-Batteria|Terra: Par / Barre Laterali (Taglio)|Terra: Teste Mobili a Terra"
+                presetUseColor="0" presetUseDimmer="1" presetUseMove="0" presetUseStrobe="0"
+                presetColor1="fff59e0b" presetColor2="fff59e0b" presetDimmerMin="15"
+                presetDimmerMax="255" presetCurve="Linear" presetStrobeUseHw="0"
+                presetStrobeSubdiv="1/8" presetMoveShape="Fixed" presetMoveSpeed="Sine_4Bars"
+                presetMoveAmpPan="0" presetMoveAmpTilt="0">
+    <ROLE_COMMAND roleName="Aria: Wash Controluce (Fondale)" parameter="Dimmer"
+                  startValue="15" endValue="255" curve="Linear" commandColor="fff59e0b"/>
+    <ROLE_COMMAND roleName="Aria: Par / Spot Frontali (Band)" parameter="Dimmer"
+                  startValue="15" endValue="255" curve="Linear" commandColor="fff59e0b"/>
+    <ROLE_COMMAND roleName="Aria: Teste Mobili / Beam" parameter="Dimmer" startValue="15"
+                  endValue="255" curve="Linear" commandColor="fff59e0b"/>
+    <ROLE_COMMAND roleName="Terra: Controluce / Sotto-Batteria" parameter="Dimmer"
+                  startValue="15" endValue="255" curve="Linear" commandColor="fff59e0b"/>
+    <ROLE_COMMAND roleName="Terra: Par / Barre Laterali (Taglio)" parameter="Dimmer"
+                  startValue="15" endValue="255" curve="Linear" commandColor="fff59e0b"/>
+    <ROLE_COMMAND roleName="Terra: Teste Mobili a Terra" parameter="Dimmer" startValue="15"
+                  endValue="255" curve="Linear" commandColor="fff59e0b"/>
+  </SCENE_PRESET>
+  <SCENE_PRESET presetName="[F] Pulsazione Media (2 Bars / 8 Q)" sceneName="[F] Pulsazione Media (2 Bars / 8 Q)"
+                presetPool="Dimmer" layerType="Base" durationBeats="8.0" isOneShot="0"
+                phaseMode="Sync" targetRolesCsv="Aria: Wash Controluce (Fondale)|Aria: Par / Spot Frontali (Band)|Aria: Teste Mobili / Beam|Terra: Controluce / Sotto-Batteria|Terra: Par / Barre Laterali (Taglio)|Terra: Teste Mobili a Terra"
+                presetUseColor="0" presetUseDimmer="1" presetUseMove="0" presetUseStrobe="0"
+                presetColor1="ff38bdf8" presetColor2="ff1d4ed8" presetDimmerMin="25"
+                presetDimmerMax="255" presetCurve="Sine_2Bars" presetStrobeUseHw="0"
+                presetStrobeSubdiv="1/8" presetMoveShape="Fixed" presetMoveSpeed="Sine_2Bars"
+                presetMoveAmpPan="0" presetMoveAmpTilt="0">
+    <ROLE_COMMAND roleName="Aria: Wash Controluce (Fondale)" parameter="Dimmer"
+                  startValue="25" endValue="255" curve="Sine_2Bars" commandColor="ff38bdf8"/>
+    <ROLE_COMMAND roleName="Aria: Par / Spot Frontali (Band)" parameter="Dimmer"
+                  startValue="25" endValue="255" curve="Sine_2Bars" commandColor="ff38bdf8"/>
+    <ROLE_COMMAND roleName="Aria: Teste Mobili / Beam" parameter="Dimmer" startValue="25"
+                  endValue="255" curve="Sine_2Bars" commandColor="ff38bdf8"/>
+    <ROLE_COMMAND roleName="Terra: Controluce / Sotto-Batteria" parameter="Dimmer"
+                  startValue="25" endValue="255" curve="Sine_2Bars" commandColor="ff1d4ed8"/>
+    <ROLE_COMMAND roleName="Terra: Par / Barre Laterali (Taglio)" parameter="Dimmer"
+                  startValue="25" endValue="255" curve="Sine_2Bars" commandColor="ff1d4ed8"/>
+    <ROLE_COMMAND roleName="Terra: Teste Mobili a Terra" parameter="Dimmer" startValue="25"
+                  endValue="255" curve="Sine_2Bars" commandColor="ff1d4ed8"/>
+  </SCENE_PRESET>
+  <SCENE_PRESET presetName="[F] Onda Dimmer SX -&gt; DX (2 Bars)" sceneName="[F] Onda Dimmer SX -&gt; DX (2 Bars)"
+                presetPool="Dimmer" layerType="Base" durationBeats="8.0" isOneShot="0"
+                phaseMode="LeftToRight" targetRolesCsv="Aria: Wash Controluce (Fondale)|Aria: Par / Spot Frontali (Band)|Aria: Teste Mobili / Beam|Terra: Controluce / Sotto-Batteria|Terra: Par / Barre Laterali (Taglio)|Terra: Teste Mobili a Terra"
+                presetUseColor="0" presetUseDimmer="1" presetUseMove="0" presetUseStrobe="0"
+                presetColor1="ff38bdf8" presetColor2="ff38bdf8" presetDimmerMin="0"
+                presetDimmerMax="255" presetCurve="Sine_2Bars" presetStrobeUseHw="0"
+                presetStrobeSubdiv="1/8" presetMoveShape="Fixed" presetMoveSpeed="Sine_2Bars"
+                presetMoveAmpPan="0" presetMoveAmpTilt="0">
+    <ROLE_COMMAND roleName="Aria: Wash Controluce (Fondale)" parameter="Dimmer"
+                  startValue="0" endValue="255" curve="Sine_2Bars" commandColor="ff38bdf8"/>
+    <ROLE_COMMAND roleName="Aria: Par / Spot Frontali (Band)" parameter="Dimmer"
+                  startValue="0" endValue="255" curve="Sine_2Bars" commandColor="ff38bdf8"/>
+    <ROLE_COMMAND roleName="Aria: Teste Mobili / Beam" parameter="Dimmer" startValue="0"
+                  endValue="255" curve="Sine_2Bars" commandColor="ff38bdf8"/>
+    <ROLE_COMMAND roleName="Terra: Controluce / Sotto-Batteria" parameter="Dimmer"
+                  startValue="0" endValue="255" curve="Sine_2Bars" commandColor="ff38bdf8"/>
+    <ROLE_COMMAND roleName="Terra: Par / Barre Laterali (Taglio)" parameter="Dimmer"
+                  startValue="0" endValue="255" curve="Sine_2Bars" commandColor="ff38bdf8"/>
+    <ROLE_COMMAND roleName="Terra: Teste Mobili a Terra" parameter="Dimmer" startValue="0"
+                  endValue="255" curve="Sine_2Bars" commandColor="ff38bdf8"/>
+  </SCENE_PRESET>
+  <SCENE_PRESET presetName="[F] Posizione Home (Centro Fisso)" sceneName="[F] Posizione Home (Centro Fisso)"
+                presetPool="Movement" layerType="Movement" durationBeats="4.0"
+                isOneShot="0" phaseMode="Sync" targetRolesCsv="Aria: Teste Mobili / Beam|Terra: Teste Mobili a Terra"
+                presetUseColor="0" presetUseDimmer="0" presetUseMove="1" presetUseStrobe="0"
+                presetColor1="ff38bdf8" presetColor2="ff38bdf8" presetDimmerMin="0"
+                presetDimmerMax="255" presetCurve="Static" presetStrobeUseHw="0"
+                presetStrobeSubdiv="1/8" presetMoveShape="Fixed" presetMoveSpeed="Sine_4Bars"
+                presetMoveAmpPan="0" presetMoveAmpTilt="0">
+    <ROLE_COMMAND roleName="Aria: Teste Mobili / Beam" parameter="Pan" startValue="128"
+                  endValue="128" curve="Static" commandColor="ff38bdf8"/>
+    <ROLE_COMMAND roleName="Aria: Teste Mobili / Beam" parameter="Tilt" startValue="128"
+                  endValue="128" curve="Static" commandColor="ff38bdf8"/>
+    <ROLE_COMMAND roleName="Terra: Teste Mobili a Terra" parameter="Pan" startValue="128"
+                  endValue="128" curve="Static" commandColor="ff38bdf8"/>
+    <ROLE_COMMAND roleName="Terra: Teste Mobili a Terra" parameter="Tilt" startValue="128"
+                  endValue="128" curve="Static" commandColor="ff38bdf8"/>
+  </SCENE_PRESET>
+  <SCENE_PRESET presetName="[F] Sweep Pan Veloce Sync (1 Bar)" sceneName="[F] Sweep Pan Veloce Sync (1 Bar)"
+                presetPool="Movement" layerType="Movement" durationBeats="4.0"
+                isOneShot="0" phaseMode="Sync" targetRolesCsv="Aria: Teste Mobili / Beam|Terra: Teste Mobili a Terra"
+                presetUseColor="0" presetUseDimmer="0" presetUseMove="1" presetUseStrobe="0"
+                presetColor1="ff38bdf8" presetColor2="ff38bdf8" presetDimmerMin="0"
+                presetDimmerMax="255" presetCurve="Static" presetStrobeUseHw="0"
+                presetStrobeSubdiv="1/8" presetMoveShape="PanSweep" presetMoveSpeed="Sine_1Bar"
+                presetMoveAmpPan="70" presetMoveAmpTilt="0">
+    <ROLE_COMMAND roleName="Aria: Teste Mobili / Beam" parameter="Pan" startValue="39"
+                  endValue="217" curve="Sine_1Bar" commandColor="ff38bdf8"/>
+    <ROLE_COMMAND roleName="Aria: Teste Mobili / Beam" parameter="Tilt" startValue="128"
+                  endValue="128" curve="Static" commandColor="ff38bdf8"/>
+    <ROLE_COMMAND roleName="Terra: Teste Mobili a Terra" parameter="Pan" startValue="39"
+                  endValue="217" curve="Sine_1Bar" commandColor="ff38bdf8"/>
+    <ROLE_COMMAND roleName="Terra: Teste Mobili a Terra" parameter="Tilt" startValue="128"
+                  endValue="128" curve="Static" commandColor="ff38bdf8"/>
+  </SCENE_PRESET>
+  <SCENE_PRESET presetName="[F] Tilt Wave Verticale (2 Bars)" sceneName="[F] Tilt Wave Verticale (2 Bars)"
+                presetPool="Movement" layerType="Movement" durationBeats="8.0"
+                isOneShot="0" phaseMode="Sync" targetRolesCsv="Aria: Teste Mobili / Beam|Terra: Teste Mobili a Terra"
+                presetUseColor="0" presetUseDimmer="0" presetUseMove="1" presetUseStrobe="0"
+                presetColor1="ff38bdf8" presetColor2="ff38bdf8" presetDimmerMin="0"
+                presetDimmerMax="255" presetCurve="Static" presetStrobeUseHw="0"
+                presetStrobeSubdiv="1/8" presetMoveShape="TiltWave" presetMoveSpeed="Sine_2Bars"
+                presetMoveAmpPan="0" presetMoveAmpTilt="75">
+    <ROLE_COMMAND roleName="Aria: Teste Mobili / Beam" parameter="Pan" startValue="128"
+                  endValue="128" curve="Static" commandColor="ff38bdf8"/>
+    <ROLE_COMMAND roleName="Aria: Teste Mobili / Beam" parameter="Tilt" startValue="33"
+                  endValue="223" curve="Sine_2Bars" commandColor="ff38bdf8"/>
+    <ROLE_COMMAND roleName="Terra: Teste Mobili a Terra" parameter="Pan" startValue="128"
+                  endValue="128" curve="Static" commandColor="ff38bdf8"/>
+    <ROLE_COMMAND roleName="Terra: Teste Mobili a Terra" parameter="Tilt" startValue="33"
+                  endValue="223" curve="Sine_2Bars" commandColor="ff38bdf8"/>
+  </SCENE_PRESET>
+  <SCENE_PRESET presetName="[F] Tilt Wave Onda SX -&gt; DX (2 Bars)" sceneName="[F] Tilt Wave Onda SX -&gt; DX (2 Bars)"
+                presetPool="Movement" layerType="Movement" durationBeats="8.0"
+                isOneShot="0" phaseMode="LeftToRight" targetRolesCsv="Aria: Teste Mobili / Beam|Terra: Teste Mobili a Terra"
+                presetUseColor="0" presetUseDimmer="0" presetUseMove="1" presetUseStrobe="0"
+                presetColor1="ff38bdf8" presetColor2="ff38bdf8" presetDimmerMin="0"
+                presetDimmerMax="255" presetCurve="Static" presetStrobeUseHw="0"
+                presetStrobeSubdiv="1/8" presetMoveShape="TiltWave" presetMoveSpeed="Sine_2Bars"
+                presetMoveAmpPan="0" presetMoveAmpTilt="80">
+    <ROLE_COMMAND roleName="Aria: Teste Mobili / Beam" parameter="Pan" startValue="128"
+                  endValue="128" curve="Static" commandColor="ff38bdf8"/>
+    <ROLE_COMMAND roleName="Aria: Teste Mobili / Beam" parameter="Tilt" startValue="26"
+                  endValue="230" curve="Sine_2Bars" commandColor="ff38bdf8"/>
+    <ROLE_COMMAND roleName="Terra: Teste Mobili a Terra" parameter="Pan" startValue="128"
+                  endValue="128" curve="Static" commandColor="ff38bdf8"/>
+    <ROLE_COMMAND roleName="Terra: Teste Mobili a Terra" parameter="Tilt" startValue="26"
+                  endValue="230" curve="Sine_2Bars" commandColor="ff38bdf8"/>
+  </SCENE_PRESET>
+  <SCENE_PRESET presetName="[F] Tilt Alternato Pari/Dispari (1 Bar)" sceneName="[F] Tilt Alternato Pari/Dispari (1 Bar)"
+                presetPool="Movement" layerType="Movement" durationBeats="4.0"
+                isOneShot="0" phaseMode="OddEven" targetRolesCsv="Aria: Teste Mobili / Beam|Terra: Teste Mobili a Terra"
+                presetUseColor="0" presetUseDimmer="0" presetUseMove="1" presetUseStrobe="0"
+                presetColor1="ff38bdf8" presetColor2="ff38bdf8" presetDimmerMin="0"
+                presetDimmerMax="255" presetCurve="Static" presetStrobeUseHw="0"
+                presetStrobeSubdiv="1/8" presetMoveShape="TiltWave" presetMoveSpeed="Sine_1Bar"
+                presetMoveAmpPan="0" presetMoveAmpTilt="70">
+    <ROLE_COMMAND roleName="Aria: Teste Mobili / Beam" parameter="Pan" startValue="128"
+                  endValue="128" curve="Static" commandColor="ff38bdf8"/>
+    <ROLE_COMMAND roleName="Aria: Teste Mobili / Beam" parameter="Tilt" startValue="39"
+                  endValue="217" curve="Sine_1Bar" commandColor="ff38bdf8"/>
+    <ROLE_COMMAND roleName="Terra: Teste Mobili a Terra" parameter="Pan" startValue="128"
+                  endValue="128" curve="Static" commandColor="ff38bdf8"/>
+    <ROLE_COMMAND roleName="Terra: Teste Mobili a Terra" parameter="Tilt" startValue="39"
+                  endValue="217" curve="Sine_1Bar" commandColor="ff38bdf8"/>
+  </SCENE_PRESET>
+  <SCENE_PRESET presetName="[F] Cerchio Ampio Lento (4 Bars)" sceneName="[F] Cerchio Ampio Lento (4 Bars)"
+                presetPool="Movement" layerType="Movement" durationBeats="16.0"
+                isOneShot="0" phaseMode="SymmetricalFan" targetRolesCsv="Aria: Teste Mobili / Beam|Terra: Teste Mobili a Terra"
+                presetUseColor="0" presetUseDimmer="0" presetUseMove="1" presetUseStrobe="0"
+                presetColor1="ff38bdf8" presetColor2="ff38bdf8" presetDimmerMin="0"
+                presetDimmerMax="255" presetCurve="Static" presetStrobeUseHw="0"
+                presetStrobeSubdiv="1/8" presetMoveShape="Circle" presetMoveSpeed="Sine_4Bars"
+                presetMoveAmpPan="85" presetMoveAmpTilt="75">
+    <ROLE_COMMAND roleName="Aria: Teste Mobili / Beam" parameter="Pan" startValue="20"
+                  endValue="236" curve="Sine_4Bars" commandColor="ff38bdf8"/>
+    <ROLE_COMMAND roleName="Aria: Teste Mobili / Beam" parameter="Tilt" startValue="33"
+                  endValue="223" curve="Cosine_4Bars" commandColor="ff38bdf8"/>
+    <ROLE_COMMAND roleName="Terra: Teste Mobili a Terra" parameter="Pan" startValue="20"
+                  endValue="236" curve="Sine_4Bars" commandColor="ff38bdf8"/>
+    <ROLE_COMMAND roleName="Terra: Teste Mobili a Terra" parameter="Tilt" startValue="33"
+                  endValue="223" curve="Cosine_4Bars" commandColor="ff38bdf8"/>
+  </SCENE_PRESET>
+  <SCENE_PRESET presetName="[F] Figure-8 Ventaglio (4 Bars)" sceneName="[F] Figure-8 Ventaglio (4 Bars)"
+                presetPool="Movement" layerType="Movement" durationBeats="16.0"
+                isOneShot="0" phaseMode="SymmetricalFan" targetRolesCsv="Aria: Teste Mobili / Beam|Terra: Teste Mobili a Terra"
+                presetUseColor="0" presetUseDimmer="0" presetUseMove="1" presetUseStrobe="0"
+                presetColor1="ff38bdf8" presetColor2="ff38bdf8" presetDimmerMin="0"
+                presetDimmerMax="255" presetCurve="Static" presetStrobeUseHw="0"
+                presetStrobeSubdiv="1/8" presetMoveShape="Figure8" presetMoveSpeed="Sine_4Bars"
+                presetMoveAmpPan="85" presetMoveAmpTilt="70">
+    <ROLE_COMMAND roleName="Aria: Teste Mobili / Beam" parameter="Pan" startValue="20"
+                  endValue="236" curve="Sine_4Bars" commandColor="ff38bdf8"/>
+    <ROLE_COMMAND roleName="Aria: Teste Mobili / Beam" parameter="Tilt" startValue="39"
+                  endValue="217" curve="Sine2x_4Bars" commandColor="ff38bdf8"/>
+    <ROLE_COMMAND roleName="Terra: Teste Mobili a Terra" parameter="Pan" startValue="20"
+                  endValue="236" curve="Sine_4Bars" commandColor="ff38bdf8"/>
+    <ROLE_COMMAND roleName="Terra: Teste Mobili a Terra" parameter="Tilt" startValue="39"
+                  endValue="217" curve="Sine2x_4Bars" commandColor="ff38bdf8"/>
+  </SCENE_PRESET>
+  <SCENE_PRESET presetName="[F] Figure-8 Onda SX -&gt; DX (2 Bars)" sceneName="[F] Figure-8 Onda SX -&gt; DX (2 Bars)"
+                presetPool="Movement" layerType="Movement" durationBeats="8.0"
+                isOneShot="0" phaseMode="LeftToRight" targetRolesCsv="Aria: Teste Mobili / Beam|Terra: Teste Mobili a Terra"
+                presetUseColor="0" presetUseDimmer="0" presetUseMove="1" presetUseStrobe="0"
+                presetColor1="ff38bdf8" presetColor2="ff38bdf8" presetDimmerMin="0"
+                presetDimmerMax="255" presetCurve="Static" presetStrobeUseHw="0"
+                presetStrobeSubdiv="1/8" presetMoveShape="Figure8" presetMoveSpeed="Sine_2Bars"
+                presetMoveAmpPan="75" presetMoveAmpTilt="60">
+    <ROLE_COMMAND roleName="Aria: Teste Mobili / Beam" parameter="Pan" startValue="33"
+                  endValue="223" curve="Sine_2Bars" commandColor="ff38bdf8"/>
+    <ROLE_COMMAND roleName="Aria: Teste Mobili / Beam" parameter="Tilt" startValue="52"
+                  endValue="204" curve="Sine2x_2Bars" commandColor="ff38bdf8"/>
+    <ROLE_COMMAND roleName="Terra: Teste Mobili a Terra" parameter="Pan" startValue="33"
+                  endValue="223" curve="Sine_2Bars" commandColor="ff38bdf8"/>
+    <ROLE_COMMAND roleName="Terra: Teste Mobili a Terra" parameter="Tilt" startValue="52"
+                  endValue="204" curve="Sine2x_2Bars" commandColor="ff38bdf8"/>
+  </SCENE_PRESET>
+  <SCENE_PRESET presetName="[F] Strobo 1/8 (Colore Attivo - Full Rig)" sceneName="[F] Strobo 1/8 (Colore Attivo - Full Rig)"
+                presetPool="Strobe" layerType="OverlayFX" durationBeats="4.0"
+                isOneShot="0" phaseMode="Sync" targetRolesCsv="Aria: Wash Controluce (Fondale)|Aria: Par / Spot Frontali (Band)|Aria: Teste Mobili / Beam|Terra: Controluce / Sotto-Batteria|Terra: Par / Barre Laterali (Taglio)|Terra: Teste Mobili a Terra"
+                presetUseColor="0" presetUseDimmer="0" presetUseMove="0" presetUseStrobe="1"
+                presetColor1="ffffffff" presetColor2="ffffffff" presetDimmerMin="0"
+                presetDimmerMax="255" presetCurve="Square_1_8" presetStrobeUseHw="0"
+                presetStrobeSubdiv="1/8" presetMoveShape="Fixed" presetMoveSpeed="Sine_1Bar"
+                presetMoveAmpPan="0" presetMoveAmpTilt="0">
+    <ROLE_COMMAND roleName="Aria: Wash Controluce (Fondale)" parameter="Dimmer"
+                  startValue="0" endValue="255" curve="Square_1_8" commandColor="ffffffff"/>
+    <ROLE_COMMAND roleName="Aria: Par / Spot Frontali (Band)" parameter="Dimmer"
+                  startValue="0" endValue="255" curve="Square_1_8" commandColor="ffffffff"/>
+    <ROLE_COMMAND roleName="Aria: Teste Mobili / Beam" parameter="Dimmer" startValue="0"
+                  endValue="255" curve="Square_1_8" commandColor="ffffffff"/>
+    <ROLE_COMMAND roleName="Terra: Controluce / Sotto-Batteria" parameter="Dimmer"
+                  startValue="0" endValue="255" curve="Square_1_8" commandColor="ffffffff"/>
+    <ROLE_COMMAND roleName="Terra: Par / Barre Laterali (Taglio)" parameter="Dimmer"
+                  startValue="0" endValue="255" curve="Square_1_8" commandColor="ffffffff"/>
+    <ROLE_COMMAND roleName="Terra: Teste Mobili a Terra" parameter="Dimmer" startValue="0"
+                  endValue="255" curve="Square_1_8" commandColor="ffffffff"/>
+  </SCENE_PRESET>
+  <SCENE_PRESET presetName="[F] Strobo 1/8T Terzine (Colore Attivo)" sceneName="[F] Strobo 1/8T Terzine (Colore Attivo)"
+                presetPool="Strobe" layerType="OverlayFX" durationBeats="4.0"
+                isOneShot="0" phaseMode="Sync" targetRolesCsv="Aria: Wash Controluce (Fondale)|Aria: Par / Spot Frontali (Band)|Aria: Teste Mobili / Beam|Terra: Controluce / Sotto-Batteria|Terra: Par / Barre Laterali (Taglio)|Terra: Teste Mobili a Terra"
+                presetUseColor="0" presetUseDimmer="0" presetUseMove="0" presetUseStrobe="1"
+                presetColor1="ffffffff" presetColor2="ffffffff" presetDimmerMin="0"
+                presetDimmerMax="255" presetCurve="Square_1_8T" presetStrobeUseHw="0"
+                presetStrobeSubdiv="1/8T" presetMoveShape="Fixed" presetMoveSpeed="Sine_1Bar"
+                presetMoveAmpPan="0" presetMoveAmpTilt="0">
+    <ROLE_COMMAND roleName="Aria: Wash Controluce (Fondale)" parameter="Dimmer"
+                  startValue="0" endValue="255" curve="Square_1_8T" commandColor="ffffffff"/>
+    <ROLE_COMMAND roleName="Aria: Par / Spot Frontali (Band)" parameter="Dimmer"
+                  startValue="0" endValue="255" curve="Square_1_8T" commandColor="ffffffff"/>
+    <ROLE_COMMAND roleName="Aria: Teste Mobili / Beam" parameter="Dimmer" startValue="0"
+                  endValue="255" curve="Square_1_8T" commandColor="ffffffff"/>
+    <ROLE_COMMAND roleName="Terra: Controluce / Sotto-Batteria" parameter="Dimmer"
+                  startValue="0" endValue="255" curve="Square_1_8T" commandColor="ffffffff"/>
+    <ROLE_COMMAND roleName="Terra: Par / Barre Laterali (Taglio)" parameter="Dimmer"
+                  startValue="0" endValue="255" curve="Square_1_8T" commandColor="ffffffff"/>
+    <ROLE_COMMAND roleName="Terra: Teste Mobili a Terra" parameter="Dimmer" startValue="0"
+                  endValue="255" curve="Square_1_8T" commandColor="ffffffff"/>
+  </SCENE_PRESET>
+  <SCENE_PRESET presetName="[F] Strobo 1/16 Blast (Colore Attivo)" sceneName="[F] Strobo 1/16 Blast (Colore Attivo)"
+                presetPool="Strobe" layerType="OverlayFX" durationBeats="4.0"
+                isOneShot="0" phaseMode="Sync" targetRolesCsv="Aria: Wash Controluce (Fondale)|Aria: Par / Spot Frontali (Band)|Aria: Teste Mobili / Beam|Terra: Controluce / Sotto-Batteria|Terra: Par / Barre Laterali (Taglio)|Terra: Teste Mobili a Terra"
+                presetUseColor="0" presetUseDimmer="0" presetUseMove="0" presetUseStrobe="1"
+                presetColor1="ffffffff" presetColor2="ffffffff" presetDimmerMin="0"
+                presetDimmerMax="255" presetCurve="Square_1_16" presetStrobeUseHw="0"
+                presetStrobeSubdiv="1/16" presetMoveShape="Fixed" presetMoveSpeed="Sine_1Bar"
+                presetMoveAmpPan="0" presetMoveAmpTilt="0">
+    <ROLE_COMMAND roleName="Aria: Wash Controluce (Fondale)" parameter="Dimmer"
+                  startValue="0" endValue="255" curve="Square_1_16" commandColor="ffffffff"/>
+    <ROLE_COMMAND roleName="Aria: Par / Spot Frontali (Band)" parameter="Dimmer"
+                  startValue="0" endValue="255" curve="Square_1_16" commandColor="ffffffff"/>
+    <ROLE_COMMAND roleName="Aria: Teste Mobili / Beam" parameter="Dimmer" startValue="0"
+                  endValue="255" curve="Square_1_16" commandColor="ffffffff"/>
+    <ROLE_COMMAND roleName="Terra: Controluce / Sotto-Batteria" parameter="Dimmer"
+                  startValue="0" endValue="255" curve="Square_1_16" commandColor="ffffffff"/>
+    <ROLE_COMMAND roleName="Terra: Par / Barre Laterali (Taglio)" parameter="Dimmer"
+                  startValue="0" endValue="255" curve="Square_1_16" commandColor="ffffffff"/>
+    <ROLE_COMMAND roleName="Terra: Teste Mobili a Terra" parameter="Dimmer" startValue="0"
+                  endValue="255" curve="Square_1_16" commandColor="ffffffff"/>
+  </SCENE_PRESET>
+  <SCENE_PRESET presetName="[F] Strobo 1/16T Sestine (Colore Attivo)" sceneName="[F] Strobo 1/16T Sestine (Colore Attivo)"
+                presetPool="Strobe" layerType="OverlayFX" durationBeats="4.0"
+                isOneShot="0" phaseMode="Sync" targetRolesCsv="Aria: Wash Controluce (Fondale)|Aria: Par / Spot Frontali (Band)|Aria: Teste Mobili / Beam|Terra: Controluce / Sotto-Batteria|Terra: Par / Barre Laterali (Taglio)|Terra: Teste Mobili a Terra"
+                presetUseColor="0" presetUseDimmer="0" presetUseMove="0" presetUseStrobe="1"
+                presetColor1="ffffffff" presetColor2="ffffffff" presetDimmerMin="0"
+                presetDimmerMax="255" presetCurve="Square_1_16T" presetStrobeUseHw="0"
+                presetStrobeSubdiv="1/16T" presetMoveShape="Fixed" presetMoveSpeed="Sine_1Bar"
+                presetMoveAmpPan="0" presetMoveAmpTilt="0">
+    <ROLE_COMMAND roleName="Aria: Wash Controluce (Fondale)" parameter="Dimmer"
+                  startValue="0" endValue="255" curve="Square_1_16T" commandColor="ffffffff"/>
+    <ROLE_COMMAND roleName="Aria: Par / Spot Frontali (Band)" parameter="Dimmer"
+                  startValue="0" endValue="255" curve="Square_1_16T" commandColor="ffffffff"/>
+    <ROLE_COMMAND roleName="Aria: Teste Mobili / Beam" parameter="Dimmer" startValue="0"
+                  endValue="255" curve="Square_1_16T" commandColor="ffffffff"/>
+    <ROLE_COMMAND roleName="Terra: Controluce / Sotto-Batteria" parameter="Dimmer"
+                  startValue="0" endValue="255" curve="Square_1_16T" commandColor="ffffffff"/>
+    <ROLE_COMMAND roleName="Terra: Par / Barre Laterali (Taglio)" parameter="Dimmer"
+                  startValue="0" endValue="255" curve="Square_1_16T" commandColor="ffffffff"/>
+    <ROLE_COMMAND roleName="Terra: Teste Mobili a Terra" parameter="Dimmer" startValue="0"
+                  endValue="255" curve="Square_1_16T" commandColor="ffffffff"/>
+  </SCENE_PRESET>
+  <SCENE_PRESET presetName="[F] Strobo Alternato Pari/Dispari (1/8)" sceneName="[F] Strobo Alternato Pari/Dispari (1/8)"
+                presetPool="Strobe" layerType="OverlayFX" durationBeats="4.0"
+                isOneShot="0" phaseMode="OddEven" targetRolesCsv="Aria: Wash Controluce (Fondale)|Aria: Par / Spot Frontali (Band)|Aria: Teste Mobili / Beam|Terra: Controluce / Sotto-Batteria|Terra: Par / Barre Laterali (Taglio)|Terra: Teste Mobili a Terra"
+                presetUseColor="0" presetUseDimmer="0" presetUseMove="0" presetUseStrobe="1"
+                presetColor1="ffffffff" presetColor2="ffffffff" presetDimmerMin="0"
+                presetDimmerMax="255" presetCurve="Square_1_8" presetStrobeUseHw="0"
+                presetStrobeSubdiv="1/8" presetMoveShape="Fixed" presetMoveSpeed="Sine_1Bar"
+                presetMoveAmpPan="0" presetMoveAmpTilt="0">
+    <ROLE_COMMAND roleName="Aria: Wash Controluce (Fondale)" parameter="Dimmer"
+                  startValue="0" endValue="255" curve="Square_1_8" commandColor="ffffffff"/>
+    <ROLE_COMMAND roleName="Aria: Par / Spot Frontali (Band)" parameter="Dimmer"
+                  startValue="0" endValue="255" curve="Square_1_8" commandColor="ffffffff"/>
+    <ROLE_COMMAND roleName="Aria: Teste Mobili / Beam" parameter="Dimmer" startValue="0"
+                  endValue="255" curve="Square_1_8" commandColor="ffffffff"/>
+    <ROLE_COMMAND roleName="Terra: Controluce / Sotto-Batteria" parameter="Dimmer"
+                  startValue="0" endValue="255" curve="Square_1_8" commandColor="ffffffff"/>
+    <ROLE_COMMAND roleName="Terra: Par / Barre Laterali (Taglio)" parameter="Dimmer"
+                  startValue="0" endValue="255" curve="Square_1_8" commandColor="ffffffff"/>
+    <ROLE_COMMAND roleName="Terra: Teste Mobili a Terra" parameter="Dimmer" startValue="0"
+                  endValue="255" curve="Square_1_8" commandColor="ffffffff"/>
+  </SCENE_PRESET>
+  <SCENE_PRESET presetName="[F] Strobo Onda SX -&gt; DX (1/16)" sceneName="[F] Strobo Onda SX -&gt; DX (1/16)"
+                presetPool="Strobe" layerType="OverlayFX" durationBeats="4.0"
+                isOneShot="0" phaseMode="LeftToRight" targetRolesCsv="Aria: Wash Controluce (Fondale)|Aria: Par / Spot Frontali (Band)|Aria: Teste Mobili / Beam|Terra: Controluce / Sotto-Batteria|Terra: Par / Barre Laterali (Taglio)|Terra: Teste Mobili a Terra"
+                presetUseColor="0" presetUseDimmer="0" presetUseMove="0" presetUseStrobe="1"
+                presetColor1="ffffffff" presetColor2="ffffffff" presetDimmerMin="0"
+                presetDimmerMax="255" presetCurve="Square_1_16" presetStrobeUseHw="0"
+                presetStrobeSubdiv="1/16" presetMoveShape="Fixed" presetMoveSpeed="Sine_1Bar"
+                presetMoveAmpPan="0" presetMoveAmpTilt="0">
+    <ROLE_COMMAND roleName="Aria: Wash Controluce (Fondale)" parameter="Dimmer"
+                  startValue="0" endValue="255" curve="Square_1_16" commandColor="ffffffff"/>
+    <ROLE_COMMAND roleName="Aria: Par / Spot Frontali (Band)" parameter="Dimmer"
+                  startValue="0" endValue="255" curve="Square_1_16" commandColor="ffffffff"/>
+    <ROLE_COMMAND roleName="Aria: Teste Mobili / Beam" parameter="Dimmer" startValue="0"
+                  endValue="255" curve="Square_1_16" commandColor="ffffffff"/>
+    <ROLE_COMMAND roleName="Terra: Controluce / Sotto-Batteria" parameter="Dimmer"
+                  startValue="0" endValue="255" curve="Square_1_16" commandColor="ffffffff"/>
+    <ROLE_COMMAND roleName="Terra: Par / Barre Laterali (Taglio)" parameter="Dimmer"
+                  startValue="0" endValue="255" curve="Square_1_16" commandColor="ffffffff"/>
+    <ROLE_COMMAND roleName="Terra: Teste Mobili a Terra" parameter="Dimmer" startValue="0"
+                  endValue="255" curve="Square_1_16" commandColor="ffffffff"/>
+  </SCENE_PRESET>
+  <SCENE_PRESET presetName="[F] Strobo Bianco Impatto (1/16)" sceneName="[F] Strobo Bianco Impatto (1/16)"
+                presetPool="Strobe" layerType="OverlayFX" durationBeats="4.0"
+                isOneShot="0" phaseMode="Sync" targetRolesCsv="Impatto: Strobo|Aria: Teste Mobili / Beam|Aria: Wash Controluce (Fondale)|Terra: Controluce / Sotto-Batteria"
+                presetUseColor="1" presetUseDimmer="0" presetUseMove="0" presetUseStrobe="1"
+                presetColor1="ffffffff" presetColor2="ffffffff" presetDimmerMin="0"
+                presetDimmerMax="255" presetCurve="Square_1_16" presetStrobeUseHw="1"
+                presetStrobeSubdiv="1/16" presetMoveShape="Fixed" presetMoveSpeed="Sine_1Bar"
+                presetMoveAmpPan="0" presetMoveAmpTilt="0">
+    <ROLE_COMMAND roleName="Impatto: Strobo" parameter="Red" startValue="255" endValue="255"
+                  curve="Static" commandColor="ffffffff"/>
+    <ROLE_COMMAND roleName="Impatto: Strobo" parameter="Green" startValue="255"
+                  endValue="255" curve="Static" commandColor="ffffffff"/>
+    <ROLE_COMMAND roleName="Impatto: Strobo" parameter="Blue" startValue="255"
+                  endValue="255" curve="Static" commandColor="ffffffff"/>
+    <ROLE_COMMAND roleName="Impatto: Strobo" parameter="Dimmer" startValue="0"
+                  endValue="255" curve="Square_1_16" commandColor="ffffffff"/>
+    <ROLE_COMMAND roleName="Aria: Teste Mobili / Beam" parameter="Red" startValue="255"
+                  endValue="255" curve="Static" commandColor="ffffffff"/>
+    <ROLE_COMMAND roleName="Aria: Teste Mobili / Beam" parameter="Green" startValue="255"
+                  endValue="255" curve="Static" commandColor="ffffffff"/>
+    <ROLE_COMMAND roleName="Aria: Teste Mobili / Beam" parameter="Blue" startValue="255"
+                  endValue="255" curve="Static" commandColor="ffffffff"/>
+    <ROLE_COMMAND roleName="Aria: Teste Mobili / Beam" parameter="Dimmer" startValue="0"
+                  endValue="255" curve="Square_1_16" commandColor="ffffffff"/>
+    <ROLE_COMMAND roleName="Aria: Wash Controluce (Fondale)" parameter="Red" startValue="255"
+                  endValue="255" curve="Static" commandColor="ffffffff"/>
+    <ROLE_COMMAND roleName="Aria: Wash Controluce (Fondale)" parameter="Green"
+                  startValue="255" endValue="255" curve="Static" commandColor="ffffffff"/>
+    <ROLE_COMMAND roleName="Aria: Wash Controluce (Fondale)" parameter="Blue" startValue="255"
+                  endValue="255" curve="Static" commandColor="ffffffff"/>
+    <ROLE_COMMAND roleName="Aria: Wash Controluce (Fondale)" parameter="Dimmer"
+                  startValue="0" endValue="255" curve="Square_1_16" commandColor="ffffffff"/>
+    <ROLE_COMMAND roleName="Terra: Controluce / Sotto-Batteria" parameter="Red"
+                  startValue="255" endValue="255" curve="Static" commandColor="ffffffff"/>
+    <ROLE_COMMAND roleName="Terra: Controluce / Sotto-Batteria" parameter="Green"
+                  startValue="255" endValue="255" curve="Static" commandColor="ffffffff"/>
+    <ROLE_COMMAND roleName="Terra: Controluce / Sotto-Batteria" parameter="Blue"
+                  startValue="255" endValue="255" curve="Static" commandColor="ffffffff"/>
+    <ROLE_COMMAND roleName="Terra: Controluce / Sotto-Batteria" parameter="Dimmer"
+                  startValue="0" endValue="255" curve="Square_1_16" commandColor="ffffffff"/>
+  </SCENE_PRESET>
+  <SCENE_PRESET presetName="[F] Blinder Hit Rapido (2 Q)" sceneName="[F] Blinder Hit Rapido (2 Q)"
+                presetPool="ImpactFX" layerType="OverlayFX" durationBeats="2.0"
+                isOneShot="1" phaseMode="Sync" targetRolesCsv="Impatto: Blinder Pubblico"
+                presetUseColor="1" presetUseDimmer="1" presetUseMove="0" presetUseStrobe="0"
+                presetColor1="ffffedd5" presetColor2="ffffedd5" presetDimmerMin="0"
+                presetDimmerMax="255" presetCurve="Decay" presetStrobeUseHw="0"
+                presetStrobeSubdiv="1/8" presetMoveShape="Fixed" presetMoveSpeed="Sine_1Bar"
+                presetMoveAmpPan="0" presetMoveAmpTilt="0">
+    <ROLE_COMMAND roleName="Impatto: Blinder Pubblico" parameter="Red" startValue="255"
+                  endValue="255" curve="Static" commandColor="ffffedd5"/>
+    <ROLE_COMMAND roleName="Impatto: Blinder Pubblico" parameter="Green" startValue="237"
+                  endValue="237" curve="Static" commandColor="ffffedd5"/>
+    <ROLE_COMMAND roleName="Impatto: Blinder Pubblico" parameter="Blue" startValue="213"
+                  endValue="213" curve="Static" commandColor="ffffedd5"/>
+    <ROLE_COMMAND roleName="Impatto: Blinder Pubblico" parameter="Dimmer" startValue="255"
+                  endValue="0" curve="Decay" commandColor="ffffedd5"/>
+  </SCENE_PRESET>
+  <SCENE_PRESET presetName="[F] Blinder Full Hold (4 Q)" sceneName="[F] Blinder Full Hold (4 Q)"
+                presetPool="ImpactFX" layerType="OverlayFX" durationBeats="4.0"
+                isOneShot="0" phaseMode="Sync" targetRolesCsv="Impatto: Blinder Pubblico"
+                presetUseColor="1" presetUseDimmer="1" presetUseMove="0" presetUseStrobe="0"
+                presetColor1="ffffedd5" presetColor2="ffffedd5" presetDimmerMin="255"
+                presetDimmerMax="255" presetCurve="Static" presetStrobeUseHw="0"
+                presetStrobeSubdiv="1/8" presetMoveShape="Fixed" presetMoveSpeed="Sine_1Bar"
+                presetMoveAmpPan="0" presetMoveAmpTilt="0">
+    <ROLE_COMMAND roleName="Impatto: Blinder Pubblico" parameter="Red" startValue="255"
+                  endValue="255" curve="Static" commandColor="ffffedd5"/>
+    <ROLE_COMMAND roleName="Impatto: Blinder Pubblico" parameter="Green" startValue="237"
+                  endValue="237" curve="Static" commandColor="ffffedd5"/>
+    <ROLE_COMMAND roleName="Impatto: Blinder Pubblico" parameter="Blue" startValue="213"
+                  endValue="213" curve="Static" commandColor="ffffedd5"/>
+    <ROLE_COMMAND roleName="Impatto: Blinder Pubblico" parameter="Dimmer" startValue="255"
+                  endValue="255" curve="Static" commandColor="ffffedd5"/>
+  </SCENE_PRESET>
+  <SCENE_PRESET presetName="[F] Blinder Crescendo (8 Q)" sceneName="[F] Blinder Crescendo (8 Q)"
+                presetPool="ImpactFX" layerType="OverlayFX" durationBeats="8.0"
+                isOneShot="1" phaseMode="Sync" targetRolesCsv="Impatto: Blinder Pubblico"
+                presetUseColor="1" presetUseDimmer="1" presetUseMove="0" presetUseStrobe="0"
+                presetColor1="ffffedd5" presetColor2="ffffedd5" presetDimmerMin="0"
+                presetDimmerMax="255" presetCurve="Linear" presetStrobeUseHw="0"
+                presetStrobeSubdiv="1/8" presetMoveShape="Fixed" presetMoveSpeed="Sine_1Bar"
+                presetMoveAmpPan="0" presetMoveAmpTilt="0">
+    <ROLE_COMMAND roleName="Impatto: Blinder Pubblico" parameter="Red" startValue="255"
+                  endValue="255" curve="Static" commandColor="ffffedd5"/>
+    <ROLE_COMMAND roleName="Impatto: Blinder Pubblico" parameter="Green" startValue="237"
+                  endValue="237" curve="Static" commandColor="ffffedd5"/>
+    <ROLE_COMMAND roleName="Impatto: Blinder Pubblico" parameter="Blue" startValue="213"
+                  endValue="213" curve="Static" commandColor="ffffedd5"/>
+    <ROLE_COMMAND roleName="Impatto: Blinder Pubblico" parameter="Dimmer" startValue="0"
+                  endValue="255" curve="Linear" commandColor="ffffedd5"/>
+  </SCENE_PRESET>
+  <SCENE_PRESET presetName="[F] Flash Impatto Full-Rig (2 Q)" sceneName="[F] Flash Impatto Full-Rig (2 Q)"
+                presetPool="ImpactFX" layerType="OverlayFX" durationBeats="2.0"
+                isOneShot="1" phaseMode="Sync" targetRolesCsv="Aria: Wash Controluce (Fondale)|Aria: Par / Spot Frontali (Band)|Aria: Teste Mobili / Beam|Terra: Controluce / Sotto-Batteria|Terra: Par / Barre Laterali (Taglio)|Terra: Teste Mobili a Terra"
+                presetUseColor="1" presetUseDimmer="1" presetUseMove="0" presetUseStrobe="0"
+                presetColor1="ffffffff" presetColor2="ffffffff" presetDimmerMin="0"
+                presetDimmerMax="255" presetCurve="Decay" presetStrobeUseHw="0"
+                presetStrobeSubdiv="1/8" presetMoveShape="Fixed" presetMoveSpeed="Sine_1Bar"
+                presetMoveAmpPan="0" presetMoveAmpTilt="0">
+    <ROLE_COMMAND roleName="Aria: Wash Controluce (Fondale)" parameter="Red" startValue="255"
+                  endValue="255" curve="Static" commandColor="ffffffff"/>
+    <ROLE_COMMAND roleName="Aria: Wash Controluce (Fondale)" parameter="Green"
+                  startValue="255" endValue="255" curve="Static" commandColor="ffffffff"/>
+    <ROLE_COMMAND roleName="Aria: Wash Controluce (Fondale)" parameter="Blue" startValue="255"
+                  endValue="255" curve="Static" commandColor="ffffffff"/>
+    <ROLE_COMMAND roleName="Aria: Wash Controluce (Fondale)" parameter="Dimmer"
+                  startValue="255" endValue="0" curve="Decay" commandColor="ffffffff"/>
+    <ROLE_COMMAND roleName="Aria: Par / Spot Frontali (Band)" parameter="Red" startValue="255"
+                  endValue="255" curve="Static" commandColor="ffffffff"/>
+    <ROLE_COMMAND roleName="Aria: Par / Spot Frontali (Band)" parameter="Green"
+                  startValue="255" endValue="255" curve="Static" commandColor="ffffffff"/>
+    <ROLE_COMMAND roleName="Aria: Par / Spot Frontali (Band)" parameter="Blue"
+                  startValue="255" endValue="255" curve="Static" commandColor="ffffffff"/>
+    <ROLE_COMMAND roleName="Aria: Par / Spot Frontali (Band)" parameter="Dimmer"
+                  startValue="255" endValue="0" curve="Decay" commandColor="ffffffff"/>
+    <ROLE_COMMAND roleName="Aria: Teste Mobili / Beam" parameter="Red" startValue="255"
+                  endValue="255" curve="Static" commandColor="ffffffff"/>
+    <ROLE_COMMAND roleName="Aria: Teste Mobili / Beam" parameter="Green" startValue="255"
+                  endValue="255" curve="Static" commandColor="ffffffff"/>
+    <ROLE_COMMAND roleName="Aria: Teste Mobili / Beam" parameter="Blue" startValue="255"
+                  endValue="255" curve="Static" commandColor="ffffffff"/>
+    <ROLE_COMMAND roleName="Aria: Teste Mobili / Beam" parameter="Dimmer" startValue="255"
+                  endValue="0" curve="Decay" commandColor="ffffffff"/>
+    <ROLE_COMMAND roleName="Terra: Controluce / Sotto-Batteria" parameter="Red"
+                  startValue="255" endValue="255" curve="Static" commandColor="ffffffff"/>
+    <ROLE_COMMAND roleName="Terra: Controluce / Sotto-Batteria" parameter="Green"
+                  startValue="255" endValue="255" curve="Static" commandColor="ffffffff"/>
+    <ROLE_COMMAND roleName="Terra: Controluce / Sotto-Batteria" parameter="Blue"
+                  startValue="255" endValue="255" curve="Static" commandColor="ffffffff"/>
+    <ROLE_COMMAND roleName="Terra: Controluce / Sotto-Batteria" parameter="Dimmer"
+                  startValue="255" endValue="0" curve="Decay" commandColor="ffffffff"/>
+    <ROLE_COMMAND roleName="Terra: Par / Barre Laterali (Taglio)" parameter="Red"
+                  startValue="255" endValue="255" curve="Static" commandColor="ffffffff"/>
+    <ROLE_COMMAND roleName="Terra: Par / Barre Laterali (Taglio)" parameter="Green"
+                  startValue="255" endValue="255" curve="Static" commandColor="ffffffff"/>
+    <ROLE_COMMAND roleName="Terra: Par / Barre Laterali (Taglio)" parameter="Blue"
+                  startValue="255" endValue="255" curve="Static" commandColor="ffffffff"/>
+    <ROLE_COMMAND roleName="Terra: Par / Barre Laterali (Taglio)" parameter="Dimmer"
+                  startValue="255" endValue="0" curve="Decay" commandColor="ffffffff"/>
+    <ROLE_COMMAND roleName="Terra: Teste Mobili a Terra" parameter="Red" startValue="255"
+                  endValue="255" curve="Static" commandColor="ffffffff"/>
+    <ROLE_COMMAND roleName="Terra: Teste Mobili a Terra" parameter="Green" startValue="255"
+                  endValue="255" curve="Static" commandColor="ffffffff"/>
+    <ROLE_COMMAND roleName="Terra: Teste Mobili a Terra" parameter="Blue" startValue="255"
+                  endValue="255" curve="Static" commandColor="ffffffff"/>
+    <ROLE_COMMAND roleName="Terra: Teste Mobili a Terra" parameter="Dimmer" startValue="255"
+                  endValue="0" curve="Decay" commandColor="ffffffff"/>
+  </SCENE_PRESET>
+  <SCENE_PRESET presetName="[F] Geyser Colpo Secco Bianco (2 Q)" sceneName="[F] Geyser Colpo Secco Bianco (2 Q)"
+                presetPool="ImpactFX" layerType="OverlayFX" durationBeats="2.0"
+                isOneShot="1" phaseMode="Sync" targetRolesCsv="FX: Geyser Verticale (Fumo + LED)"
+                presetUseColor="1" presetUseDimmer="1" presetUseMove="0" presetUseStrobe="0"
+                presetColor1="ffe0f2fe" presetColor2="ffe0f2fe" presetDimmerMin="0"
+                presetDimmerMax="255" presetCurve="Decay" presetStrobeUseHw="0"
+                presetStrobeSubdiv="1/8" presetMoveShape="Fixed" presetMoveSpeed="Sine_1Bar"
+                presetMoveAmpPan="0" presetMoveAmpTilt="0">
+    <ROLE_COMMAND roleName="FX: Geyser Verticale (Fumo + LED)" parameter="Red"
+                  startValue="224" endValue="224" curve="Static" commandColor="ffe0f2fe"/>
+    <ROLE_COMMAND roleName="FX: Geyser Verticale (Fumo + LED)" parameter="Green"
+                  startValue="242" endValue="242" curve="Static" commandColor="ffe0f2fe"/>
+    <ROLE_COMMAND roleName="FX: Geyser Verticale (Fumo + LED)" parameter="Blue"
+                  startValue="254" endValue="254" curve="Static" commandColor="ffe0f2fe"/>
+    <ROLE_COMMAND roleName="FX: Geyser Verticale (Fumo + LED)" parameter="Dimmer"
+                  startValue="255" endValue="0" curve="Decay" commandColor="ffe0f2fe"/>
+  </SCENE_PRESET>
+  <SCENE_PRESET presetName="[F] Hazer Mantenimento Leggero (35%)" sceneName="[F] Hazer Mantenimento Leggero (35%)"
+                presetPool="ImpactFX" layerType="OverlayFX" durationBeats="8.0"
+                isOneShot="0" phaseMode="Sync" targetRolesCsv="FX: Macchina del Fumo / Hazer"
+                presetUseColor="0" presetUseDimmer="1" presetUseMove="0" presetUseStrobe="0"
+                presetColor1="ffcbd5e1" presetColor2="ffcbd5e1" presetDimmerMin="90"
+                presetDimmerMax="90" presetCurve="Static" presetStrobeUseHw="0"
+                presetStrobeSubdiv="1/8" presetMoveShape="Fixed" presetMoveSpeed="Sine_1Bar"
+                presetMoveAmpPan="0" presetMoveAmpTilt="0">
+    <ROLE_COMMAND roleName="FX: Macchina del Fumo / Hazer" parameter="Dimmer" startValue="90"
+                  endValue="90" curve="Static" commandColor="ffcbd5e1"/>
+  </SCENE_PRESET>
+  <SCENE_PRESET presetName="[F] Pre-Carica Nebbia Hazer (75%)" sceneName="[F] Pre-Carica Nebbia Hazer (75%)"
+                presetPool="ImpactFX" layerType="OverlayFX" durationBeats="8.0"
+                isOneShot="0" phaseMode="Sync" targetRolesCsv="FX: Macchina del Fumo / Hazer"
+                presetUseColor="0" presetUseDimmer="1" presetUseMove="0" presetUseStrobe="0"
+                presetColor1="ffcbd5e1" presetColor2="ffcbd5e1" presetDimmerMin="190"
+                presetDimmerMax="190" presetCurve="Static" presetStrobeUseHw="0"
+                presetStrobeSubdiv="1/8" presetMoveShape="Fixed" presetMoveSpeed="Sine_1Bar"
+                presetMoveAmpPan="0" presetMoveAmpTilt="0">
+    <ROLE_COMMAND roleName="FX: Macchina del Fumo / Hazer" parameter="Dimmer" startValue="190"
+                  endValue="190" curve="Static" commandColor="ffcbd5e1"/>
+  </SCENE_PRESET>
+</PRESET_LIBRARY>

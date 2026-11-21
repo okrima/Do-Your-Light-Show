@@ -170,6 +170,8 @@ public:
     void mouseDown(const juce::MouseEvent& e) override;
     void mouseDrag(const juce::MouseEvent& e) override;
     void mouseUp(const juce::MouseEvent& e) override;
+    void mouseMove(const juce::MouseEvent& e) override;
+    void mouseExit(const juce::MouseEvent& e) override;
 
     // DragAndDropTarget interface
     bool isInterestedInDragSource(const SourceDetails& dragSourceDetails) override;
@@ -196,6 +198,7 @@ public:
     std::function<void(int)> onFixtureSelectedFromMap;
 
 private:
+
     enum class ValidZone
     {
         None,
@@ -216,6 +219,7 @@ private:
         bool isPlaced = false;
         juce::Rectangle<float> screenBounds;
         juce::ValueTree unitNode;
+        juce::Point<float> center;
     };
 
     void rebuildUnitCache();
@@ -262,6 +266,9 @@ private:
     juce::String activeDragLabel;
     int hitItemIndex = -1;
     bool hitWasPlaced = false;
+
+    juce::Rectangle<float> stageRect;
+    int hoveredPlacedIndex = -1;
 };
 
 // =============================================================================

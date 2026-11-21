@@ -1,5 +1,6 @@
 #include "VenuePatchTab.h"
 #include "../Components/PanTiltCalibrationWizard.h"
+#include "../Components/StageArtworkHelper.h"
 
 namespace
 {
@@ -759,15 +760,13 @@ void StagePatchAndCasePanel::resized()
     b.removeFromTop(8.0f);
     stageCanvasArea = b;
 
-    float sx = stageCanvasArea.getX() + 12.0f;
-    float sy = stageCanvasArea.getY() + 30.0f;
-    float sw = stageCanvasArea.getWidth() - 24.0f;
-    float sh = stageCanvasArea.getHeight() - 42.0f;
+    // Rettangolo palco effettivo identico a StageSimulatorView::getStageRect() (esclude i 24 px del titolo)
+    stageRect = stageCanvasArea.withTrimmedTop(24.0f);
 
-    airZoneRect = juce::Rectangle<float>(sx + sw * 0.10f, sy + sh * 0.04f, sw * 0.80f, sh * 0.22f);
-    floorZoneRect = juce::Rectangle<float>(sx + sw * 0.12f, sy + sh * 0.68f, sw * 0.76f, sh * 0.26f);
-    leftWingRect = juce::Rectangle<float>(sx + sw * 0.01f, sy + sh * 0.28f, sw * 0.10f, sh * 0.64f);
-    rightWingRect = juce::Rectangle<float>(sx + sw * 0.89f, sy + sh * 0.28f, sw * 0.10f, sh * 0.64f);
+    airZoneRect = StageArtworkHelper::getAirZoneRect(stageRect);
+    floorZoneRect = StageArtworkHelper::getFloorZoneRect(stageRect);
+    leftWingRect = StageArtworkHelper::getLeftWingRect(stageRect);
+    rightWingRect = StageArtworkHelper::getRightWingRect(stageRect);
 
     rebuildUnitCache();
 }
@@ -781,6 +780,7 @@ void StagePatchAndCasePanel::rebuildUnitCache()
 
     unplacedUnits.clear();
     placedUnits.clear();
+    hoveredPlacedIndex = -1;
 
     venueNode = appState.getChildWithName(StateKeys::VenueNode);
     if (!venueNode.isValid())
@@ -797,8 +797,6 @@ void StagePatchAndCasePanel::rebuildUnitCache()
         juce::String baseName = fix.getProperty(StateKeys::FixtureName, "Faro").toString();
         juce::String roleName = fix.getProperty(StateKeys::RoleName, "").toString();
         auto cat = StageRoleCatalog::classifyRole(roleName, baseName);
-
-        // Tutte le unita' fisiche di questo faro condividono lo stesso identico StartAddress DMX
         int sharedDmxAddr = static_cast<int>(fix.getProperty(StateKeys::StartAddress, 1));
 
         int unitCounter = 0;
@@ -823,10 +821,12 @@ void StagePatchAndCasePanel::rebuildUnitCache()
             if (item.isPlaced)
             {
                 float normX = static_cast<float>(static_cast<double>(unitNode.getProperty(StateKeys::PosX, 0.5)));
-                float normY = static_cast<float>(static_cast<double>(unitNode.getProperty(StateKeys::PosY, 0.15)));
-                float px = stageCanvasArea.getX() + normX * stageCanvasArea.getWidth();
-                float py = stageCanvasArea.getY() + normY * stageCanvasArea.getHeight();
-                item.screenBounds = juce::Rectangle<float>(px - 26.0f, py - 16.0f, 52.0f, 32.0f);
+                float normY = static_cast<float>(static_cast<double>(unitNode.getProperty(StateKeys::PosY, 0.14)));
+                float px = stageRect.getX() + normX * stageRect.getWidth();
+                float py = stageRect.getY() + normY * stageRect.getHeight();
+                item.center = { px, py };
+                // Area di presa comoda (36x28) attorno all'icona hardware 16x12
+                item.screenBounds = juce::Rectangle<float>(px - 18.0f, py - 14.0f, 36.0f, 28.0f);
                 placedUnits.push_back(item);
             }
             else
@@ -851,6 +851,7 @@ void StagePatchAndCasePanel::rebuildUnitCache()
             caseY += tileH + gap;
         }
         item.screenBounds = juce::Rectangle<float>(caseX, caseY, tileW, tileH);
+        item.center = item.screenBounds.getCentre();
         caseX += tileW + gap;
     }
 }
@@ -859,7 +860,14 @@ void StagePatchAndCasePanel::paint(juce::Graphics& g)
 {
     g.fillAll(juce::Colour(0xff12131a));
 
-    // --- 1. DISEGNO BOX "LIGHT CASE" ---
+    auto getZoneColour = [](ValidZone z) -> juce::Colour
+        {
+            if (z == ValidZone::FloorStage) return juce::Colour(0xfff59e0b);
+            if (z == ValidZone::SideWings)  return juce::Colour(0xffa855f7);
+            return juce::Colour(0xff38bdf8);
+        };
+
+    // --- 1. BOX "LIGHT CASE" ---
     g.setColour(juce::Colour(0xff1c1e29));
     g.fillRoundedRectangle(lightCaseArea, 6.0f);
     g.setColour(juce::Colour(0xff38bdf8).withAlpha(0.5f));
@@ -872,25 +880,25 @@ void StagePatchAndCasePanel::paint(juce::Graphics& g)
         static_cast<int>(lightCaseArea.getY() + 6.0f),
         340, 22, juce::Justification::centredLeft, true);
 
-    auto drawUnitTile = [&](const auto& item, const juce::Rectangle<float>& tileRect, juce::Colour zoneCol)
+    auto drawCaseTile = [&](const VisualUnitItem& item, juce::Colour zoneCol)
         {
             const bool hasSelection = (selectedFixtureIdx >= 0);
             const bool isSelectedGroup = (hasSelection && item.fixtureIdx == selectedFixtureIdx);
             const float contentAlpha = (hasSelection && !isSelectedGroup) ? 0.55f : 1.0f;
+            const auto& tileRect = item.screenBounds;
 
             if (isSelectedGroup)
             {
                 g.setColour(juce::Colour(0xfffacc15).withAlpha(0.28f));
-                g.fillRoundedRectangle(tileRect.expanded(3.5f), 7.0f);
+                g.fillRoundedRectangle(tileRect.expanded(3.0f), 7.0f);
             }
 
-            // Sfondo sempre opaco (100%) per non far trasparire le scritte delle zone sottostanti
             g.setColour(isSelectedGroup ? juce::Colour(0xff2b3146)
                 : (hasSelection ? juce::Colour(0xff151924) : juce::Colour(0xff1e2436)));
             g.fillRoundedRectangle(tileRect, 5.0f);
 
             g.setColour(isSelectedGroup ? juce::Colour(0xfffacc15) : zoneCol.withAlpha(contentAlpha));
-            g.drawRoundedRectangle(tileRect, 5.0f, isSelectedGroup ? 2.4f : 1.3f);
+            g.drawRoundedRectangle(tileRect, 5.0f, isSelectedGroup ? 2.2f : 1.3f);
 
             g.setColour((isSelectedGroup ? juce::Colour(0xfffef08a) : juce::Colours::white).withAlpha(contentAlpha));
             g.setFont(juce::FontOptions(11.0f, juce::Font::bold));
@@ -904,110 +912,206 @@ void StagePatchAndCasePanel::paint(juce::Graphics& g)
                 juce::Justification::centred, true);
         };
 
-    auto getZoneColour = [](ValidZone z) -> juce::Colour
-        {
-            if (z == ValidZone::FloorStage) return juce::Colour(0xfff59e0b);
-            if (z == ValidZone::SideWings)  return juce::Colour(0xffa855f7);
-            return juce::Colour(0xff38bdf8);
-        };
-
     if (unplacedUnits.empty())
     {
         g.setColour(juce::Colour(0xff64748b));
         g.setFont(juce::FontOptions(13.0f));
-        g.drawText("Tutte le luci sono montate sul palco! (Tasto destro su una luce del palco per rimetterla nel Case)",
+        g.drawText("Tutte le luci sono montate sul palco! (Tasto destro su una luce per rimetterla nel Case)",
             lightCaseArea.withTrimmedTop(26.0f), juce::Justification::centred, true);
     }
     else
     {
-        // 1. Disegna i fari nel Light Case (NESSUN altro fillRoundedRectangle/drawText qui dentro)
         for (const auto& item : unplacedUnits)
-        {
-            auto zoneCol = getZoneColour(getValidZoneForCategory(item.category));
-            drawUnitTile(item, item.screenBounds, zoneCol);
-        }
+            drawCaseTile(item, getZoneColour(getValidZoneForCategory(item.category)));
     }
 
-    // --- 2. DISEGNO PALCO 2D E STRUTTURE ---
-    g.setColour(juce::Colour(0xff0b0c12));
-    g.fillRoundedRectangle(stageCanvasArea, 6.0f);
+    // --- 2. PALCO 2D UNIFICATO (Identico a Tab 2 e Tab 3) ---
+    g.setColour(juce::Colour(0xff94a3b8));
+    g.setFont(juce::FontOptions(12.0f, juce::Font::bold));
+    g.drawText("MAPPA FISICA PALCO  |  Trascina i fari su Americana, Quinte o Pavimento (Tasto DX = Case)",
+        static_cast<int>(stageCanvasArea.getX() + 6.0f),
+        static_cast<int>(stageCanvasArea.getY() + 2.0f),
+        static_cast<int>(stageCanvasArea.getWidth() - 12.0f),
+        20, juce::Justification::centredLeft, true);
 
-    g.setColour(juce::Colour(0xffcbd5e1));
-    g.setFont(juce::FontOptions(13.0f, juce::Font::bold));
-    g.drawText("MAPPA FISICA PALCO (Aria / Quinte Laterali / Terra)",
-        static_cast<int>(stageCanvasArea.getX() + 12.0f),
-        static_cast<int>(stageCanvasArea.getY() + 6.0f),
-        450, 20, juce::Justification::centredLeft, true);
+    StageArtworkHelper::drawStageBackdrop(g, stageRect);
 
-    auto drawZoneBox = [&g](const juce::Rectangle<float>& r, const juce::String& title, juce::Colour col)
+    const float trussY = stageRect.getY() + stageRect.getHeight() * StageArtworkHelper::kTrussNormY;
+    const float floorY = stageRect.getY() + stageRect.getHeight() * StageArtworkHelper::kFloorNormY;
+
+    StageArtworkHelper::drawTrussAndFloorStructure(g, stageRect, trussY, floorY);
+    StageArtworkHelper::drawBandSilhouettes(g, stageRect, floorY);
+
+    // Zone colorate trasparenti sempre visibili come guida di posizionamento
+    auto drawZoneBox = [&g](const juce::Rectangle<float>& r,
+        const juce::String& title,
+        juce::Colour col,
+        juce::Justification labelJust,
+        bool isActiveTarget)
         {
-            g.setColour(col.withAlpha(0.10f));
+            g.setColour(col.withAlpha(isActiveTarget ? 0.14f : 0.06f));
             g.fillRoundedRectangle(r, 5.0f);
-            g.setColour(col.withAlpha(0.40f));
-            g.drawRoundedRectangle(r, 5.0f, 1.2f);
-            g.setColour(col.withAlpha(0.75f));
-            g.setFont(juce::FontOptions(11.0f, juce::Font::bold));
-            g.drawText(title, r.reduced(6.0f, 4.0f), juce::Justification::topLeft, true);
+            g.setColour(col.withAlpha(isActiveTarget ? 0.85f : 0.34f));
+            g.drawRoundedRectangle(r, 5.0f, isActiveTarget ? 2.0f : 1.0f);
+
+            g.setColour(col.withAlpha(isActiveTarget ? 0.95f : 0.65f));
+            g.setFont(juce::FontOptions(10.0f, juce::Font::bold));
+            g.drawText(title, r.reduced(6.0f, 3.0f), labelJust, true);
         };
 
-    drawZoneBox(airZoneRect, "ZONA ARIA (Americana Superiore: Wash, Par Front, Beam, Blinder, Strobo)", juce::Colour(0xff38bdf8));
-    drawZoneBox(floorZoneRect, "ZONA TERRA (Pavimento & Sotto-Batteria: Controluce Terra, Geyser, Fumo)", juce::Colour(0xfff59e0b));
-    drawZoneBox(leftWingRect, "QUINTA SX", juce::Colour(0xffa855f7));
-    drawZoneBox(rightWingRect, "QUINTA DX", juce::Colour(0xffa855f7));
+    drawZoneBox(airZoneRect, "ZONA ARIA (Americana: Wash, Par, Beam, Blinder, Strobo)",
+        juce::Colour(0xff38bdf8), juce::Justification::bottomLeft,
+        isDraggingUnit && activeDragZone == ValidZone::AirTruss);
 
-    // 2. Disegna i fari piazzati sulla Mappa Palco (NESSUN altro fillRoundedRectangle/drawText qui dentro)
-    for (const auto& item : placedUnits)
+    drawZoneBox(floorZoneRect, "ZONA TERRA (Pavimento: Controluce, Beam Terra, Geyser, Hazer)",
+        juce::Colour(0xfff59e0b), juce::Justification::bottomLeft,
+        isDraggingUnit && activeDragZone == ValidZone::FloorStage);
+
+    drawZoneBox(leftWingRect, "QUINTA SX",
+        juce::Colour(0xffa855f7), juce::Justification::topLeft,
+        isDraggingUnit && activeDragZone == ValidZone::SideWings);
+
+    drawZoneBox(rightWingRect, "QUINTA DX",
+        juce::Colour(0xffa855f7), juce::Justification::topRight,
+        isDraggingUnit && activeDragZone == ValidZone::SideWings);
+
+    // --- 3. FARI MONTATI (Stessa icona hardware di Tab 2 e Tab 3) ---
+    for (size_t i = 0; i < placedUnits.size(); ++i)
     {
-        auto zoneCol = getZoneColour(getValidZoneForCategory(item.category));
-        drawUnitTile(item, item.screenBounds, zoneCol);
+        const auto& item = placedUnits[i];
+        const auto zoneCol = getZoneColour(getValidZoneForCategory(item.category));
+        const bool hasSelection = (selectedFixtureIdx >= 0);
+        const bool isSelectedGroup = (hasSelection && item.fixtureIdx == selectedFixtureIdx);
+        const bool isHovered = (static_cast<int>(i) == hoveredPlacedIndex);
+        const float dimAlpha = (hasSelection && !isSelectedGroup && !isHovered) ? 0.62f : 1.0f;
+
+        juce::Rectangle<float> box(item.center.x - 8.0f, item.center.y - 6.0f, 16.0f, 12.0f);
+
+        if (isSelectedGroup || isHovered)
+        {
+            juce::Colour hiCol = isSelectedGroup ? juce::Colour(0xfffacc15) : juce::Colour(0xff38bdf8);
+            g.setColour(hiCol.withAlpha(isSelectedGroup ? 0.30f : 0.22f));
+            g.fillRoundedRectangle(box.expanded(4.0f), 5.0f);
+        }
+
+        g.setColour(juce::Colour(0xff1e202b));
+        g.fillRoundedRectangle(box, 3.0f);
+
+        juce::Colour borderCol = isSelectedGroup ? juce::Colour(0xfffacc15)
+            : (isHovered ? juce::Colour(0xff38bdf8) : zoneCol.withAlpha(0.75f * dimAlpha));
+        g.setColour(borderCol);
+        g.drawRoundedRectangle(box, 3.0f, (isSelectedGroup || isHovered) ? 2.0f : 1.2f);
+
+        // Lente interna colorata per categoria/selezione
+        juce::Colour lensCol = isSelectedGroup ? juce::Colour(0xfffacc15) : zoneCol;
+        g.setColour(lensCol.withAlpha((isSelectedGroup ? 0.85f : 0.35f) * dimAlpha));
+        g.fillEllipse(item.center.x - 4.5f, item.center.y - 4.5f, 9.0f, 9.0f);
+
+        // Etichetta nome + DMX compatta (sopra per i fari su/sopra americana, sotto per gli altri)
+        const bool labelAbove = (item.center.y <= trussY + 4.0f);
+        const float nameY = labelAbove ? (item.center.y - 25.0f) : (item.center.y + 8.0f);
+        const float dmxY = labelAbove ? (item.center.y - 15.0f) : (item.center.y + 18.0f);
+
+        g.setColour((isSelectedGroup ? juce::Colour(0xfffef08a) : juce::Colour(0xffcbd5e1)).withAlpha(dimAlpha));
+        g.setFont(juce::FontOptions(9.5f, isSelectedGroup ? juce::Font::bold : juce::Font::plain));
+        g.drawText(item.label,
+            static_cast<int>(item.center.x - 46.0f), static_cast<int>(nameY),
+            92, 11, juce::Justification::centred, true);
+
+        g.setColour((isSelectedGroup ? juce::Colour(0xfffde047) : zoneCol.brighter(0.25f)).withAlpha(0.85f * dimAlpha));
+        g.setFont(juce::FontOptions(8.5f));
+        g.drawText("DMX " + juce::String(item.dmxAddress),
+            static_cast<int>(item.center.x - 36.0f), static_cast<int>(dmxY),
+            72, 10, juce::Justification::centred, true);
     }
 
-    // --- 3. SMART MASKING DURANTE IL DRAG & DROP ---
+    // --- 4. SMART MASKING SEMI-TRASPARENTE DURANTE IL DRAG & DROP ---
     if (isDraggingUnit && activeDragZone != ValidZone::None)
     {
         juce::Path maskPath;
-        maskPath.addRoundedRectangle(stageCanvasArea, 6.0f);
+        maskPath.addRoundedRectangle(stageRect, 6.0f);
         maskPath.setUsingNonZeroWinding(false);
 
         if (activeDragZone == ValidZone::AirTruss)
-        {
             maskPath.addRoundedRectangle(airZoneRect, 5.0f);
-        }
         else if (activeDragZone == ValidZone::FloorStage)
-        {
             maskPath.addRoundedRectangle(floorZoneRect, 5.0f);
-        }
         else if (activeDragZone == ValidZone::SideWings)
         {
             maskPath.addRoundedRectangle(leftWingRect, 5.0f);
             maskPath.addRoundedRectangle(rightWingRect, 5.0f);
         }
 
-        g.setColour(juce::Colours::black.withAlpha(0.82f));
+        // Trasparenza bilanciata (0.68): scurisce le zone non valide ma lascia intravedere traliccio e band
+        g.setColour(juce::Colours::black.withAlpha(0.68f));
         g.fillPath(maskPath);
 
         g.setColour(juce::Colour(0xff10b981));
+        g.setFont(juce::FontOptions(11.0f, juce::Font::bold));
         if (activeDragZone == ValidZone::AirTruss)
         {
-            g.drawRoundedRectangle(airZoneRect, 5.0f, 2.8f);
-            g.drawText("RILASCIA QUI IN AMERICANA: " + activeDragLabel,
-                airZoneRect, juce::Justification::centred, true);
+            g.drawRoundedRectangle(airZoneRect, 5.0f, 2.4f);
+            g.drawText("RILASCIA IN AMERICANA: " + activeDragLabel,
+                airZoneRect.reduced(8.0f, 4.0f), juce::Justification::topRight, true);
         }
         else if (activeDragZone == ValidZone::FloorStage)
         {
-            g.drawRoundedRectangle(floorZoneRect, 5.0f, 2.8f);
-            g.drawText("RILASCIA QUI A TERRA: " + activeDragLabel,
-                floorZoneRect, juce::Justification::centred, true);
+            g.drawRoundedRectangle(floorZoneRect, 5.0f, 2.4f);
+            g.drawText("RILASCIA A TERRA: " + activeDragLabel,
+                floorZoneRect.reduced(8.0f, 4.0f), juce::Justification::topRight, true);
         }
         else if (activeDragZone == ValidZone::SideWings)
         {
-            g.drawRoundedRectangle(leftWingRect, 5.0f, 2.8f);
-            g.drawRoundedRectangle(rightWingRect, 5.0f, 2.8f);
+            g.drawRoundedRectangle(leftWingRect, 5.0f, 2.4f);
+            g.drawRoundedRectangle(rightWingRect, 5.0f, 2.4f);
         }
     }
 
     g.setColour(juce::Colour(0xff2a2a38));
-    g.drawRoundedRectangle(stageCanvasArea, 6.0f, 1.5f);
+    g.drawRoundedRectangle(stageRect, 6.0f, 1.5f);
+}
+
+void StagePatchAndCasePanel::mouseMove(const juce::MouseEvent& e)
+{
+    int newHover = -1;
+    for (size_t i = 0; i < placedUnits.size(); ++i)
+    {
+        if (placedUnits[i].screenBounds.contains(e.position))
+        {
+            newHover = static_cast<int>(i);
+            break;
+        }
+    }
+
+    if (newHover != hoveredPlacedIndex)
+    {
+        hoveredPlacedIndex = newHover;
+        repaint();
+    }
+
+    bool overAnyUnit = (newHover >= 0);
+    if (!overAnyUnit)
+    {
+        for (const auto& u : unplacedUnits)
+        {
+            if (u.screenBounds.contains(e.position))
+            {
+                overAnyUnit = true;
+                break;
+            }
+        }
+    }
+    setMouseCursor(overAnyUnit ? juce::MouseCursor::PointingHandCursor : juce::MouseCursor::NormalCursor);
+}
+
+void StagePatchAndCasePanel::mouseExit(const juce::MouseEvent&)
+{
+    if (hoveredPlacedIndex != -1)
+    {
+        hoveredPlacedIndex = -1;
+        repaint();
+    }
+    setMouseCursor(juce::MouseCursor::NormalCursor);
 }
 
 void StagePatchAndCasePanel::mouseDown(const juce::MouseEvent& e)
@@ -1071,38 +1175,36 @@ void StagePatchAndCasePanel::mouseDrag(const juce::MouseEvent& e)
             activeDragLabel = item.label;
             isDraggingUnit = true;
 
-            // Crea lo snapshot solo per il singolo faro selezionato
-            const int imgW = 88;
-            const int imgH = 38;
+            // Ghost compatto centrato esattamente sull'icona hardware 16x12 del faro
+            const int imgW = 96;
+            const int imgH = 40;
+            const float cx = imgW * 0.5f;
+            const float cy = 12.0f;
             juce::Image dragImg(juce::Image::ARGB, imgW, imgH, true);
             {
                 juce::Graphics g(dragImg);
-                auto tileRect = juce::Rectangle<float>(1.0f, 1.0f,
-                    static_cast<float>(imgW - 2),
-                    static_cast<float>(imgH - 2));
-
                 juce::Colour accentCol(0xff38bdf8);
                 if (activeDragZone == ValidZone::FloorStage)     accentCol = juce::Colour(0xfff59e0b);
                 else if (activeDragZone == ValidZone::SideWings) accentCol = juce::Colour(0xffa855f7);
 
-                g.setColour(juce::Colour(0xff1e2436).withAlpha(0.95f));
-                g.fillRoundedRectangle(tileRect, 5.0f);
-                g.setColour(accentCol);
-                g.drawRoundedRectangle(tileRect, 5.0f, 1.8f);
-
+                juce::Rectangle<float> box(cx - 8.0f, cy - 6.0f, 16.0f, 12.0f);
+                g.setColour(accentCol.withAlpha(0.32f));
+                g.fillRoundedRectangle(box.expanded(3.5f), 5.0f);
+                g.setColour(juce::Colour(0xff1e202b));
+                g.fillRoundedRectangle(box, 3.0f);
                 g.setColour(juce::Colours::white);
-                g.setFont(juce::FontOptions(11.0f, juce::Font::bold));
-                g.drawText(item.label, tileRect.withHeight(18.0f).reduced(3.0f, 1.0f),
-                    juce::Justification::centred, true);
+                g.drawRoundedRectangle(box, 3.0f, 1.6f);
+                g.setColour(accentCol);
+                g.fillEllipse(cx - 4.5f, cy - 4.5f, 9.0f, 9.0f);
 
-                g.setColour(accentCol.brighter(0.3f));
-                g.setFont(juce::FontOptions(9.5f));
-                g.drawText("DMX " + juce::String(item.dmxAddress),
-                    tileRect.withTrimmedTop(17.0f),
-                    juce::Justification::centred, true);
+                g.setColour(juce::Colour(0xff0b0c12).withAlpha(0.85f));
+                g.fillRoundedRectangle(4.0f, 22.0f, static_cast<float>(imgW - 8), 15.0f, 3.0f);
+                g.setColour(juce::Colours::white);
+                g.setFont(juce::FontOptions(9.5f, juce::Font::bold));
+                g.drawText(item.label, 6, 22, imgW - 12, 15, juce::Justification::centred, true);
             }
 
-            juce::Point<int> imgOffset(-imgW / 2, -imgH / 2);
+            juce::Point<int> imgOffset(-imgW / 2, -static_cast<int>(cy));
             juce::String dragDesc = juce::String(item.fixtureIdx) + ":" + juce::String(item.unitIdxInChild);
 
             if (auto* container = juce::DragAndDropContainer::findParentDragContainerFor(this))
@@ -1188,12 +1290,11 @@ juce::Point<float> StagePatchAndCasePanel::clampPointToZone(juce::Point<float> p
     if (zone == ValidZone::FloorStage)
         target = floorZoneRect;
     else if (zone == ValidZone::SideWings)
-        target = (pt.x < stageCanvasArea.getCentreX()) ? leftWingRect : rightWingRect;
+        target = (pt.x < stageRect.getCentreX()) ? leftWingRect : rightWingRect;
 
-    // Evita inversione limiti su zone strette come le Quinte Laterali
-    float padX = juce::jmin(24.0f, target.getWidth() * 0.35f);
-    float padY = juce::jmin(14.0f, target.getHeight() * 0.35f);
-    auto inner = target.reduced(padX, padY);
+    const float padX = juce::jmin(10.0f, target.getWidth() * 0.25f);
+    const float padY = juce::jmin(8.0f, target.getHeight() * 0.25f);
+    const auto inner = target.reduced(padX, padY);
 
     return {
         juce::jlimit(inner.getX(), juce::jmax(inner.getX(), inner.getRight()), pt.x),
@@ -1234,11 +1335,11 @@ void StagePatchAndCasePanel::itemDropped(const SourceDetails& dragSourceDetails)
         return;
     }
 
-    if (stageCanvasArea.contains(dropPt))
+    if (stageRect.expanded(8.0f).contains(dropPt) && stageRect.getWidth() > 1.0f && stageRect.getHeight() > 1.0f)
     {
         auto clampedPt = clampPointToZone(dropPt, targetZone);
-        double normX = juce::jlimit(0.04, 0.96, static_cast<double>((clampedPt.x - stageCanvasArea.getX()) / stageCanvasArea.getWidth()));
-        double normY = juce::jlimit(0.06, 0.94, static_cast<double>((clampedPt.y - stageCanvasArea.getY()) / stageCanvasArea.getHeight()));
+        double normX = juce::jlimit(0.03, 0.97, static_cast<double>((clampedPt.x - stageRect.getX()) / stageRect.getWidth()));
+        double normY = juce::jlimit(0.05, 0.95, static_cast<double>((clampedPt.y - stageRect.getY()) / stageRect.getHeight()));
 
         unitNode.setProperty(StateKeys::IsPlaced, true, nullptr);
         unitNode.setProperty(StateKeys::PosX, normX, nullptr);
@@ -1280,8 +1381,8 @@ void StagePatchAndCasePanel::autoPlaceAllUnits()
     {
         double ratio = static_cast<double>(i + 1) / static_cast<double>(airUnits.size() + 1);
         airUnits[i].setProperty(StateKeys::IsPlaced, true, nullptr);
-        airUnits[i].setProperty(StateKeys::PosX, 0.14 + 0.72 * ratio, nullptr);
-        airUnits[i].setProperty(StateKeys::PosY, 0.14, nullptr);
+        airUnits[i].setProperty(StateKeys::PosX, 0.08 + 0.84 * ratio, nullptr);
+        airUnits[i].setProperty(StateKeys::PosY, static_cast<double>(StageArtworkHelper::kTrussNormY), nullptr);
     }
 
     for (size_t i = 0; i < floorUnits.size(); ++i)
@@ -1289,16 +1390,16 @@ void StagePatchAndCasePanel::autoPlaceAllUnits()
         double ratio = static_cast<double>(i + 1) / static_cast<double>(floorUnits.size() + 1);
         floorUnits[i].setProperty(StateKeys::IsPlaced, true, nullptr);
         floorUnits[i].setProperty(StateKeys::PosX, 0.16 + 0.68 * ratio, nullptr);
-        floorUnits[i].setProperty(StateKeys::PosY, 0.82, nullptr);
+        floorUnits[i].setProperty(StateKeys::PosY, static_cast<double>(StageArtworkHelper::kFloorNormY), nullptr);
     }
 
     for (size_t i = 0; i < sideUnits.size(); ++i)
     {
         bool isLeft = (i % 2 == 0);
-        double yRatio = 0.40 + 0.15 * static_cast<double>(i / 2);
+        double yRatio = 0.50 + 0.14 * static_cast<double>(i / 2);
         sideUnits[i].setProperty(StateKeys::IsPlaced, true, nullptr);
-        sideUnits[i].setProperty(StateKeys::PosX, isLeft ? 0.06 : 0.94, nullptr);
-        sideUnits[i].setProperty(StateKeys::PosY, juce::jmin(0.85, yRatio), nullptr);
+        sideUnits[i].setProperty(StateKeys::PosX, isLeft ? 0.065 : 0.935, nullptr);
+        sideUnits[i].setProperty(StateKeys::PosY, juce::jmin(0.90, yRatio), nullptr);
     }
 
     rebuildUnitCache();

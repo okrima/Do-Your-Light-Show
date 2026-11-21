@@ -5,6 +5,7 @@
 #include "../../Model/StageRoleCatalog.h"
 #include "../../Audio/StemAudioEngine.h"
 #include "../../Model/CurveEvaluator.h"
+#include "StageArtworkHelper.h"
 #include <vector>
 #include <map>
 #include <cmath>
@@ -193,7 +194,7 @@ public:
         {
             bool isHovered = allowStageDrag && vf.unitNode.isValid() && (vf.unitNode == hoveredUnitNode);
             bool isDragged = allowStageDrag && vf.unitNode.isValid() && (vf.unitNode == draggedUnitNode);
-            drawFixtureHardwareBody(g, vf, isHovered, isDragged);
+            drawFixtureHardwareBody(g, vf, isHovered, isDragged, trussY);
 
             if (vf.state.hasAnyCommand)            ++targetedCount;
             if (vf.state.blockedByStrobePolicy)    ++blockedStrobeCount;
@@ -356,21 +357,16 @@ private:
     {
         if (cat == StageRoleCatalog::Category::FloorSideWash)
         {
-            // Quinte laterali SX o DX
-            double clampedX = (nx < 0.5) ? juce::jlimit(0.04, 0.22, nx)
-                : juce::jlimit(0.78, 0.96, nx);
-            double clampedY = juce::jlimit(0.45, 0.92, ny);
+            double clampedX = (nx < 0.5) ? juce::jlimit(0.035, 0.105, nx)
+                : juce::jlimit(0.895, 0.965, nx);
+            double clampedY = juce::jlimit(0.41, 0.94, ny);
             return { clampedX, clampedY };
         }
 
         if (isAirCategory(cat))
-        {
-            // Zona Aria / Americana superiore
-            return { juce::jlimit(0.04, 0.96, nx), juce::jlimit(0.06, 0.44, ny) };
-        }
+            return { juce::jlimit(0.03, 0.97, nx), juce::jlimit(0.06, 0.35, ny) };
 
-        // Zona Terra / Palco inferiore
-        return { juce::jlimit(0.04, 0.96, nx), juce::jlimit(0.54, 0.94, ny) };
+        return { juce::jlimit(0.14, 0.86, nx), juce::jlimit(0.64, 0.94, ny) };
     }
 
     juce::ValueTree findPlacedUnitAt(juce::Point<float> pt,
@@ -428,34 +424,28 @@ private:
         if (!draggedUnitNode.isValid())
             return;
 
-        auto drawZoneBox = [&](float x0, float y0, float x1, float y1, juce::Colour col, const juce::String& title)
+        auto drawZoneBox = [&](const juce::Rectangle<float>& zr, juce::Colour col, const juce::String& title)
             {
-                juce::Rectangle<float> zr(
-                    stageRect.getX() + x0 * stageRect.getWidth(),
-                    stageRect.getY() + y0 * stageRect.getHeight(),
-                    (x1 - x0) * stageRect.getWidth(),
-                    (y1 - y0) * stageRect.getHeight());
-
-                g.setColour(col.withAlpha(0.10f));
-                g.fillRoundedRectangle(zr, 6.0f);
-                g.setColour(col.withAlpha(0.65f));
-                g.drawRoundedRectangle(zr, 6.0f, 1.5f);
-                g.setFont(juce::FontOptions(11.0f, juce::Font::bold));
+                g.setColour(col.withAlpha(0.11f));
+                g.fillRoundedRectangle(zr, 5.0f);
+                g.setColour(col.withAlpha(0.75f));
+                g.drawRoundedRectangle(zr, 5.0f, 1.5f);
+                g.setFont(juce::FontOptions(10.5f, juce::Font::bold));
                 g.drawText(title, zr.reduced(6.0f, 4.0f), juce::Justification::topLeft, true);
             };
 
         if (draggedCategory == StageRoleCatalog::Category::FloorSideWash)
         {
-            drawZoneBox(0.03f, 0.44f, 0.23f, 0.93f, juce::Colour(0xffa855f7), "QUINTA SX");
-            drawZoneBox(0.77f, 0.44f, 0.97f, 0.93f, juce::Colour(0xffa855f7), "QUINTA DX");
+            drawZoneBox(StageArtworkHelper::getLeftWingRect(stageRect), juce::Colour(0xffa855f7), "QUINTA SX");
+            drawZoneBox(StageArtworkHelper::getRightWingRect(stageRect), juce::Colour(0xffa855f7), "QUINTA DX");
         }
         else if (isAirCategory(draggedCategory))
         {
-            drawZoneBox(0.03f, 0.05f, 0.97f, 0.45f, juce::Colour(0xff38bdf8), "ZONA ARIA: " + draggedUnitLabel);
+            drawZoneBox(StageArtworkHelper::getAirZoneRect(stageRect), juce::Colour(0xff38bdf8), "ZONA ARIA: " + draggedUnitLabel);
         }
         else
         {
-            drawZoneBox(0.03f, 0.53f, 0.97f, 0.95f, juce::Colour(0xfff59e0b), "ZONA TERRA: " + draggedUnitLabel);
+            drawZoneBox(StageArtworkHelper::getFloorZoneRect(stageRect), juce::Colour(0xfff59e0b), "ZONA TERRA: " + draggedUnitLabel);
         }
     }
     
@@ -737,8 +727,13 @@ private:
             juce::String defaultHex = activeNode.getProperty(StateKeys::PresetColor1, "ff1e3a8a").toString();
             juce::String colHex = cmd.getProperty(StateKeys::CommandColor, defaultHex).toString();
 
+            const bool isPanOrTilt = param.equalsIgnoreCase("Pan") || param.equalsIgnoreCase("Tilt");
+            const double barLenQ = juce::jmax(0.25, currentMusicalPos.barLengthQ);
+            const double clipElapsedBars = juce::jmax(0.0, currentBeat - activeSceneStartBeat) / barLenQ;
+
             float val = CurveEvaluator::evaluate(curve, startVal, endVal,
-                static_cast<float>(activeSceneProgress), currentMusicalPos, phaseOffsetCycles);
+                static_cast<float>(activeSceneProgress), currentMusicalPos, phaseOffsetCycles,
+                isPanOrTilt, clipElapsedBars);
 
             vf.state.hasAnyCommand = true;
             vf.state.fallbackColor = juce::Colour::fromString(colHex);
@@ -1026,10 +1021,7 @@ private:
 
     void drawStageBackdrop(juce::Graphics& g, const juce::Rectangle<float>& stageRect)
     {
-        juce::ColourGradient bgGrad(juce::Colour(0xff10121a), stageRect.getCentreX(), stageRect.getY(),
-            juce::Colour(0xff07070b), stageRect.getCentreX(), stageRect.getBottom(), false);
-        g.setGradientFill(bgGrad);
-        g.fillRoundedRectangle(stageRect, 6.0f);
+        StageArtworkHelper::drawStageBackdrop(g, stageRect);
     }
 
     void drawTrussAndFloorStructure(juce::Graphics& g,
@@ -1037,29 +1029,7 @@ private:
         float trussY,
         float floorY)
     {
-        float leftX = stageRect.getX() + 20.0f;
-        float rightX = stageRect.getRight() - 20.0f;
-
-        g.setColour(juce::Colour(0xff2d3142));
-        g.drawLine(leftX, trussY - 4.0f, rightX, trussY - 4.0f, 2.0f);
-        g.drawLine(leftX, trussY + 4.0f, rightX, trussY + 4.0f, 2.0f);
-
-        g.setColour(juce::Colour(0xff222533));
-        for (float x = leftX; x < rightX - 18.0f; x += 18.0f)
-        {
-            g.drawLine(x, trussY - 4.0f, x + 9.0f, trussY + 4.0f, 1.0f);
-            g.drawLine(x + 9.0f, trussY + 4.0f, x + 18.0f, trussY - 4.0f, 1.0f);
-        }
-
-        juce::Rectangle<float> floorDeck(stageRect.getX() + 4.0f, floorY,
-            stageRect.getWidth() - 8.0f, stageRect.getBottom() - floorY - 4.0f);
-        juce::ColourGradient floorGrad(juce::Colour(0xff181922), floorDeck.getCentreX(), floorY,
-            juce::Colour(0xff0d0e14), floorDeck.getCentreX(), floorDeck.getBottom(), false);
-        g.setGradientFill(floorGrad);
-        g.fillRect(floorDeck);
-
-        g.setColour(juce::Colour(0xff353849));
-        g.drawLine(stageRect.getX() + 4.0f, floorY, stageRect.getRight() - 4.0f, floorY, 2.0f);
+        StageArtworkHelper::drawTrussAndFloorStructure(g, stageRect, trussY, floorY);
     }
 
     void drawBandSilhouettes(juce::Graphics& g,
@@ -1080,6 +1050,8 @@ private:
                 frontTint = vf.state.getEffectiveColour();
             }
         }
+
+        StageArtworkHelper::drawBandSilhouettes(g, stageRect, floorY, frontIllumination, frontTint);
 
         juce::Colour baseSilhouette(0xff0b0c10);
         juce::Colour litBody = baseSilhouette.interpolatedWith(frontTint, frontIllumination * 0.45f);
@@ -1138,7 +1110,16 @@ private:
         {
             const float rawPan = vf.state.hasPanCmd ? vf.state.panCmd : 0.5f;
             const int panDmx = vf.panTiltSpec.mapStagePanToDmx(rawPan, mirrorPan);
-            outPanSigned = juce::jlimit(-1.0f, 1.0f, (static_cast<float>(panDmx) - 127.5f) / 90.0f);
+
+            const float panCenter = 0.5f * static_cast<float>(vf.panTiltSpec.panLeft + vf.panTiltSpec.panRight);
+            const float panHalfSpan = 0.5f * static_cast<float>(vf.panTiltSpec.panRight - vf.panTiltSpec.panLeft);
+            const float normSigned = (std::abs(panHalfSpan) > 0.5f)
+                ? juce::jlimit(-1.0f, 1.0f, (static_cast<float>(panDmx) - panCenter) / panHalfSpan)
+                : 0.0f;
+
+            const float widthScale = juce::jlimit(0.25f, 1.0f,
+                static_cast<float>(vf.panTiltSpec.getPanSpan()) / 180.0f);
+            outPanSigned = juce::jlimit(-1.0f, 1.0f, normSigned * widthScale);
         }
         else
         {
@@ -1149,7 +1130,16 @@ private:
         {
             const float rawTilt = vf.state.hasTiltCmd ? vf.state.tiltCmd : 0.5f;
             const int tiltDmx = vf.panTiltSpec.mapStageTiltToDmx(rawTilt);
-            outTiltNorm = juce::jlimit(0.05f, 0.95f, static_cast<float>(tiltDmx) / 255.0f);
+
+            const float tiltCenter = 0.5f * static_cast<float>(vf.panTiltSpec.tiltLow + vf.panTiltSpec.tiltHigh);
+            const float tiltHalfSpan = 0.5f * static_cast<float>(vf.panTiltSpec.tiltHigh - vf.panTiltSpec.tiltLow);
+            const float normSigned = (std::abs(tiltHalfSpan) > 0.5f)
+                ? juce::jlimit(-1.0f, 1.0f, (static_cast<float>(tiltDmx) - tiltCenter) / tiltHalfSpan)
+                : 0.0f;
+
+            const float rangeScale = juce::jlimit(0.25f, 1.0f,
+                static_cast<float>(vf.panTiltSpec.getTiltSpan()) / 180.0f);
+            outTiltNorm = juce::jlimit(0.05f, 0.95f, 0.35f + normSigned * 0.48f * rangeScale);
         }
         else
         {
@@ -1356,10 +1346,7 @@ private:
         g.fillRect(fogArea);
     }
 
-    static void drawFixtureHardwareBody(juce::Graphics& g,
-        const VisualFixture& vf,
-        bool isHovered,
-        bool isDragged)
+    static void drawFixtureHardwareBody(juce::Graphics& g, const VisualFixture& vf, bool isHovered, bool isDragged, float trussY)
     {
         const bool isPolicyBlocked = vf.state.blockedByStrobePolicy || vf.state.blockedByMovePolicy;
         juce::Rectangle<float> box(vf.pos.x - 8.0f, vf.pos.y - 6.0f, 16.0f, 12.0f);
@@ -1412,7 +1399,7 @@ private:
 
         g.setColour(labelCol.withAlpha(0.95f));
         g.setFont(juce::FontOptions(9.5f, (isDragged || isPolicyBlocked) ? juce::Font::bold : juce::Font::plain));
-        float textY = (vf.pos.y < 180.0f) ? (vf.pos.y - 17.0f) : (vf.pos.y + 7.0f);
+        float textY = (vf.pos.y <= trussY + 4.0f) ? (vf.pos.y - 17.0f) : (vf.pos.y + 7.0f);
         g.drawText(vf.name, static_cast<int>(vf.pos.x - 44.0f), static_cast<int>(textY),
             88, 12, juce::Justification::centred, true);
     }

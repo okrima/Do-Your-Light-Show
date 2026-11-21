@@ -6,6 +6,7 @@ namespace StateKeys
     // Nodi Principali
     const juce::Identifier VenueNode{ "VENUE" };
     const juce::Identifier ShowNode{ "SHOW_TIMELINE" };
+    const juce::Identifier ShowPackageNode{ "SHOW_PACKAGE" };
 
     // --- NODI PRESET LIBRARY ---
     const juce::Identifier PresetLibNode{ "PRESET_LIBRARY" };
@@ -29,6 +30,10 @@ namespace StateKeys
     const juce::Identifier PresetMoveSpeed{ "presetMoveSpeed" };             // "Sine_4Bars" | "Sine_2Bars" | "Sine_1Bar"
     const juce::Identifier PresetMoveAmpPan{ "presetMoveAmpPan" };           // 0..100 %
     const juce::Identifier PresetMoveAmpTilt{ "presetMoveAmpTilt" };         // 0..100 %
+    const juce::Identifier PresetUseColor{ "presetUseColor" };
+    const juce::Identifier PresetUseDimmer{ "presetUseDimmer" };
+    const juce::Identifier PresetUseMove{ "presetUseMove" };
+    const juce::Identifier PresetUseStrobe{ "presetUseStrobe" };
 
     // --- NODI RADICE ---
     const juce::Identifier AudioStemsNode{ "AUDIO_STEMS" };
@@ -37,10 +42,16 @@ namespace StateKeys
 
     // --- PROPRIETA' AUDIO_STEMS ---
     const juce::Identifier StemFullMix{ "fullMixPath" };
+    const juce::Identifier StemFullMixOffset{ "fullMixOffsetSec" };
     const juce::Identifier StemClick{ "clickPath" };
     const juce::Identifier StemDrums{ "drumsPath" };
     const juce::Identifier StemBass{ "bassPath" };
     const juce::Identifier StemGuitars{ "guitarsPath" };
+    const juce::Identifier StemFullMixVol{ "fullMixVol" };
+    const juce::Identifier StemClickVol{ "clickVol" };
+    const juce::Identifier StemDrumsVol{ "drumsVol" };
+    const juce::Identifier StemBassVol{ "bassVol" };
+    const juce::Identifier StemGuitarsVol{ "guitarsVol" };
 
     // --- PROPRIETA' AESTHETIC_CONFIG ---
     const juce::Identifier PrimaryColor{ "primaryColor" };
@@ -127,6 +138,8 @@ namespace StateKeys
     const juce::Identifier MeterPointNode{ "METER_POINT" };
     const juce::Identifier TimeSigNum{ "timeSigNum" }; // es. 4, 3, 6, 7, 12
     const juce::Identifier TimeSigDen{ "timeSigDen" }; // es. 4, 8, 16
+    const juce::Identifier MetronomeEnabled{ "metronomeEnabled" };
+    const juce::Identifier MetronomeGain{ "metronomeGain" };
 
     struct MusicalPosition
     {

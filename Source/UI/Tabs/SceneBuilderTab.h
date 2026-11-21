@@ -90,20 +90,38 @@ public:
         auto node = filteredPresets[static_cast<size_t>(rowNumber)];
         juce::String name = node.getProperty(StateKeys::PresetName, "Preset").toString();
         juce::String pool = node.getProperty(StateKeys::PresetPool, "Color").toString();
-        juce::String layer = node.getProperty(StateKeys::LayerType, "Base").toString();
         double dur = static_cast<double>(node.getProperty(StateKeys::DurationBeats, 4.0));
         bool oneShot = static_cast<bool>(node.getProperty(StateKeys::IsOneShot, false));
+
         juce::Colour c1 = juce::Colour::fromString(node.getProperty(StateKeys::PresetColor1, "ff38bdf8").toString());
 
-        // Swatch colore a sinistra
-        g.setColour(c1);
+        bool uCol = false, uDim = false, uMov = false, uStr = false;
+        resolvePresetFeatureFlags(node, uCol, uDim, uMov, uStr);
+
+        // Swatch colore a sinistra (usa il colore reale se Colore e' attivo, altrimenti tinta del Pool)
+        juce::Colour swatchCol = c1;
+        if (!uCol)
+        {
+            if (uStr)      swatchCol = juce::Colour(0xffe2e8f0);
+            else if (uMov) swatchCol = juce::Colour(0xffa855f7);
+            else if (uDim) swatchCol = juce::Colour(0xfff59e0b);
+            else           swatchCol = juce::Colour(0xff475569);
+        }
+        g.setColour(swatchCol);
         g.fillRoundedRectangle(6.0f, 6.0f, 10.0f, static_cast<float>(height - 12), 3.0f);
 
         g.setColour(juce::Colours::white);
         g.setFont(juce::FontOptions(13.0f, juce::Font::bold));
         g.drawText(name, 22, 2, width - 92, 18, juce::Justification::centredLeft, true);
 
-        juce::String meta = pool + " | " + layer + (oneShot ? " [1-Shot]" : " [Loop]");
+        juce::StringArray attrs;
+        if (uCol) attrs.add("Col");
+        if (uDim) attrs.add("Dim");
+        if (uMov) attrs.add("Mov");
+        if (uStr) attrs.add("Str");
+        juce::String attrTag = attrs.isEmpty() ? "[Vuoto]" : ("[" + attrs.joinIntoString("+") + "]");
+
+        juce::String meta = pool + " " + attrTag + (oneShot ? " 1-Shot" : " Loop");
         g.setColour(juce::Colour(0xff94a3b8));
         g.setFont(juce::FontOptions(10.5f));
         g.drawText(meta, 22, 19, width - 92, 14, juce::Justification::centredLeft, true);
@@ -113,9 +131,13 @@ public:
         g.fillRoundedRectangle(static_cast<float>(width - 66), 7.0f, 58.0f, static_cast<float>(height - 14), 4.0f);
         g.setColour(juce::Colour(0xff38bdf8));
         g.setFont(juce::FontOptions(11.0f, juce::Font::bold));
-        juce::String durText = (std::abs(dur - std::round(dur)) > 0.01)
-            ? juce::String(dur, 1)
-            : juce::String(dur, 0);
+        juce::String durText;
+        if (std::abs(dur - std::round(dur)) < 0.01)
+            durText = juce::String(dur, 0);
+        else if (std::abs(dur * 2.0 - std::round(dur * 2.0)) < 0.01)
+            durText = juce::String(dur, 1);
+        else
+            durText = juce::String(dur, 2);
         g.drawText(durText + " Q", width - 66, 0, 58, height, juce::Justification::centred, true);
     }
 
@@ -161,7 +183,11 @@ public:
         addPresetBtn.setBounds(rowAct1.removeFromLeft(halfAct).reduced(2));
         dupPresetBtn.setBounds(rowAct1.reduced(2));
         bottomBtns.removeFromTop(4);
-        delPresetBtn.setBounds(bottomBtns.removeFromTop(26).reduced(2));
+        
+        auto rowAct2 = bottomBtns.removeFromTop(26);
+        delPresetBtn.setBounds(rowAct2.removeFromLeft(halfAct).reduced(2));
+        factoryPresetsBtn.setBounds(rowAct2.reduced(2));
+
         bottomBtns.removeFromTop(4);
         auto rowFile = bottomBtns.removeFromTop(26);
         saveLibBtn.setBounds(rowFile.removeFromLeft(halfAct).reduced(2));
@@ -189,6 +215,71 @@ public:
     }
 
 private:
+
+    void snapDurationToLoopCycle(juce::ValueTree& preset, const juce::String& speedOrCurveKey)
+    {
+        if (!preset.isValid() || static_cast<bool>(preset.getProperty(StateKeys::IsOneShot, false)))
+            return;
+
+        double cycleBars = 0.0;
+        if (speedOrCurveKey.containsIgnoreCase("4Bars"))      cycleBars = 4.0;
+        else if (speedOrCurveKey.containsIgnoreCase("2Bars")) cycleBars = 2.0;
+        else if (speedOrCurveKey.containsIgnoreCase("1Bar"))  cycleBars = 1.0;
+
+        if (cycleBars <= 0.0)
+            return;
+
+        const double cycleQ = cycleBars * previewSimulator.getPreviewBarLengthQ();
+        const double curDur = static_cast<double>(preset.getProperty(StateKeys::DurationBeats, cycleQ));
+        const double ratio = curDur / cycleQ;
+
+        // Se la durata corrente non e' un multiplo intero del ciclo, la allinea al multiplo piu' vicino (>= 1 ciclo)
+        if (std::abs(ratio - std::round(ratio)) > 0.01 || curDur < cycleQ - 0.01)
+        {
+            const double alignedDur = juce::jmax(1.0, std::round(ratio)) * cycleQ;
+            preset.setProperty(StateKeys::DurationBeats, alignedDur, nullptr);
+            juce::ScopedValueSetter<bool> guard(isUpdatingUI, true);
+            durSlider.setValue(alignedDur, juce::dontSendNotification);
+            presetList.repaint();
+        }
+    }
+
+    static void resolvePresetFeatureFlags(const juce::ValueTree& p,
+        bool& useColor, bool& useDimmer, bool& useMove, bool& useStrobe)
+    {
+        if (!p.isValid())
+        {
+            useColor = useDimmer = useMove = useStrobe = false;
+            return;
+        }
+
+        const juce::String pool = p.getProperty(StateKeys::PresetPool, "Color").toString();
+
+        useColor = p.hasProperty(StateKeys::PresetUseColor)
+            ? static_cast<bool>(p.getProperty(StateKeys::PresetUseColor))
+            : (pool == "Color" || pool == "ImpactFX");
+
+        useDimmer = p.hasProperty(StateKeys::PresetUseDimmer)
+            ? static_cast<bool>(p.getProperty(StateKeys::PresetUseDimmer))
+            : (pool == "Dimmer" || pool == "ImpactFX");
+
+        useMove = p.hasProperty(StateKeys::PresetUseMove)
+            ? static_cast<bool>(p.getProperty(StateKeys::PresetUseMove))
+            : (pool == "Movement");
+
+        useStrobe = p.hasProperty(StateKeys::PresetUseStrobe)
+            ? static_cast<bool>(p.getProperty(StateKeys::PresetUseStrobe))
+            : (pool == "Strobe");
+    }
+
+    void saveFeatureTogglesToPreset()
+    {
+        if (!currentPreset.isValid()) return;
+        currentPreset.setProperty(StateKeys::PresetUseColor, useColorToggle.getToggleState(), nullptr);
+        currentPreset.setProperty(StateKeys::PresetUseDimmer, useDimmerToggle.getToggleState(), nullptr);
+        currentPreset.setProperty(StateKeys::PresetUseMove, useMoveToggle.getToggleState(), nullptr);
+        currentPreset.setProperty(StateKeys::PresetUseStrobe, useStrobeToggle.getToggleState(), nullptr);
+    }
 
     static void migrateLegacyPreset(juce::ValueTree& p)
     {
@@ -402,10 +493,26 @@ private:
         dupPresetBtn.onClick = [this]() { duplicateCurrentPreset(); };
         addAndMakeVisible(dupPresetBtn);
 
-        delPresetBtn.setButtonText("- Elimina Selezionato");
+        delPresetBtn.setButtonText("- Elimina");
         delPresetBtn.setColour(juce::TextButton::buttonColourId, juce::Colour(0xff7f1d1d));
         delPresetBtn.onClick = [this]() { deleteCurrentPreset(); };
         addAndMakeVisible(delPresetBtn);
+
+        factoryPresetsBtn.setButtonText("+ Factory");
+        factoryPresetsBtn.setColour(juce::TextButton::buttonColourId, juce::Colour(0xff0f766e));
+        factoryPresetsBtn.setTooltip("Aggiunge tutti i preset professionali mancanti senza toccare i tuoi");
+        factoryPresetsBtn.onClick = [this]() {
+            const int added = populateStarterPresets(true);
+            rebuildFilteredList();
+            savePresetLibraryToDefaultDisk();
+            juce::NativeMessageBox::showMessageBoxAsync(
+                juce::MessageBoxIconType::InfoIcon,
+                "Libreria Factory",
+                added > 0
+                ? ("Aggiunti " + juce::String(added) + " preset factory alla libreria!")
+                : "Tutti i preset factory sono gia' presenti nella tua libreria.");
+            };
+        addAndMakeVisible(factoryPresetsBtn);
 
         saveLibBtn.setButtonText("Salva Lib...");
         saveLibBtn.setColour(juce::TextButton::buttonColourId, juce::Colour(0xff293d3d));
@@ -450,12 +557,18 @@ private:
         poolCombo.addItem("ImpactFX", 5);
         poolCombo.onChange = [this]() {
             if (isUpdatingUI || !currentPreset.isValid()) return;
+            // Fissa i flag espliciti correnti prima di cambiare la categoria in libreria
+            saveFeatureTogglesToPreset();
+
             juce::String newPool = poolCombo.getText();
             currentPreset.setProperty(StateKeys::PresetPool, newPool, nullptr);
-            // Layer consigliato automatico al cambio Pool
-            if (newPool == "Movement") currentPreset.setProperty(StateKeys::LayerType, "Movement", nullptr);
-            else if (newPool == "Strobe" || newPool == "ImpactFX") currentPreset.setProperty(StateKeys::LayerType, "OverlayFX", nullptr);
-            else currentPreset.setProperty(StateKeys::LayerType, "Base", nullptr);
+
+            if (newPool == "Movement")
+                currentPreset.setProperty(StateKeys::LayerType, "Movement", nullptr);
+            else if (newPool == "Strobe" || newPool == "ImpactFX")
+                currentPreset.setProperty(StateKeys::LayerType, "OverlayFX", nullptr);
+            else
+                currentPreset.setProperty(StateKeys::LayerType, "Base", nullptr);
 
             rebuildPresetCommands(currentPreset);
             updateEditorFromPreset();
@@ -474,9 +587,9 @@ private:
         addAndMakeVisible(layerCombo);
 
         durSlider.setSliderStyle(juce::Slider::IncDecButtons);
-        durSlider.setTextBoxStyle(juce::Slider::TextBoxLeft, false, 42, 20);
-        durSlider.setRange(0.5, 32.0, 0.5);
-        durSlider.setNumDecimalPlacesToDisplay(1);
+        durSlider.setTextBoxStyle(juce::Slider::TextBoxLeft, false, 54, 20);
+        durSlider.setRange(0.25, 999.0, 0.25);
+        durSlider.setNumDecimalPlacesToDisplay(2);
         durSlider.onValueChange = [this]() {
             if (isUpdatingUI || !currentPreset.isValid()) return;
             currentPreset.setProperty(StateKeys::DurationBeats, durSlider.getValue(), nullptr);
@@ -509,6 +622,8 @@ private:
         // --- RUOLI TARGET (Checklist 10 categorie) ---
         setupLbl(rolesHeaderLbl, "Ruoli / Categorie Pilotate:", true, juce::Colours::orange);
 
+
+
         selectAllRolesBtn.setButtonText("Tutti");
         selectAllRolesBtn.onClick = [this]() { setAllRoleToggles(true); };
         addAndMakeVisible(selectAllRolesBtn);
@@ -532,7 +647,28 @@ private:
         }
 
         // --- SEZIONE CONTESTUALE PARAMETRI DEL POOL ---
-        setupLbl(paramsHeaderLbl, "Parametri Effetto:", true, juce::Colour(0xffa78bfa));
+        setupLbl(paramsHeaderLbl, "Attributi Inclusi nella Scena (seleziona cosa controlla):", true, juce::Colour(0xffa78bfa));
+
+        auto setupFeatureToggle = [this](juce::ToggleButton& tb, const juce::String& text, const juce::String& tip)
+            {
+                tb.setButtonText(text);
+                tb.setColour(juce::ToggleButton::textColourId, juce::Colour(0xffe2e8f0));
+                tb.setTooltip(tip);
+                tb.onClick = [this]() {
+                    if (isUpdatingUI || !currentPreset.isValid()) return;
+                    saveFeatureTogglesToPreset();
+                    rebuildPresetCommands(currentPreset);
+                    resized();
+                    presetList.repaint();
+                    previewSimulator.notifyPresetEdited();
+                    };
+                addAndMakeVisible(tb);
+            };
+
+        setupFeatureToggle(useColorToggle, "Colore", "Invia comandi RGB (se spento lascia invariato il colore attivo)");
+        setupFeatureToggle(useDimmerToggle, "Dimmer / FX", "Invia curva Dimmer (statica, rampa, respiro, decay)");
+        setupFeatureToggle(useMoveToggle, "Movimento", "Invia Pan/Tilt (se spento lascia invariato il movimento attivo)");
+        setupFeatureToggle(useStrobeToggle, "Strobo", "Invia flash ritmico sul Dimmer (ha priorita' sulla curva Dimmer)");
 
         // 1. Controlli Colore (Palette rapida + RGB)
         setupLbl(color1Lbl, "Colore Primario:");
@@ -640,6 +776,7 @@ private:
             };
             int idx = juce::jlimit(0, 6, curveCombo.getSelectedId() - 1);
             currentPreset.setProperty(StateKeys::PresetCurve, curveKeys[idx], nullptr);
+            snapDurationToLoopCycle(currentPreset, curveKeys[idx]);
             rebuildPresetCommands(currentPreset);
             previewSimulator.notifyPresetEdited();
             };
@@ -692,6 +829,7 @@ private:
             static const char* speeds[4] = { "Sine_4Bars", "Sine_2Bars", "Sine_1Bar", "Sine_Duration" };
             int idx = juce::jlimit(0, 3, moveSpeedCombo.getSelectedId() - 1);
             currentPreset.setProperty(StateKeys::PresetMoveSpeed, speeds[idx], nullptr);
+            snapDurationToLoopCycle(currentPreset, speeds[idx]);
             rebuildPresetCommands(currentPreset);
             previewSimulator.notifyPresetEdited();
             };
@@ -778,6 +916,15 @@ private:
             int idx = juce::jlimit(0, 6, meterCombo.getSelectedId() - 1);
             previewSimulator.setPreviewTimeSignature(nums[idx], dens[idx]);
             refreshBarLabelsForPreviewMeter();
+            if (currentPreset.isValid())
+            {
+                bool uCol = false, uDim = false, uMov = false, uStr = false;
+                resolvePresetFeatureFlags(currentPreset, uCol, uDim, uMov, uStr);
+                if (uMov)
+                    snapDurationToLoopCycle(currentPreset, currentPreset.getProperty(StateKeys::PresetMoveSpeed, "").toString());
+                else if (uDim)
+                    snapDurationToLoopCycle(currentPreset, currentPreset.getProperty(StateKeys::PresetCurve, "").toString());
+            }
             };
         addAndMakeVisible(meterCombo);
         refreshBarLabelsForPreviewMeter();
@@ -815,12 +962,12 @@ private:
 
         // Riga 2: Layer + Durata + OneShot
         auto r2 = area.removeFromTop(24);
-        layerLbl.setBounds(r2.removeFromLeft(46));
-        layerCombo.setBounds(r2.removeFromLeft(102));
-        r2.removeFromLeft(8);
-        durLbl.setBounds(r2.removeFromLeft(68));
-        durSlider.setBounds(r2.removeFromLeft(86));
-        r2.removeFromLeft(8);
+        layerLbl.setBounds(r2.removeFromLeft(44));
+        layerCombo.setBounds(r2.removeFromLeft(94));
+        r2.removeFromLeft(6);
+        durLbl.setBounds(r2.removeFromLeft(66));
+        durSlider.setBounds(r2.removeFromLeft(104));
+        r2.removeFromLeft(6);
         oneShotToggle.setBounds(r2);
 
         area.removeFromTop(6);
@@ -851,29 +998,31 @@ private:
                 roleGrid.getX() + col * halfW, roleGrid.getY() + row * 21, halfW - 4, 20);
         }
 
-        area.removeFromTop(10);
-        paramsHeaderLbl.setBounds(area.removeFromTop(20));
+        area.removeFromTop(8);
+        paramsHeaderLbl.setBounds(area.removeFromTop(18));
+        area.removeFromTop(4);
+
+        // Barra dei 4 interruttori indipendenti (Colore / Dimmer / Movimento / Strobo)
+        auto featRow = area.removeFromTop(24);
+        int qW = featRow.getWidth() / 4;
+        useColorToggle.setBounds(featRow.removeFromLeft(qW));
+        useDimmerToggle.setBounds(featRow.removeFromLeft(qW));
+        useMoveToggle.setBounds(featRow.removeFromLeft(qW));
+        useStrobeToggle.setBounds(featRow);
         area.removeFromTop(6);
 
-        juce::String pool = currentPreset.isValid()
-            ? currentPreset.getProperty(StateKeys::PresetPool, "Color").toString()
-            : "Color";
+        bool showColor = false, showDimmer = false, showMove = false, showStrobe = false;
+        resolvePresetFeatureFlags(currentPreset, showColor, showDimmer, showMove, showStrobe);
 
-        bool showColor1 = (pool == "Color" || pool == "Strobe" || pool == "ImpactFX");
-        bool showColor2 = (pool == "Color");
-        bool showDimmer = (pool == "Dimmer" || pool == "ImpactFX");
-        bool showStrobe = (pool == "Strobe");
-        bool showMove = (pool == "Movement");
+        // Visibilita' guidata esclusivamente dagli interruttori attivi
+        color1Lbl.setVisible(showColor);
+        rSlider.setVisible(showColor);
+        gSlider.setVisible(showColor);
+        bSlider.setVisible(showColor);
+        for (auto& btn : quickColorBtns1) btn->setVisible(showColor);
 
-        // Visibilita' contestuale
-        color1Lbl.setVisible(showColor1);
-        rSlider.setVisible(showColor1);
-        gSlider.setVisible(showColor1);
-        bSlider.setVisible(showColor1);
-        for (auto& btn : quickColorBtns1) btn->setVisible(showColor1);
-
-        color2Lbl.setVisible(showColor2);
-        for (auto& btn : quickColorBtns2) btn->setVisible(showColor2);
+        color2Lbl.setVisible(showColor);
+        for (auto& btn : quickColorBtns2) btn->setVisible(showColor);
 
         dimMinLbl.setVisible(showDimmer); dimMinSlider.setVisible(showDimmer);
         dimMaxLbl.setVisible(showDimmer); dimMaxSlider.setVisible(showDimmer);
@@ -886,75 +1035,72 @@ private:
         ampPanLbl.setVisible(showMove);     ampPanSlider.setVisible(showMove);
         ampTiltLbl.setVisible(showMove);    ampTiltSlider.setVisible(showMove);
 
-        // Posizionamento dei blocchi visibili
-        if (showStrobe)
+        // Posizionamento compatto: tutte e 4 le sezioni convivono senza sovrapporsi
+        if (showStrobe && area.getHeight() >= 24)
         {
-            auto sr = area.removeFromTop(24);
+            auto sr = area.removeFromTop(22);
             strobeSubdivLbl.setBounds(sr.removeFromLeft(95));
             strobeSubdivCombo.setBounds(sr);
-            area.removeFromTop(8);
+            area.removeFromTop(5);
         }
 
-        if (showDimmer)
+        if (showMove && area.getHeight() >= 96)
         {
-            auto dr1 = area.removeFromTop(24);
-            curveLbl.setBounds(dr1.removeFromLeft(85));
-            curveCombo.setBounds(dr1);
-            area.removeFromTop(5);
-            auto dr2 = area.removeFromTop(24);
-            dimMinLbl.setBounds(dr2.removeFromLeft(85));
-            dimMinSlider.setBounds(dr2);
-            area.removeFromTop(5);
-            auto dr3 = area.removeFromTop(24);
-            dimMaxLbl.setBounds(dr3.removeFromLeft(85));
-            dimMaxSlider.setBounds(dr3);
-            area.removeFromTop(8);
-        }
-
-        if (showMove)
-        {
-            auto mr1 = area.removeFromTop(24);
+            auto mr1 = area.removeFromTop(22);
             moveShapeLbl.setBounds(mr1.removeFromLeft(85));
             moveShapeCombo.setBounds(mr1);
-            area.removeFromTop(5);
-            auto mr2 = area.removeFromTop(24);
+            area.removeFromTop(3);
+            auto mr2 = area.removeFromTop(22);
             moveSpeedLbl.setBounds(mr2.removeFromLeft(85));
             moveSpeedCombo.setBounds(mr2);
-            area.removeFromTop(5);
-            auto mr3 = area.removeFromTop(24);
+            area.removeFromTop(3);
+            auto mr3 = area.removeFromTop(22);
             ampPanLbl.setBounds(mr3.removeFromLeft(85));
             ampPanSlider.setBounds(mr3);
-            area.removeFromTop(5);
-            auto mr4 = area.removeFromTop(24);
+            area.removeFromTop(3);
+            auto mr4 = area.removeFromTop(22);
             ampTiltLbl.setBounds(mr4.removeFromLeft(85));
             ampTiltSlider.setBounds(mr4);
-            area.removeFromTop(8);
+            area.removeFromTop(6);
         }
 
-        if (showColor1)
+        if (showDimmer && area.getHeight() >= 72)
         {
-            auto cr1 = area.removeFromTop(24);
+            auto dr1 = area.removeFromTop(22);
+            curveLbl.setBounds(dr1.removeFromLeft(85));
+            curveCombo.setBounds(dr1);
+            area.removeFromTop(3);
+            auto dr2 = area.removeFromTop(22);
+            dimMinLbl.setBounds(dr2.removeFromLeft(85));
+            dimMinSlider.setBounds(dr2);
+            area.removeFromTop(3);
+            auto dr3 = area.removeFromTop(22);
+            dimMaxLbl.setBounds(dr3.removeFromLeft(85));
+            dimMaxSlider.setBounds(dr3);
+            area.removeFromTop(6);
+        }
+
+        if (showColor && area.getHeight() >= 72)
+        {
+            auto cr1 = area.removeFromTop(22);
             color1Lbl.setBounds(cr1.removeFromLeft(115));
-            int swW = juce::jmax(20, cr1.getWidth() / static_cast<int>(quickColorBtns1.size()));
+            int swW = juce::jmax(18, cr1.getWidth() / juce::jmax(1, static_cast<int>(quickColorBtns1.size())));
             for (auto& btn : quickColorBtns1)
                 btn->setBounds(cr1.removeFromLeft(swW).reduced(2));
 
-            area.removeFromTop(4);
-            auto rgbRow = area.removeFromTop(22);
+            area.removeFromTop(3);
+            auto rgbRow = area.removeFromTop(20);
             int thirdW = rgbRow.getWidth() / 3;
             rSlider.setBounds(rgbRow.removeFromLeft(thirdW).reduced(1));
             gSlider.setBounds(rgbRow.removeFromLeft(thirdW).reduced(1));
             bSlider.setBounds(rgbRow.reduced(1));
-            area.removeFromTop(6);
-        }
 
-        if (showColor2)
-        {
-            auto cr2 = area.removeFromTop(24);
+            area.removeFromTop(4);
+            auto cr2 = area.removeFromTop(22);
             color2Lbl.setBounds(cr2.removeFromLeft(115));
-            int swW = juce::jmax(20, cr2.getWidth() / static_cast<int>(quickColorBtns2.size()));
+            int swW2 = juce::jmax(18, cr2.getWidth() / juce::jmax(1, static_cast<int>(quickColorBtns2.size())));
             for (auto& btn : quickColorBtns2)
-                btn->setBounds(cr2.removeFromLeft(swW).reduced(2));
+                btn->setBounds(cr2.removeFromLeft(swW2).reduced(2));
         }
     }
 
@@ -1004,6 +1150,10 @@ private:
         durSlider.setEnabled(valid);
         oneShotToggle.setEnabled(valid);
         phaseCombo.setEnabled(valid);
+        useColorToggle.setEnabled(valid);
+        useDimmerToggle.setEnabled(valid);
+        useMoveToggle.setEnabled(valid);
+        useStrobeToggle.setEnabled(valid);
 
         if (!valid)
             return;
@@ -1030,6 +1180,13 @@ private:
         else if (phase == "LeftToRight")    phaseCombo.setSelectedId(3, juce::dontSendNotification);
         else if (phase == "SymmetricalFan") phaseCombo.setSelectedId(4, juce::dontSendNotification);
         else                                phaseCombo.setSelectedId(1, juce::dontSendNotification);
+
+        bool uCol = false, uDim = false, uMov = false, uStr = false;
+        resolvePresetFeatureFlags(currentPreset, uCol, uDim, uMov, uStr);
+        useColorToggle.setToggleState(uCol, juce::dontSendNotification);
+        useDimmerToggle.setToggleState(uDim, juce::dontSendNotification);
+        useMoveToggle.setToggleState(uMov, juce::dontSendNotification);
+        useStrobeToggle.setToggleState(uStr, juce::dontSendNotification);
 
         /// Sincronizza checklist Ruoli Target (match per nome o per categoria)
         juce::String rolesCsv = currentPreset.getProperty(StateKeys::TargetRolesCsv, "").toString();
@@ -1132,10 +1289,8 @@ private:
         if (!preset.isValid()) return;
         preset.removeAllChildren(nullptr);
 
-        juce::String pool = preset.getProperty(StateKeys::PresetPool, "Color").toString();
-
-        if (!preset.hasProperty(StateKeys::PresetPool))
-            preset.setProperty(StateKeys::PresetPool, pool, nullptr);
+        bool useColor = false, useDimmer = false, useMove = false, useStrobe = false;
+        resolvePresetFeatureFlags(preset, useColor, useDimmer, useMove, useStrobe);
 
         juce::String rolesCsv = preset.getProperty(StateKeys::TargetRolesCsv, "").toString();
         juce::StringArray roles;
@@ -1145,134 +1300,213 @@ private:
         juce::Colour c1 = juce::Colour::fromString(preset.getProperty(StateKeys::PresetColor1, "ff38bdf8").toString());
         juce::Colour c2 = juce::Colour::fromString(preset.getProperty(StateKeys::PresetColor2, "ff1d4ed8").toString());
 
-        auto addCmd = [&](const juce::String& role, const juce::String& param, int sVal, int eVal, const juce::String& curve, juce::Colour col)
+        const int dMin = static_cast<int>(preset.getProperty(StateKeys::PresetDimmerMin, 0));
+        const int dMax = static_cast<int>(preset.getProperty(StateKeys::PresetDimmerMax, 255));
+        const juce::String curve = preset.getProperty(StateKeys::PresetCurve, "Sine_2Bars").toString();
+
+        const juce::String shape = preset.getProperty(StateKeys::PresetMoveShape, "PanSweep").toString();
+        const juce::String speed = preset.getProperty(StateKeys::PresetMoveSpeed, "Sine_4Bars").toString();
+        const int ampP = static_cast<int>(preset.getProperty(StateKeys::PresetMoveAmpPan, 80));
+        const int ampT = static_cast<int>(preset.getProperty(StateKeys::PresetMoveAmpTilt, 60));
+
+        const int halfP = juce::roundToInt(127.0f * (static_cast<float>(ampP) / 100.0f));
+        const int halfT = juce::roundToInt(127.0f * (static_cast<float>(ampT) / 100.0f));
+        const int pStart = 128 - halfP, pEnd = 128 + halfP;
+        const int tStart = 128 - halfT, tEnd = 128 + halfT;
+
+        auto addCmd = [&](const juce::String& role, const juce::String& param, int sVal, int eVal, const juce::String& cType, juce::Colour col)
             {
                 juce::ValueTree cmd(StateKeys::RoleCommand);
                 cmd.setProperty(StateKeys::TargetRole, role, nullptr);
                 cmd.setProperty(StateKeys::TargetParam, param, nullptr);
                 cmd.setProperty(StateKeys::StartValue, juce::jlimit(0, 255, sVal), nullptr);
                 cmd.setProperty(StateKeys::EndValue, juce::jlimit(0, 255, eVal), nullptr);
-                cmd.setProperty(StateKeys::CurveType, curve, nullptr);
+                cmd.setProperty(StateKeys::CurveType, cType, nullptr);
                 cmd.setProperty(StateKeys::CommandColor, col.toString(), nullptr);
                 preset.addChild(cmd, -1, nullptr);
             };
 
         for (const auto& role : roles)
         {
-            auto cat = StageRoleCatalog::classifyRole(role);
-            bool isFloorRole = (cat == StageRoleCatalog::Category::FloorBackSilhouette ||
+            const auto cat = StageRoleCatalog::classifyRole(role);
+            const bool isFloorRole = (cat == StageRoleCatalog::Category::FloorBackSilhouette ||
                 cat == StageRoleCatalog::Category::FloorSideWash ||
                 cat == StageRoleCatalog::Category::FloorMovingBeam);
+            const juce::Colour useCol = isFloorRole ? c2 : c1;
 
-            if (pool == "Color")
+            // 1. Colore (solo se spuntato)
+            if (useColor)
             {
-                juce::Colour useCol = isFloorRole ? c2 : c1;
                 addCmd(role, "Red", useCol.getRed(), useCol.getRed(), "Static", useCol);
                 addCmd(role, "Green", useCol.getGreen(), useCol.getGreen(), "Static", useCol);
                 addCmd(role, "Blue", useCol.getBlue(), useCol.getBlue(), "Static", useCol);
             }
-            else if (pool == "Dimmer")
-            {
-                int dMin = static_cast<int>(preset.getProperty(StateKeys::PresetDimmerMin, 30));
-                int dMax = static_cast<int>(preset.getProperty(StateKeys::PresetDimmerMax, 255));
-                juce::String curve = preset.getProperty(StateKeys::PresetCurve, "Sine_2Bars").toString();
 
-                if (curve == "Static")
-                    addCmd(role, "Dimmer", dMax, dMax, "Static", c1);
-                else
-                    addCmd(role, "Dimmer", dMin, dMax, curve, c1);
-            }
-            else if (pool == "Strobe")
+            // 2. Strobo oppure Dimmer/FX (solo se spuntato)
+            if (useStrobe)
             {
-                juce::String sub = preset.getProperty(StateKeys::PresetStrobeSubdiv, "1/8").toString();
+                const juce::String sub = preset.getProperty(StateKeys::PresetStrobeSubdiv, "1/8").toString();
                 juce::String sqCurve = "Square_1_8";
                 if (sub == "1/8T")       sqCurve = "Square_1_8T";
                 else if (sub == "1/16")  sqCurve = "Square_1_16";
                 else if (sub == "1/16T") sqCurve = "Square_1_16T";
-
-                addCmd(role, "Red", c1.getRed(), c1.getRed(), "Static", c1);
-                addCmd(role, "Green", c1.getGreen(), c1.getGreen(), "Static", c1);
-                addCmd(role, "Blue", c1.getBlue(), c1.getBlue(), "Static", c1);
-                addCmd(role, "Dimmer", 0, 255, sqCurve, c1);
+                addCmd(role, "Dimmer", 0, 255, sqCurve, useCol);
             }
-            else if (pool == "Movement")
+            else if (useDimmer)
             {
-                juce::String shape = preset.getProperty(StateKeys::PresetMoveShape, "PanSweep").toString();
-                juce::String speed = preset.getProperty(StateKeys::PresetMoveSpeed, "Sine_4Bars").toString();
-                int ampP = static_cast<int>(preset.getProperty(StateKeys::PresetMoveAmpPan, 80));
-                int ampT = static_cast<int>(preset.getProperty(StateKeys::PresetMoveAmpTilt, 60));
+                if (curve == "Decay")
+                    addCmd(role, "Dimmer", dMax, dMin, "Decay", useCol);
+                else if (curve == "Static")
+                    addCmd(role, "Dimmer", dMax, dMax, "Static", useCol);
+                else
+                    addCmd(role, "Dimmer", dMin, dMax, curve, useCol);
+            }
 
-                int halfP = juce::roundToInt(127.0f * (static_cast<float>(ampP) / 100.0f));
-                int halfT = juce::roundToInt(127.0f * (static_cast<float>(ampT) / 100.0f));
-                int pStart = 128 - halfP, pEnd = 128 + halfP;
-                int tStart = 128 - halfT, tEnd = 128 + halfT;
-
+            // 3. Movimento Pan/Tilt (solo se spuntato)
+            if (useMove)
+            {
                 if (shape == "Fixed")
                 {
-                    addCmd(role, "Pan", 128, 128, "Static", c1);
-                    addCmd(role, "Tilt", 128, 128, "Static", c1);
+                    addCmd(role, "Pan", 128, 128, "Static", useCol);
+                    addCmd(role, "Tilt", 128, 128, "Static", useCol);
                 }
                 else if (shape == "PanSweep")
                 {
-                    addCmd(role, "Pan", pStart, pEnd, speed, c1);
-                    addCmd(role, "Tilt", 128, 128, "Static", c1);
+                    addCmd(role, "Pan", pStart, pEnd, speed, useCol);
+                    addCmd(role, "Tilt", 128, 128, "Static", useCol);
                 }
                 else if (shape == "TiltWave")
                 {
-                    addCmd(role, "Pan", 128, 128, "Static", c1);
-                    addCmd(role, "Tilt", tStart, tEnd, speed, c1);
+                    addCmd(role, "Pan", 128, 128, "Static", useCol);
+                    addCmd(role, "Tilt", tStart, tEnd, speed, useCol);
                 }
                 else if (shape == "Circle")
                 {
-                    juce::String cosSpeed = speed.replace("Sine", "Cosine");
-                    addCmd(role, "Pan", pStart, pEnd, speed, c1);
-                    addCmd(role, "Tilt", tStart, tEnd, cosSpeed, c1);
+                    const juce::String cosSpeed = juce::String(speed).replace("Sine", "Cosine");
+                    addCmd(role, "Pan", pStart, pEnd, speed, useCol);
+                    addCmd(role, "Tilt", tStart, tEnd, cosSpeed, useCol);
                 }
                 else // Figure8
                 {
-                    juce::String doubleSpeed = speed.replace("Sine", "Sine2x");
-                    addCmd(role, "Pan", pStart, pEnd, speed, c1);
-                    addCmd(role, "Tilt", tStart, tEnd, doubleSpeed, c1);
+                    const juce::String doubleSpeed = juce::String(speed).replace("Sine", "Sine2x");
+                    addCmd(role, "Pan", pStart, pEnd, speed, useCol);
+                    addCmd(role, "Tilt", tStart, tEnd, doubleSpeed, useCol);
                 }
-            }
-            else // ImpactFX
-            {
-                int dMin = static_cast<int>(preset.getProperty(StateKeys::PresetDimmerMin, 0));
-                int dMax = static_cast<int>(preset.getProperty(StateKeys::PresetDimmerMax, 255));
-                juce::String curve = preset.getProperty(StateKeys::PresetCurve, "Decay").toString();
-
-                addCmd(role, "Red", c1.getRed(), c1.getRed(), "Static", c1);
-                addCmd(role, "Green", c1.getGreen(), c1.getGreen(), "Static", c1);
-                addCmd(role, "Blue", c1.getBlue(), c1.getBlue(), "Static", c1);
-
-                // In Decay parte da dMax e scende a dMin
-                if (curve == "Decay")
-                    addCmd(role, "Dimmer", dMax, dMin, "Decay", c1);
-                else if (curve == "Static")
-                    addCmd(role, "Dimmer", dMax, dMax, "Static", c1);
-                else
-                    addCmd(role, "Dimmer", dMin, dMax, curve, c1);
             }
         }
     }
 
-    void populateStarterPresets()
+    void savePresetLibraryToDefaultDisk()
     {
-        auto addStarter = [this](const juce::String& name, const juce::String& pool, const juce::String& layer,
-            double dur, bool oneShot, const juce::String& phase, const juce::String& rolesCsv,
-            const juce::String& c1, const juce::String& c2,
-            int dMin, int dMax, const juce::String& curve,
-            bool hwStrobe, const juce::String& sub,
-            const juce::String& shape, const juce::String& speed, int ampP, int ampT)
+        if (!presetLibNode.isValid()) return;
+        auto dir = juce::File::getSpecialLocation(juce::File::userApplicationDataDirectory)
+            .getChildFile("DoYourLightShow");
+        dir.createDirectory();
+        if (auto xml = presetLibNode.createXml())
+            xml->writeTo(dir.getChildFile("preset_library.xml"));
+    }
+
+    int populateStarterPresets(bool onlyAddMissing = false)
+    {
+        auto findPresetByName = [this](const juce::String& targetName) -> juce::ValueTree
             {
+                for (int i = 0; i < presetLibNode.getNumChildren(); ++i)
+                {
+                    auto ch = presetLibNode.getChild(i);
+                    if (ch.hasType(StateKeys::ScenePreset) &&
+                        ch.getProperty(StateKeys::PresetName, "").toString().equalsIgnoreCase(targetName))
+                        return ch;
+                }
+                return {};
+            };
+
+        auto roleFor = [](StageRoleCatalog::Category targetCat) -> juce::String
+            {
+                for (const auto& r : StageRoleCatalog::getAllRoles())
+                    if (StageRoleCatalog::classifyRole(r.displayName) == targetCat)
+                        return r.displayName;
+                return {};
+            };
+
+        auto joinRoles = [](std::initializer_list<juce::String> list) -> juce::String
+            {
+                juce::StringArray arr;
+                for (const auto& s : list)
+                    if (s.isNotEmpty())
+                        arr.addIfNotAlreadyThere(s);
+                return arr.joinIntoString("|");
+            };
+
+        using Cat = StageRoleCatalog::Category;
+        const juce::String airWash = roleFor(Cat::AirWashBack);
+        const juce::String airFront = roleFor(Cat::AirParFront);
+        const juce::String airBeam = roleFor(Cat::AirMovingBeam);
+        const juce::String floorBack = roleFor(Cat::FloorBackSilhouette);
+        const juce::String floorSide = roleFor(Cat::FloorSideWash);
+        const juce::String floorBeam = roleFor(Cat::FloorMovingBeam);
+        const juce::String blinder = roleFor(Cat::ImpactBlinder);
+        const juce::String strobe = roleFor(Cat::ImpactStrobe);
+        const juce::String geyser = roleFor(Cat::FxGeyserBurst);
+        const juce::String hazer = roleFor(Cat::FxSmokeHazer);
+
+        const juce::String fullStageLights = joinRoles({ airWash, airFront, airBeam, floorBack, floorSide, floorBeam });
+        const juce::String backAndFloor = joinRoles({ airWash, floorBack, floorSide });
+        const juce::String airGroup = joinRoles({ airWash, airFront, airBeam });
+        const juce::String allMovers = joinRoles({ airBeam, floorBeam });
+        const juce::String strobeRig = joinRoles({ strobe, airBeam, airWash, floorBack });
+
+        int addedCount = 0;
+
+        auto addStarter = [&](const juce::String& name,
+            const juce::String& pool,
+            const juce::String& layer,
+            double dur,
+            bool oneShot,
+            const juce::String& phase,
+            const juce::String& rolesCsv,
+            bool useCol, bool useDim, bool useMov, bool useStr,
+            const juce::String& c1,
+            const juce::String& c2,
+            int dMin, int dMax,
+            const juce::String& curve,
+            bool hwStrobe,
+            const juce::String& sub,
+            const juce::String& shape,
+            const juce::String& speed,
+            int ampP, int ampT)
+            {
+                const juce::String factoryName = name.startsWithIgnoreCase("[F] ") ? name : ("[F] " + name);
+
+                if (onlyAddMissing)
+                {
+                    if (findPresetByName(factoryName).isValid())
+                        return;
+
+                    // Se il preset factory era gia' stato importato senza [F], lo rinomina sul posto senza duplicarlo
+                    if (auto existing = findPresetByName(name); existing.isValid())
+                    {
+                        existing.setProperty(StateKeys::PresetName, factoryName, nullptr);
+                        existing.setProperty(StateKeys::SceneName, factoryName, nullptr);
+                        ++addedCount;
+                        return;
+                    }
+                }
+
                 juce::ValueTree p(StateKeys::ScenePreset);
-                p.setProperty(StateKeys::PresetName, name, nullptr);
+                p.setProperty(StateKeys::PresetName, factoryName, nullptr);
+                p.setProperty(StateKeys::SceneName, factoryName, nullptr);
                 p.setProperty(StateKeys::PresetPool, pool, nullptr);
                 p.setProperty(StateKeys::LayerType, layer, nullptr);
                 p.setProperty(StateKeys::DurationBeats, dur, nullptr);
                 p.setProperty(StateKeys::IsOneShot, oneShot, nullptr);
                 p.setProperty(StateKeys::PhaseMode, phase, nullptr);
                 p.setProperty(StateKeys::TargetRolesCsv, rolesCsv, nullptr);
+
+                p.setProperty(StateKeys::PresetUseColor, useCol, nullptr);
+                p.setProperty(StateKeys::PresetUseDimmer, useDim, nullptr);
+                p.setProperty(StateKeys::PresetUseMove, useMov, nullptr);
+                p.setProperty(StateKeys::PresetUseStrobe, useStr, nullptr);
+
                 p.setProperty(StateKeys::PresetColor1, c1, nullptr);
                 p.setProperty(StateKeys::PresetColor2, c2, nullptr);
                 p.setProperty(StateKeys::PresetDimmerMin, dMin, nullptr);
@@ -1284,78 +1518,172 @@ private:
                 p.setProperty(StateKeys::PresetMoveSpeed, speed, nullptr);
                 p.setProperty(StateKeys::PresetMoveAmpPan, ampP, nullptr);
                 p.setProperty(StateKeys::PresetMoveAmpTilt, ampT, nullptr);
+
                 rebuildPresetCommands(p);
                 presetLibNode.addChild(p, -1, nullptr);
+                ++addedCount;
             };
 
-        auto roleFor = [](StageRoleCatalog::Category targetCat) -> juce::String
-            {
-                for (const auto& r : StageRoleCatalog::getAllRoles())
-                    if (StageRoleCatalog::classifyRole(r.displayName) == targetCat)
-                        return r.displayName;
-                return {};
-            };
+        // =====================================================================
+        // 1. COLOR POOL (11 preset — solo Colore, sovrapponibili a tutto)
+        // =====================================================================
+        addStarter("Colore: Bianco Freddo (Daylight)", "Color", "Base", 8.0, false, "Sync", fullStageLights,
+            true, false, false, false, "ffe0f2fe", "ffbae6fd", 0, 255, "Static", false, "1/8", "Fixed", "Sine_4Bars", 0, 0);
 
-        using Cat = StageRoleCatalog::Category;
-        const juce::String airWash = roleFor(Cat::AirWashBack);
-        const juce::String airFront = roleFor(Cat::AirParFront);
-        const juce::String airBeam = roleFor(Cat::AirMovingBeam);
-        const juce::String floorBack = roleFor(Cat::FloorBackSilhouette);
-        const juce::String floorBeam = roleFor(Cat::FloorMovingBeam);
-        const juce::String blinder = roleFor(Cat::ImpactBlinder);
-        const juce::String strobe = roleFor(Cat::ImpactStrobe);
-        const juce::String geyser = roleFor(Cat::FxGeyserBurst);
-        const juce::String hazer = roleFor(Cat::FxSmokeHazer);
-        const juce::String floorSide = roleFor(Cat::FloorSideWash);
+        addStarter("Colore: Tungsteno Caldo (Ambra)", "Color", "Base", 8.0, false, "Sync", fullStageLights,
+            true, false, false, false, "ffffedd5", "fff59e0b", 0, 255, "Static", false, "1/8", "Fixed", "Sine_4Bars", 0, 0);
 
-        // 1. Colori
-        addStarter("Split Blu Notte / Ghiaccio", "Color", "Base", 8.0, false, "Sync",
-            airWash + "|" + airFront + "|" + floorBack,
-            "ff1d4ed8", "ff38bdf8", 0, 255, "Static", false, "1/8", "Fixed", "Sine_4Bars", 0, 0);
+        addStarter("Colore: Blu Notte Profondo", "Color", "Base", 8.0, false, "Sync", fullStageLights,
+            true, false, false, false, "ff1d4ed8", "ff1e3a8a", 0, 255, "Static", false, "1/8", "Fixed", "Sine_4Bars", 0, 0);
 
-        addStarter("Rosso Sangue / Ambra Terra", "Color", "Base", 8.0, false, "Sync",
-            airWash + "|" + airBeam + "|" + floorBack,
-            "ffdc2626", "fff59e0b", 0, 255, "Static", false, "1/8", "Fixed", "Sine_4Bars", 0, 0);
+        addStarter("Colore: Rosso Sangue", "Color", "Base", 8.0, false, "Sync", fullStageLights,
+            true, false, false, false, "ffdc2626", "ff7f1d1d", 0, 255, "Static", false, "1/8", "Fixed", "Sine_4Bars", 0, 0);
 
-        // 2. Dimmer
-        addStarter("Respiro Atmosferico (4 Bars / 16 Q)", "Dimmer", "Base", 16.0, false, "Sync",
-            airWash + "|" + floorBack,
-            "ff38bdf8", "ff1d4ed8", 40, 240, "Sine_4Bars", false, "1/8", "Fixed", "Sine_4Bars", 0, 0);
+        addStarter("Colore: UV / Viola Profondo", "Color", "Base", 8.0, false, "Sync", fullStageLights,
+            true, false, false, false, "ff7c3aed", "ff3b0764", 0, 255, "Static", false, "1/8", "Fixed", "Sine_4Bars", 0, 0);
 
-        addStarter("Chase Pari/Dispari (1 Bar / 4 Q)", "Dimmer", "Base", 4.0, false, "OddEven",
-            airWash + "|" + airFront,
-            "fff59e0b", "ffdc2626", 15, 255, "Sine_1Bar", false, "1/8", "Fixed", "Sine_1Bar", 0, 0);
+        addStarter("Colore: Verde Bosco / Smeraldo", "Color", "Base", 8.0, false, "Sync", fullStageLights,
+            true, false, false, false, "ff15803d", "ff064e3b", 0, 255, "Static", false, "1/8", "Fixed", "Sine_4Bars", 0, 0);
 
-        // 3. Strobo
-        addStarter("Strobo 1/8 (Ottavi Full-Rig)", "Strobe", "OverlayFX", 4.0, false, "Sync",
-            airWash + "|" + airFront + "|" + airBeam + "|" + floorBack + "|" + floorSide + "|" + floorBeam,
-            "ffffffff", "ffffffff", 0, 255, "Square_1_8", false, "1/8", "Fixed", "Sine_1Bar", 0, 0);
+        addStarter("Split Blu Notte / Ghiaccio", "Color", "Base", 8.0, false, "Sync", fullStageLights,
+            true, false, false, false, "ff1d4ed8", "ff38bdf8", 0, 255, "Static", false, "1/8", "Fixed", "Sine_4Bars", 0, 0);
 
-        addStarter("Strobo 1/16 (Sedicesimi)", "Strobe", "OverlayFX", 4.0, false, "Sync",
-            strobe + "|" + airBeam,
-            "ffffffff", "ffffffff", 0, 255, "Square_1_16", true, "1/16", "Fixed", "Sine_1Bar", 0, 0);
+        addStarter("Split Rosso Sangue / Ambra Terra", "Color", "Base", 8.0, false, "Sync", fullStageLights,
+            true, false, false, false, "ffdc2626", "fff59e0b", 0, 255, "Static", false, "1/8", "Fixed", "Sine_4Bars", 0, 0);
 
-        // 4. Movimenti Pan/Tilt
-        addStarter("Sweep Lento Ventaglio (4 Bars / 16 Q)", "Movement", "Movement", 16.0, false, "SymmetricalFan",
-            airBeam + "|" + floorBeam,
-            "ff38bdf8", "ff38bdf8", 0, 255, "Sine_4Bars", false, "1/8", "PanSweep", "Sine_4Bars", 85, 40);
+        addStarter("Split Blu Ghiaccio / Ambra Calda", "Color", "Base", 8.0, false, "Sync", fullStageLights,
+            true, false, false, false, "ff0284c7", "ffd97706", 0, 255, "Static", false, "1/8", "Fixed", "Sine_4Bars", 0, 0);
 
-        addStarter("Cerchio Ipnotico (2 Bars / 8 Q)", "Movement", "Movement", 8.0, false, "SymmetricalFan",
-            airBeam + "|" + floorBeam,
-            "ff38bdf8", "ff38bdf8", 0, 255, "Sine_2Bars", false, "1/8", "Circle", "Sine_2Bars", 75, 70);
+        addStarter("Split Viola / Ciano", "Color", "Base", 8.0, false, "Sync", fullStageLights,
+            true, false, false, false, "ff7e22ce", "ff06b6d4", 0, 255, "Static", false, "1/8", "Fixed", "Sine_4Bars", 0, 0);
 
-        // 5. Impatto & FX
-        addStarter("Blinder Decay Impatto (4 Q)", "ImpactFX", "OverlayFX", 4.0, true, "Sync",
-            blinder,
-            "ffffedd5", "ffffedd5", 0, 255, "Decay", false, "1/8", "Fixed", "Sine_1Bar", 0, 0);
+        addStarter("Split Rosso / Bianco Taglio", "Color", "Base", 8.0, false, "Sync", fullStageLights,
+            true, false, false, false, "ff991b1b", "ffffffff", 0, 255, "Static", false, "1/8", "Fixed", "Sine_4Bars", 0, 0);
 
-        addStarter("Geyser Drop Rosso (4 Q)", "ImpactFX", "OverlayFX", 4.0, true, "Sync",
-            geyser,
-            "ffdc2626", "ffdc2626", 0, 255, "Decay", false, "1/8", "Fixed", "Sine_1Bar", 0, 0);
+        // =====================================================================
+        // 2. DIMMER POOL (11 preset — solo Intensita' & Chase)
+        // =====================================================================
+        addStarter("Dimmer: Full On 100% (Full Rig)", "Dimmer", "Base", 8.0, false, "Sync", fullStageLights,
+            false, true, false, false, "ffffffff", "ffffffff", 255, 255, "Static", false, "1/8", "Fixed", "Sine_4Bars", 0, 0);
 
-        addStarter("Pre-Carica Nebbia Hazer", "ImpactFX", "OverlayFX", 8.0, false, "Sync",
-            hazer,
-            "ffcbd5e1", "ffcbd5e1", 180, 180, "Static", false, "1/8", "Fixed", "Sine_1Bar", 0, 0);
+        addStarter("Dimmer: Atmosfera 45% (Soft)", "Dimmer", "Base", 8.0, false, "Sync", fullStageLights,
+            false, true, false, false, "ff94a3b8", "ff94a3b8", 115, 115, "Static", false, "1/8", "Fixed", "Sine_4Bars", 0, 0);
+
+        addStarter("Dimmer: Solo Controluce Silhouette", "Dimmer", "Base", 8.0, false, "Sync", backAndFloor,
+            false, true, false, false, "ff38bdf8", "ff38bdf8", 230, 230, "Static", false, "1/8", "Fixed", "Sine_4Bars", 0, 0);
+
+        addStarter("Dimmer: Blackout Totale (0%)", "Dimmer", "Base", 4.0, false, "Sync", fullStageLights,
+            false, true, false, false, "ff1e293b", "ff1e293b", 0, 0, "Static", false, "1/8", "Fixed", "Sine_4Bars", 0, 0);
+
+        addStarter("Fade In Lento (16 Q)", "Dimmer", "Base", 16.0, true, "Sync", fullStageLights,
+            false, true, false, false, "ffffffff", "ffffffff", 0, 255, "Linear", false, "1/8", "Fixed", "Sine_4Bars", 0, 0);
+
+        addStarter("Fade Out Lento (16 Q)", "Dimmer", "Base", 16.0, true, "Sync", fullStageLights,
+            false, true, false, false, "ffffffff", "ffffffff", 0, 255, "Decay", false, "1/8", "Fixed", "Sine_4Bars", 0, 0);
+
+        addStarter("Crescendo Build-Up (8 Q)", "Dimmer", "Base", 8.0, true, "Sync", fullStageLights,
+            false, true, false, false, "fff59e0b", "fff59e0b", 15, 255, "Linear", false, "1/8", "Fixed", "Sine_4Bars", 0, 0);
+
+        addStarter("Respiro Atmosferico (4 Bars / 16 Q)", "Dimmer", "Base", 16.0, false, "Sync", backAndFloor,
+            false, true, false, false, "ff38bdf8", "ff1d4ed8", 35, 240, "Sine_4Bars", false, "1/8", "Fixed", "Sine_4Bars", 0, 0);
+
+        addStarter("Pulsazione Media (2 Bars / 8 Q)", "Dimmer", "Base", 8.0, false, "Sync", fullStageLights,
+            false, true, false, false, "ff38bdf8", "ff1d4ed8", 25, 255, "Sine_2Bars", false, "1/8", "Fixed", "Sine_2Bars", 0, 0);
+
+        addStarter("Chase Pari/Dispari (1 Bar / 4 Q)", "Dimmer", "Base", 4.0, false, "OddEven", airGroup,
+            false, true, false, false, "fff59e0b", "ffdc2626", 15, 255, "Sine_1Bar", false, "1/8", "Fixed", "Sine_1Bar", 0, 0);
+
+        addStarter("Onda Dimmer SX -> DX (2 Bars)", "Dimmer", "Base", 8.0, false, "LeftToRight", fullStageLights,
+            false, true, false, false, "ff38bdf8", "ff38bdf8", 0, 255, "Sine_2Bars", false, "1/8", "Fixed", "Sine_2Bars", 0, 0);
+
+        // =====================================================================
+        // 3. MOVEMENT POOL (10 preset — solo Pan/Tilt, mai override Colore/Dimmer)
+        // =====================================================================
+        addStarter("Posizione Home (Centro Fisso)", "Movement", "Movement", 4.0, false, "Sync", allMovers,
+            false, false, true, false, "ff38bdf8", "ff38bdf8", 0, 255, "Static", false, "1/8", "Fixed", "Sine_4Bars", 0, 0);
+
+        addStarter("Sweep Lento Ventaglio (4 Bars / 16 Q)", "Movement", "Movement", 16.0, false, "SymmetricalFan", allMovers,
+            false, false, true, false, "ff38bdf8", "ff38bdf8", 0, 255, "Static", false, "1/8", "PanSweep", "Sine_4Bars", 85, 0);
+
+        addStarter("Sweep Pan Veloce Sync (1 Bar)", "Movement", "Movement", 4.0, false, "Sync", allMovers,
+            false, false, true, false, "ff38bdf8", "ff38bdf8", 0, 255, "Static", false, "1/8", "PanSweep", "Sine_1Bar", 70, 0);
+
+        addStarter("Tilt Wave Verticale (2 Bars)", "Movement", "Movement", 8.0, false, "Sync", allMovers,
+            false, false, true, false, "ff38bdf8", "ff38bdf8", 0, 255, "Static", false, "1/8", "TiltWave", "Sine_2Bars", 0, 75);
+
+        addStarter("Tilt Wave Onda SX -> DX (2 Bars)", "Movement", "Movement", 8.0, false, "LeftToRight", allMovers,
+            false, false, true, false, "ff38bdf8", "ff38bdf8", 0, 255, "Static", false, "1/8", "TiltWave", "Sine_2Bars", 0, 80);
+
+        addStarter("Tilt Alternato Pari/Dispari (1 Bar)", "Movement", "Movement", 4.0, false, "OddEven", allMovers,
+            false, false, true, false, "ff38bdf8", "ff38bdf8", 0, 255, "Static", false, "1/8", "TiltWave", "Sine_1Bar", 0, 70);
+
+        addStarter("Cerchio Ampio Lento (4 Bars)", "Movement", "Movement", 16.0, false, "SymmetricalFan", allMovers,
+            false, false, true, false, "ff38bdf8", "ff38bdf8", 0, 255, "Static", false, "1/8", "Circle", "Sine_4Bars", 85, 75);
+
+        addStarter("Cerchio Ipnotico (2 Bars / 8 Q)", "Movement", "Movement", 8.0, false, "SymmetricalFan", allMovers,
+            false, false, true, false, "ff38bdf8", "ff38bdf8", 0, 255, "Static", false, "1/8", "Circle", "Sine_2Bars", 70, 65);
+
+        addStarter("Figure-8 Ventaglio (4 Bars)", "Movement", "Movement", 16.0, false, "SymmetricalFan", allMovers,
+            false, false, true, false, "ff38bdf8", "ff38bdf8", 0, 255, "Static", false, "1/8", "Figure8", "Sine_4Bars", 85, 70);
+
+        addStarter("Figure-8 Onda SX -> DX (2 Bars)", "Movement", "Movement", 8.0, false, "LeftToRight", allMovers,
+            false, false, true, false, "ff38bdf8", "ff38bdf8", 0, 255, "Static", false, "1/8", "Figure8", "Sine_2Bars", 75, 60);
+
+        // =====================================================================
+        // 4. STROBE POOL (7 preset — 6 trasparenti sul colore attivo + 1 Bianco)
+        // =====================================================================
+        addStarter("Strobo 1/8 (Colore Attivo - Full Rig)", "Strobe", "OverlayFX", 4.0, false, "Sync", fullStageLights,
+            false, false, false, true, "ffffffff", "ffffffff", 0, 255, "Square_1_8", false, "1/8", "Fixed", "Sine_1Bar", 0, 0);
+
+        addStarter("Strobo 1/8T Terzine (Colore Attivo)", "Strobe", "OverlayFX", 4.0, false, "Sync", fullStageLights,
+            false, false, false, true, "ffffffff", "ffffffff", 0, 255, "Square_1_8T", false, "1/8T", "Fixed", "Sine_1Bar", 0, 0);
+
+        addStarter("Strobo 1/16 Blast (Colore Attivo)", "Strobe", "OverlayFX", 4.0, false, "Sync", fullStageLights,
+            false, false, false, true, "ffffffff", "ffffffff", 0, 255, "Square_1_16", false, "1/16", "Fixed", "Sine_1Bar", 0, 0);
+
+        addStarter("Strobo 1/16T Sestine (Colore Attivo)", "Strobe", "OverlayFX", 4.0, false, "Sync", fullStageLights,
+            false, false, false, true, "ffffffff", "ffffffff", 0, 255, "Square_1_16T", false, "1/16T", "Fixed", "Sine_1Bar", 0, 0);
+
+        addStarter("Strobo Alternato Pari/Dispari (1/8)", "Strobe", "OverlayFX", 4.0, false, "OddEven", fullStageLights,
+            false, false, false, true, "ffffffff", "ffffffff", 0, 255, "Square_1_8", false, "1/8", "Fixed", "Sine_1Bar", 0, 0);
+
+        addStarter("Strobo Onda SX -> DX (1/16)", "Strobe", "OverlayFX", 4.0, false, "LeftToRight", fullStageLights,
+            false, false, false, true, "ffffffff", "ffffffff", 0, 255, "Square_1_16", false, "1/16", "Fixed", "Sine_1Bar", 0, 0);
+
+        addStarter("Strobo Bianco Impatto (1/16)", "Strobe", "OverlayFX", 4.0, false, "Sync", strobeRig,
+            true, false, false, true, "ffffffff", "ffffffff", 0, 255, "Square_1_16", true, "1/16", "Fixed", "Sine_1Bar", 0, 0);
+
+        // =====================================================================
+        // 5. IMPACT FX & ATMOSPHERE POOL (9 preset — Blinder, Flash, Geyser, Hazer)
+        // =====================================================================
+        addStarter("Blinder Hit Rapido (2 Q)", "ImpactFX", "OverlayFX", 2.0, true, "Sync", blinder,
+            true, true, false, false, "ffffedd5", "ffffedd5", 0, 255, "Decay", false, "1/8", "Fixed", "Sine_1Bar", 0, 0);
+
+        addStarter("Blinder Decay Impatto (4 Q)", "ImpactFX", "OverlayFX", 4.0, true, "Sync", blinder,
+            true, true, false, false, "ffffedd5", "ffffedd5", 0, 255, "Decay", false, "1/8", "Fixed", "Sine_1Bar", 0, 0);
+
+        addStarter("Blinder Full Hold (4 Q)", "ImpactFX", "OverlayFX", 4.0, false, "Sync", blinder,
+            true, true, false, false, "ffffedd5", "ffffedd5", 255, 255, "Static", false, "1/8", "Fixed", "Sine_1Bar", 0, 0);
+
+        addStarter("Blinder Crescendo (8 Q)", "ImpactFX", "OverlayFX", 8.0, true, "Sync", blinder,
+            true, true, false, false, "ffffedd5", "ffffedd5", 0, 255, "Linear", false, "1/8", "Fixed", "Sine_1Bar", 0, 0);
+
+        addStarter("Flash Impatto Full-Rig (2 Q)", "ImpactFX", "OverlayFX", 2.0, true, "Sync", fullStageLights,
+            true, true, false, false, "ffffffff", "ffffffff", 0, 255, "Decay", false, "1/8", "Fixed", "Sine_1Bar", 0, 0);
+
+        addStarter("Geyser Colpo Secco Bianco (2 Q)", "ImpactFX", "OverlayFX", 2.0, true, "Sync", geyser,
+            true, true, false, false, "ffe0f2fe", "ffe0f2fe", 0, 255, "Decay", false, "1/8", "Fixed", "Sine_1Bar", 0, 0);
+
+        addStarter("Geyser Drop Rosso (4 Q)", "ImpactFX", "OverlayFX", 4.0, true, "Sync", geyser,
+            true, true, false, false, "ffdc2626", "ffdc2626", 0, 255, "Decay", false, "1/8", "Fixed", "Sine_1Bar", 0, 0);
+
+        addStarter("Hazer Mantenimento Leggero (35%)", "ImpactFX", "OverlayFX", 8.0, false, "Sync", hazer,
+            false, true, false, false, "ffcbd5e1", "ffcbd5e1", 90, 90, "Static", false, "1/8", "Fixed", "Sine_1Bar", 0, 0);
+
+        addStarter("Pre-Carica Nebbia Hazer (75%)", "ImpactFX", "OverlayFX", 8.0, false, "Sync", hazer,
+            false, true, false, false, "ffcbd5e1", "ffcbd5e1", 190, 190, "Static", false, "1/8", "Fixed", "Sine_1Bar", 0, 0);
+
+        return addedCount;
     }
 
     void createNewPreset()
@@ -1380,6 +1708,11 @@ private:
         p.setProperty(StateKeys::PresetMoveSpeed, "Sine_4Bars", nullptr);
         p.setProperty(StateKeys::PresetMoveAmpPan, 80, nullptr);
         p.setProperty(StateKeys::PresetMoveAmpTilt, 60, nullptr);
+
+        p.setProperty(StateKeys::PresetUseColor, (pool == "Color" || pool == "ImpactFX"), nullptr);
+        p.setProperty(StateKeys::PresetUseDimmer, (pool == "Dimmer" || pool == "ImpactFX"), nullptr);
+        p.setProperty(StateKeys::PresetUseMove, (pool == "Movement"), nullptr);
+        p.setProperty(StateKeys::PresetUseStrobe, (pool == "Strobe"), nullptr);
 
         rebuildPresetCommands(p);
         presetLibNode.addChild(p, -1, nullptr);
@@ -1493,7 +1826,6 @@ private:
     std::vector<std::unique_ptr<juce::TextButton>> poolButtons;
     std::vector<juce::ValueTree> filteredPresets;
     juce::ListBox presetList;
-    juce::TextButton addPresetBtn, dupPresetBtn, delPresetBtn, saveLibBtn, loadLibBtn;
 
     // Colonna Centrale
     juce::Label editorTitle, nameLbl, poolLbl, layerLbl, durLbl, phaseLbl;
@@ -1507,6 +1839,7 @@ private:
     std::vector<std::unique_ptr<juce::ToggleButton>> roleToggles;
 
     juce::Label paramsHeaderLbl;
+    juce::ToggleButton useColorToggle, useDimmerToggle, useMoveToggle, useStrobeToggle;
     juce::Label color1Lbl, color2Lbl;
     std::vector<std::unique_ptr<juce::TextButton>> quickColorBtns1;
     std::vector<std::unique_ptr<juce::TextButton>> quickColorBtns2;
@@ -1532,6 +1865,8 @@ private:
     StageSimulatorView previewSimulator;
 
     std::unique_ptr<juce::FileChooser> fileChooser;
+
+    juce::TextButton addPresetBtn, dupPresetBtn, delPresetBtn, factoryPresetsBtn, saveLibBtn, loadLibBtn;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(SceneBuilderTab)
 };

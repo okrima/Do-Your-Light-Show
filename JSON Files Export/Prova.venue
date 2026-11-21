@@ -29,10 +29,10 @@
       "map_Strobe": 1,
       "map_Pan": 5,
       "map_Tilt": 6,
-      "panMin": 0,
-      "panMax": 255,
-      "tiltMin": 49,
-      "tiltMax": 211,
+      "panMin": 68,
+      "panMax": 188,
+      "tiltMin": 45,
+      "tiltMax": 135,
       "swapPanTilt": false,
       "invertPan": false,
       "invertTilt": false,
@@ -41,29 +41,29 @@
           "nodeType": "FIXTURE_UNIT",
           "unitIndex": 1,
           "isPlaced": true,
-          "posX": 0.190355330705643,
-          "posY": 0.244552060961723
+          "posX": 0.095177665352821,
+          "posY": 0.159601002931595
         },
         {
           "nodeType": "FIXTURE_UNIT",
           "unitIndex": 2,
           "isPlaced": true,
-          "posX": 0.275380700826645,
-          "posY": 0.242130756378174
+          "posX": 0.162436544895172,
+          "posY": 0.158354118466377
         },
         {
           "nodeType": "FIXTURE_UNIT",
           "unitIndex": 3,
           "isPlaced": true,
-          "posX": 0.362944155931473,
-          "posY": 0.240920096635818
+          "posX": 0.239847719669342,
+          "posY": 0.155860349535942
         },
         {
           "nodeType": "FIXTURE_UNIT",
           "unitIndex": 4,
           "isPlaced": true,
-          "posX": 0.449238568544388,
-          "posY": 0.238498792052269
+          "posX": 0.326142132282257,
+          "posY": 0.155860349535942
         }
       ]
     },
@@ -100,29 +100,29 @@
           "nodeType": "FIXTURE_UNIT",
           "unitIndex": 1,
           "isPlaced": true,
-          "posX": 0.84517765045166,
-          "posY": 0.246973365545273
+          "posX": 0.869289338588715,
+          "posY": 0.155860349535942
         },
         {
           "nodeType": "FIXTURE_UNIT",
           "unitIndex": 2,
           "isPlaced": true,
-          "posX": 0.772842645645142,
-          "posY": 0.248184025287628
+          "posX": 0.780456840991974,
+          "posY": 0.155860349535942
         },
         {
           "nodeType": "FIXTURE_UNIT",
           "unitIndex": 3,
           "isPlaced": true,
-          "posX": 0.618020296096802,
-          "posY": 0.245762705802917
+          "posX": 0.610406100749969,
+          "posY": 0.158354118466377
         },
         {
           "nodeType": "FIXTURE_UNIT",
           "unitIndex": 4,
           "isPlaced": true,
-          "posX": 0.697969555854797,
-          "posY": 0.250605314970016
+          "posX": 0.69923859834671,
+          "posY": 0.158354118466377
         }
       ]
     },
@@ -159,15 +159,15 @@
           "nodeType": "FIXTURE_UNIT",
           "unitIndex": 1,
           "isPlaced": true,
-          "posX": 0.312182754278183,
-          "posY": 0.180387407541275
+          "posX": 0.401015222072601,
+          "posY": 0.154613465070724
         },
         {
           "nodeType": "FIXTURE_UNIT",
           "unitIndex": 2,
           "isPlaced": true,
-          "posX": 0.738578677177429,
-          "posY": 0.186440676450729
+          "posX": 0.506345152854919,
+          "posY": 0.154613465070724
         }
       ]
     },
@@ -178,10 +178,10 @@
       "startAddress": 31,
       "channelCount": 8,
       "role": "FX: Geyser Verticale (Fumo + LED)",
-      "map_Dimmer": 1,
-      "map_Red": 2,
-      "map_Green": 3,
-      "map_Blue": 4,
+      "map_Dimmer": 2,
+      "map_Red": 3,
+      "map_Green": 4,
+      "map_Blue": 5,
       "strobeMode": 0,
       "dimmerMaxVal": 134,
       "strobeOpenVal": 0,
@@ -197,21 +197,21 @@
       "panRange": 120,
       "tiltRange": 90,
       "map_GeyserBlast": 1,
-      "map_Strobe": 1,
+      "map_Strobe": 0,
       "children": [
         {
           "nodeType": "FIXTURE_UNIT",
           "unitIndex": 1,
           "isPlaced": true,
-          "posX": 0.162030443549156,
-          "posY": 0.911573827266693
+          "posX": 0.385786801576614,
+          "posY": 0.834164559841156
         },
         {
           "nodeType": "FIXTURE_UNIT",
           "unitIndex": 2,
           "isPlaced": true,
-          "posX": 0.837969541549683,
-          "posY": 0.911573827266693
+          "posX": 0.616751253604889,
+          "posY": 0.8329176902771
         }
       ]
     },
@@ -246,15 +246,15 @@
           "nodeType": "FIXTURE_UNIT",
           "unitIndex": 1,
           "isPlaced": true,
-          "posX": 0.295685291290283,
-          "posY": 0.910411596298218
+          "posX": 0.137690350413322,
+          "posY": 0.831670820713043
         },
         {
           "nodeType": "FIXTURE_UNIT",
           "unitIndex": 2,
           "isPlaced": true,
-          "posX": 0.680203020572662,
-          "posY": 0.907990336418152
+          "posX": 0.862309634685516,
+          "posY": 0.831670820713043
         }
       ]
     },
@@ -291,29 +291,29 @@
           "nodeType": "FIXTURE_UNIT",
           "unitIndex": 1,
           "isPlaced": true,
-          "posX": 0.837969541549683,
-          "posY": 0.698692500591278
+          "posX": 0.814720809459686,
+          "posY": 0.82917708158493
         },
         {
           "nodeType": "FIXTURE_UNIT",
           "unitIndex": 2,
           "isPlaced": true,
-          "posX": 0.162030443549156,
-          "posY": 0.698692500591278
+          "posX": 0.204314723610878,
+          "posY": 0.826683282852173
         },
         {
           "nodeType": "FIXTURE_UNIT",
           "unitIndex": 3,
           "isPlaced": true,
-          "posX": 0.36167511343956,
-          "posY": 0.698692500591278
+          "posX": 0.350253820419312,
+          "posY": 0.795511245727539
         },
         {
           "nodeType": "FIXTURE_UNIT",
           "unitIndex": 4,
           "isPlaced": true,
-          "posX": 0.582487285137177,
-          "posY": 0.698692500591278
+          "posX": 0.649746179580688,
+          "posY": 0.800498723983765
         }
       ]
     },
@@ -347,15 +347,15 @@
           "nodeType": "FIXTURE_UNIT",
           "unitIndex": 1,
           "isPlaced": true,
-          "posX": 0.734771549701691,
-          "posY": 0.091234870254993
+          "posX": 0.959390878677368,
+          "posY": 0.138403996825218
         },
         {
           "nodeType": "FIXTURE_UNIT",
           "unitIndex": 2,
           "isPlaced": true,
-          "posX": 0.199238583445549,
-          "posY": 0.091234870254993
+          "posX": 0.040609136223793,
+          "posY": 0.140897750854492
         }
       ]
     }
