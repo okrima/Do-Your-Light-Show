@@ -385,6 +385,12 @@ ShowBuilderTab::ShowBuilderTab(juce::ValueTree& state) : appState(state), miniDa
     miniDawTimeline.onSceneDragFinished = [this](juce::ValueTree editedScene) {
         sortScenesByStartBeat(editedScene);
         };
+
+    miniDawTimeline.onPreferredHeightChanged = [this]() {
+        resized();
+        repaint();
+        };
+
     addAndMakeVisible(miniDawTimeline);
     miniDawTimeline.syncWithAppState();
 
@@ -680,7 +686,7 @@ void ShowBuilderTab::paint(juce::Graphics& g)
     g.fillAll(juce::Colour(0xff1a1a1e));
     g.setColour(juce::Colour(0xff2a2a32));
 
-    const float topOffset = 285.0f;
+    const float topOffset = static_cast<float>(aiWizardPanel.getBottom() + 4);
     const float dividerX = getLocalBounds().toFloat().proportionOfWidth(0.30f);
     g.fillRect(juce::Rectangle<float>(dividerX, topOffset, 2.0f, static_cast<float>(getHeight()) - topOffset));
 }
@@ -751,7 +757,9 @@ void ShowBuilderTab::resized()
     auto bounds = getLocalBounds();
 
     // 1. Fascia Superiore: Mini-DAW (145 px) + AI Wizard & Slot Stem (108 px)
-    miniDawTimeline.setBounds(bounds.removeFromTop(145));
+    const int timelineH = juce::jlimit(145, 250, miniDawTimeline.getPreferredHeight());
+    miniDawTimeline.setBounds(bounds.removeFromTop(timelineH));
+
     aiWizardPanel.setBounds(bounds.removeFromTop(136));
     bounds.removeFromTop(4);
 

@@ -485,6 +485,7 @@ private:
         float panCmd = 0.5f;
         float tiltCmd = 0.5f;
         juce::Colour fallbackColor{ 0xff1e3a8a };
+        juce::String motionPhaseMode{ "SymmetricalFan" };
 
         juce::Colour getEffectiveColour() const
         {
@@ -524,10 +525,28 @@ private:
         juce::ValueTree unitNode;
     };
 
+    struct ActiveSceneEntry
+    {
+        juce::ValueTree node;
+        double startBeat = 1.0;
+        double durationBeats = 4.0;
+        double progress = 0.0;
+        int orderIndex = 0;
+        int layerPriority = 0; // 0 = Base, 1 = Movement, 2 = OverlayFX
+    };
+
+    static int getLayerPriority(const juce::ValueTree& node)
+    {
+        const juce::String layer = node.getProperty(StateKeys::LayerType, "Base").toString();
+        if (layer.equalsIgnoreCase("OverlayFX")) return 2;
+        if (layer.equalsIgnoreCase("Movement"))  return 1;
+        return 0;
+    }
+
     bool isSimulationRunning() const
     {
         if (standalonePreviewMode)
-            return previewPlaying && !oneShotFinished && activeNode.isValid();
+            return previewPlaying && !oneShotFinished && !activeScenes.empty();
 
         return audioEngine != nullptr && audioEngine->isPlaying();
     }
@@ -547,40 +566,37 @@ private:
             currentTimeSec = audioEngine->getCurrentPositionSeconds();
             currentMusicalPos = beatTimeMap->secondsToMusicalPosition(currentTimeSec);
             currentBeat = currentMusicalPos.totalQuarters;
-            selectActiveTimelineScene(currentBeat);
+            selectActiveTimelineScenes(currentBeat);
         }
 
-        updateFogFromActiveNode(dtSec);
+        updateFogFromActiveScenes(dtSec);
         repaint();
     }
 
     void updateStandalonePreviewClock(double dtSec)
     {
-        activeNode = previewPresetNode;
-        activeSceneStartBeat = 1.0;
+        activeScenes.clear();
 
-        if (!activeNode.isValid())
+        if (!previewPresetNode.isValid())
         {
             activeSceneName = "Seleziona un Preset da testare";
-            activeSceneDuration = 4.0;
-            activeSceneProgress = 0.0;
             currentBeat = 1.0;
             currentTimeSec = 0.0;
             return;
         }
 
-        activeSceneName = activeNode.getProperty(StateKeys::PresetName, "Preset").toString();
-        activeSceneDuration = juce::jmax(0.25, static_cast<double>(activeNode.getProperty(StateKeys::DurationBeats, 4.0)));
-        bool isOneShot = static_cast<bool>(activeNode.getProperty(StateKeys::IsOneShot, false));
+        activeSceneName = previewPresetNode.getProperty(StateKeys::PresetName, "Preset").toString();
+        const double dur = juce::jmax(0.25, static_cast<double>(previewPresetNode.getProperty(StateKeys::DurationBeats, 4.0)));
+        const bool isOneShot = static_cast<bool>(previewPresetNode.getProperty(StateKeys::IsOneShot, false));
 
         if (previewPlaying && !oneShotFinished)
         {
             previewBeat += dtSec * (previewBpm / 60.0);
-            if (previewBeat >= 1.0 + activeSceneDuration)
+            if (previewBeat >= 1.0 + dur)
             {
                 if (isOneShot)
                 {
-                    previewBeat = 1.0 + activeSceneDuration;
+                    previewBeat = 1.0 + dur;
                     oneShotFinished = true;
                     previewPlaying = false;
                     if (onPreviewPlaybackChanged)
@@ -588,7 +604,7 @@ private:
                 }
                 else
                 {
-                    previewBeat = 1.0 + std::fmod(previewBeat - 1.0, activeSceneDuration);
+                    previewBeat = 1.0 + std::fmod(previewBeat - 1.0, dur);
                 }
             }
         }
@@ -597,16 +613,21 @@ private:
         currentTimeSec = juce::jmax(0.0, currentBeat - 1.0) * (60.0 / previewBpm);
         currentMusicalPos = BeatTimeMap::makeFixedMeterPosition(
             currentBeat, previewTimeSigNum, previewTimeSigDen, previewBpm);
-        activeSceneProgress = juce::jlimit(0.0, 1.0, (currentBeat - 1.0) / activeSceneDuration);
+
+        ActiveSceneEntry entry;
+        entry.node = previewPresetNode;
+        entry.startBeat = 1.0;
+        entry.durationBeats = dur;
+        entry.progress = juce::jlimit(0.0, 1.0, (currentBeat - 1.0) / dur);
+        entry.orderIndex = 0;
+        entry.layerPriority = getLayerPriority(previewPresetNode);
+        activeScenes.push_back(entry);
     }
 
-    void selectActiveTimelineScene(double beat)
+    void selectActiveTimelineScenes(double beat)
     {
-        activeNode = juce::ValueTree();
+        activeScenes.clear();
         activeSceneName = "Nessuna Scena Attiva (Blackout)";
-        activeSceneStartBeat = 1.0;
-        activeSceneDuration = 4.0;
-        activeSceneProgress = 0.0;
 
         auto showNode = appState.getChildWithName(StateKeys::ShowNode);
         if (!showNode.isValid())
@@ -618,50 +639,77 @@ private:
             if (!scene.hasType(StateKeys::Scene))
                 continue;
 
-            double startB = static_cast<double>(scene.getProperty(StateKeys::StartBeat, 1.0));
-            double durB = juce::jmax(0.25, static_cast<double>(scene.getProperty(StateKeys::DurationBeats, 4.0)));
+            const double startB = static_cast<double>(scene.getProperty(StateKeys::StartBeat, 1.0));
+            const double durB = juce::jmax(0.25, static_cast<double>(scene.getProperty(StateKeys::DurationBeats, 4.0)));
 
             if (beat >= startB && beat < (startB + durB))
             {
-                activeNode = scene;
-                activeSceneStartBeat = startB;
-                activeSceneDuration = durB;
-                activeSceneProgress = juce::jlimit(0.0, 1.0, (beat - startB) / durB);
-                activeSceneName = scene.getProperty(StateKeys::SceneName, "Scena").toString();
-                break;
+                ActiveSceneEntry entry;
+                entry.node = scene;
+                entry.startBeat = startB;
+                entry.durationBeats = durB;
+                entry.progress = juce::jlimit(0.0, 1.0, (beat - startB) / durB);
+                entry.orderIndex = i;
+                entry.layerPriority = getLayerPriority(scene);
+                activeScenes.push_back(entry);
             }
         }
+
+        if (activeScenes.empty())
+            return;
+
+        // Ordine di valutazione: Base -> Movement -> OverlayFX; a parita' di layer vince chi inizia dopo (LTP)
+        std::sort(activeScenes.begin(), activeScenes.end(),
+            [](const ActiveSceneEntry& a, const ActiveSceneEntry& b) {
+                if (a.layerPriority != b.layerPriority) return a.layerPriority < b.layerPriority;
+                if (std::abs(a.startBeat - b.startBeat) > 1e-5) return a.startBeat < b.startBeat;
+                return a.orderIndex < b.orderIndex;
+            });
+
+        juce::StringArray names;
+        const int maxNames = juce::jmin(3, static_cast<int>(activeScenes.size()));
+        for (int i = 0; i < maxNames; ++i)
+            names.add(activeScenes[static_cast<size_t>(i)].node.getProperty(StateKeys::SceneName, "Scena").toString());
+
+        activeSceneName = names.joinIntoString(" + ");
+        if (static_cast<int>(activeScenes.size()) > maxNames)
+            activeSceneName += " (+" + juce::String(static_cast<int>(activeScenes.size()) - maxNames) + ")";
     }
 
-    void updateFogFromActiveNode(double dtSec)
+    void updateFogFromActiveScenes(double dtSec)
     {
-        // Blocca l'evoluzione della nebbia se il loop o la timeline sono in pausa
         if (!isSimulationRunning())
             return;
 
         float smokeOut = 0.0f;
-        if (activeNode.isValid())
+        const double barLenQ = juce::jmax(0.25, currentMusicalPos.barLengthQ);
+
+        for (const auto& entry : activeScenes)
         {
-            for (int c = 0; c < activeNode.getNumChildren(); ++c)
+            if (!entry.node.isValid()) continue;
+            const double clipElapsedBars = juce::jmax(0.0, currentBeat - entry.startBeat) / barLenQ;
+
+            for (int c = 0; c < entry.node.getNumChildren(); ++c)
             {
-                auto cmd = activeNode.getChild(c);
+                auto cmd = entry.node.getChild(c);
                 if (!cmd.hasType(StateKeys::RoleCommand)) continue;
 
-                juce::String roleName = cmd.getProperty(StateKeys::TargetRole, "").toString().trim();
-                juce::String param = cmd.getProperty(StateKeys::TargetParam, "Dimmer").toString().trim();
+                const juce::String roleName = cmd.getProperty(StateKeys::TargetRole, "").toString().trim();
+                const juce::String param = cmd.getProperty(StateKeys::TargetParam, "Dimmer").toString().trim();
                 if (StageRoleCatalog::classifyRole(roleName) == StageRoleCatalog::Category::FxSmokeHazer &&
                     param.equalsIgnoreCase("Dimmer"))
                 {
-                    float sVal = static_cast<float>(static_cast<int>(cmd.getProperty(StateKeys::StartValue, 0))) / 255.0f;
-                    float eVal = static_cast<float>(static_cast<int>(cmd.getProperty(StateKeys::EndValue, 255))) / 255.0f;
-                    juce::String curve = cmd.getProperty(StateKeys::CurveType, "Linear").toString();
+                    const float sVal = static_cast<float>(static_cast<int>(cmd.getProperty(StateKeys::StartValue, 0))) / 255.0f;
+                    const float eVal = static_cast<float>(static_cast<int>(cmd.getProperty(StateKeys::EndValue, 255))) / 255.0f;
+                    const juce::String curve = cmd.getProperty(StateKeys::CurveType, "Linear").toString();
                     smokeOut = juce::jmax(smokeOut,
-                        CurveEvaluator::evaluate(curve, sVal, eVal, static_cast<float>(activeSceneProgress), currentMusicalPos, 0.0));
+                        CurveEvaluator::evaluate(curve, sVal, eVal,
+                            static_cast<float>(entry.progress), currentMusicalPos, 0.0, false, clipElapsedBars));
                 }
             }
         }
 
-        float dt = static_cast<float>(dtSec);
+        const float dt = static_cast<float>(dtSec);
         if (smokeOut > 0.02f)
             currentFogDensity = juce::jmin(1.0f, currentFogDensity + smokeOut * 0.27f * dt);
         else
@@ -671,155 +719,222 @@ private:
     void evaluateStateForFixture(VisualFixture& vf) const
     {
         vf.state = RoleRuntimeState();
-        if (!activeNode.isValid())
+        if (activeScenes.empty())
             return;
 
         if (standalonePreviewMode && oneShotFinished)
             return;
 
-        juce::String phaseMode = activeNode.getProperty(StateKeys::PhaseMode, "Sync").toString();
-        double phaseOffsetCycles = 0.0;
-        if (phaseMode.equalsIgnoreCase("OddEven"))
+        const double barLenQ = juce::jmax(0.25, currentMusicalPos.barLengthQ);
+
+        for (const auto& entry : activeScenes)
         {
-            phaseOffsetCycles = (vf.roleSpatialIndex % 2 == 1) ? 0.5 : 0.0;
-        }
-        else if (phaseMode.equalsIgnoreCase("LeftToRight") && vf.roleSpatialTotal > 1)
-        {
-            phaseOffsetCycles = static_cast<double>(vf.roleSpatialIndex) / static_cast<double>(vf.roleSpatialTotal);
-        }
-
-        // 1. Cerca comandi che corrispondono esattamente al nome ruolo (o alla categoria come fallback)
-        bool foundExactRole = false;
-        for (int c = 0; c < activeNode.getNumChildren(); ++c)
-        {
-            auto cmd = activeNode.getChild(c);
-            if (!cmd.hasType(StateKeys::RoleCommand)) continue;
-            if (cmd.getProperty(StateKeys::TargetRole, "").toString().trim() == vf.roleName)
-            {
-                foundExactRole = true;
-                break;
-            }
-        }
-
-        bool hasMusicalStrobeCmd = false;
-        double strobeHitsPerBeat = 2.0;
-
-        bool requestedPan = false, requestedTilt = false;
-        bool requestedActivePan = false, requestedActiveTilt = false;
-
-        for (int c = 0; c < activeNode.getNumChildren(); ++c)
-        {
-            auto cmd = activeNode.getChild(c);
-            if (!cmd.hasType(StateKeys::RoleCommand)) continue;
-
-            juce::String cmdRole = cmd.getProperty(StateKeys::TargetRole, "").toString().trim();
-            bool matches = foundExactRole
-                ? (cmdRole == vf.roleName)
-                : (StageRoleCatalog::classifyRole(cmdRole) == vf.category);
-
-            if (!matches)
+            if (!entry.node.isValid())
                 continue;
 
-            juce::String param = cmd.getProperty(StateKeys::TargetParam, "Dimmer").toString().trim();
-            float startVal = static_cast<float>(static_cast<int>(cmd.getProperty(StateKeys::StartValue, 0))) / 255.0f;
-            float endVal = static_cast<float>(static_cast<int>(cmd.getProperty(StateKeys::EndValue, 255))) / 255.0f;
-            juce::String curve = cmd.getProperty(StateKeys::CurveType, "Linear").toString();
-            juce::String defaultHex = activeNode.getProperty(StateKeys::PresetColor1, "ff1e3a8a").toString();
-            juce::String colHex = cmd.getProperty(StateKeys::CommandColor, defaultHex).toString();
+            const juce::String phaseMode = entry.node.getProperty(StateKeys::PhaseMode, "Sync").toString();
+            double phaseOffsetCycles = 0.0;
+            if (phaseMode.equalsIgnoreCase("OddEven"))
+                phaseOffsetCycles = (vf.roleSpatialIndex % 2 == 1) ? 0.5 : 0.0;
+            else if (phaseMode.equalsIgnoreCase("LeftToRight") && vf.roleSpatialTotal > 1)
+                phaseOffsetCycles = static_cast<double>(vf.roleSpatialIndex) / static_cast<double>(vf.roleSpatialTotal);
 
-            const bool isPanOrTilt = param.equalsIgnoreCase("Pan") || param.equalsIgnoreCase("Tilt");
-            const double barLenQ = juce::jmax(0.25, currentMusicalPos.barLengthQ);
-            const double clipElapsedBars = juce::jmax(0.0, currentBeat - activeSceneStartBeat) / barLenQ;
+            bool foundExactRole = false;
+            for (int c = 0; c < entry.node.getNumChildren(); ++c)
+            {
+                auto cmd = entry.node.getChild(c);
+                if (!cmd.hasType(StateKeys::RoleCommand)) continue;
+                if (cmd.getProperty(StateKeys::TargetRole, "").toString().trim() == vf.roleName)
+                {
+                    foundExactRole = true;
+                    break;
+                }
+            }
 
-            float val = CurveEvaluator::evaluate(curve, startVal, endVal,
-                static_cast<float>(activeSceneProgress), currentMusicalPos, phaseOffsetCycles,
-                isPanOrTilt, clipElapsedBars);
+            bool localAny = false;
+            bool localHasColor = false;
+            float locR = -1.0f, locG = -1.0f, locB = -1.0f, locW = -1.0f, locUv = -1.0f;
+            juce::Colour locFallback = vf.state.fallbackColor;
+
+            bool localHasDimmer = false;
+            float locDimmer = 0.0f;
+            bool localHasMusicalStrobe = false;
+            double localStrobeHitsPerQ = 2.0;
+            bool localHasHwStrobe = false;
+            float locHwStrobe = 0.0f;
+
+            bool localHasPan = false, localHasTilt = false;
+            float locPan = 0.5f, locTilt = 0.5f;
+            bool requestedPan = false, requestedTilt = false;
+            bool requestedActivePan = false, requestedActiveTilt = false;
+
+            const double clipElapsedBars = juce::jmax(0.0, currentBeat - entry.startBeat) / barLenQ;
+
+            for (int c = 0; c < entry.node.getNumChildren(); ++c)
+            {
+                auto cmd = entry.node.getChild(c);
+                if (!cmd.hasType(StateKeys::RoleCommand)) continue;
+
+                const juce::String cmdRole = cmd.getProperty(StateKeys::TargetRole, "").toString().trim();
+                const bool matches = foundExactRole
+                    ? (cmdRole == vf.roleName)
+                    : (StageRoleCatalog::classifyRole(cmdRole) == vf.category);
+
+                if (!matches)
+                    continue;
+
+                const juce::String param = cmd.getProperty(StateKeys::TargetParam, "Dimmer").toString().trim();
+                const float startVal = static_cast<float>(static_cast<int>(cmd.getProperty(StateKeys::StartValue, 0))) / 255.0f;
+                const float endVal = static_cast<float>(static_cast<int>(cmd.getProperty(StateKeys::EndValue, 255))) / 255.0f;
+                const juce::String curve = cmd.getProperty(StateKeys::CurveType, "Linear").toString();
+                const juce::String defaultHex = entry.node.getProperty(StateKeys::PresetColor1, "ff1e3a8a").toString();
+                const juce::String colHex = cmd.getProperty(StateKeys::CommandColor, defaultHex).toString();
+
+                const bool isPanOrTilt = param.equalsIgnoreCase("Pan") || param.equalsIgnoreCase("Tilt");
+                const float val = CurveEvaluator::evaluate(curve, startVal, endVal,
+                    static_cast<float>(entry.progress), currentMusicalPos, phaseOffsetCycles,
+                    isPanOrTilt, clipElapsedBars);
+
+                localAny = true;
+                locFallback = juce::Colour::fromString(colHex);
+
+                if (param.equalsIgnoreCase("Dimmer"))
+                {
+                    localHasDimmer = true;
+                    locDimmer = val;
+
+                    const double hitsPerQ = CurveEvaluator::getStrobeHitsPerQuarter(curve);
+                    if (hitsPerQ > 0.0)
+                    {
+                        localHasMusicalStrobe = true;
+                        localStrobeHitsPerQ = hitsPerQ;
+                    }
+                }
+                else if (param.equalsIgnoreCase("Red")) { localHasColor = true; locR = val; }
+                else if (param.equalsIgnoreCase("Green")) { localHasColor = true; locG = val; }
+                else if (param.equalsIgnoreCase("Blue")) { localHasColor = true; locB = val; }
+                else if (param.equalsIgnoreCase("White")) { localHasColor = true; locW = val; }
+                else if (param.equalsIgnoreCase("UV")) { localHasColor = true; locUv = val; }
+                else if (param.equalsIgnoreCase("Strobe")) { localHasHwStrobe = true; locHwStrobe = val; }
+                else if (param.equalsIgnoreCase("Pan"))
+                {
+                    requestedPan = true;
+                    if (!curve.equalsIgnoreCase("Static"))
+                        requestedActivePan = true;
+
+                    if (vf.panTiltSpec.hasPanChannel)
+                    {
+                        localHasPan = true;
+                        locPan = val;
+                    }
+                }
+                else if (param.equalsIgnoreCase("Tilt"))
+                {
+                    requestedTilt = true;
+                    if (!curve.equalsIgnoreCase("Static"))
+                        requestedActiveTilt = true;
+
+                    if (vf.panTiltSpec.hasTiltChannel)
+                    {
+                        localHasTilt = true;
+                        locTilt = val;
+                    }
+                }
+            }
+
+            if (!localAny)
+                continue;
 
             vf.state.hasAnyCommand = true;
-            vf.state.fallbackColor = juce::Colour::fromString(colHex);
 
-            if (param.equalsIgnoreCase("Dimmer"))
+            // 1. COLORE -> LTP (solo se questa scena scrive davvero canali colore)
+            if (localHasColor)
             {
+                vf.state.red = locR;
+                vf.state.green = locG;
+                vf.state.blue = locB;
+                vf.state.white = locW;
+                vf.state.uv = locUv;
+                vf.state.fallbackColor = locFallback;
+            }
+            else if (vf.state.red < 0.0f && vf.state.green < 0.0f && vf.state.blue < 0.0f &&
+                vf.state.white < 0.0f && vf.state.uv < 0.0f)
+            {
+                vf.state.fallbackColor = locFallback;
+            }
+
+            // 2. MOVIMENTO PAN/TILT -> LTP (mantiene il PhaseMode della scena di movimento)
+            if (localHasPan)
+            {
+                vf.state.hasPanCmd = true;
+                vf.state.panCmd = locPan;
+                vf.state.motionPhaseMode = phaseMode;
+            }
+            if (localHasTilt)
+            {
+                vf.state.hasTiltCmd = true;
+                vf.state.tiltCmd = locTilt;
+                vf.state.motionPhaseMode = phaseMode;
+            }
+
+            if (requestedPan || requestedTilt)
+            {
+                const bool canMoveAny = (requestedPan && vf.panTiltSpec.hasPanChannel)
+                    || (requestedTilt && vf.panTiltSpec.hasTiltChannel);
+                const bool missingActiveAxis = (requestedActivePan && !vf.panTiltSpec.hasPanChannel && !requestedActiveTilt)
+                    || (requestedActiveTilt && !vf.panTiltSpec.hasTiltChannel && !requestedActivePan);
+
+                if (!canMoveAny || missingActiveAxis)
+                    vf.state.blockedByMovePolicy = true;
+                else
+                    vf.state.blockedByMovePolicy = false;
+            }
+
+            // 3. STROBO (Override) oppure DIMMER (HTP)
+            if (localHasMusicalStrobe)
+            {
+                const double activeBpm = currentMusicalPos.localBpm;
+                if (vf.strobeSpec.mode == 1 || vf.strobeSpec.mode == 2)
+                {
+                    vf.state.hasDimmerCmd = true;
+                    vf.state.dimmer = 1.0f;
+                    vf.state.strobe = 1.0f;
+                    vf.state.strobeTargetHz = static_cast<float>((activeBpm / 60.0) * localStrobeHitsPerQ);
+                    vf.state.blockedByStrobePolicy = false;
+                }
+                else if (vf.strobeSpec.mode == 3)
+                {
+                    // Strobo disabilitato su questo faro: ignora lo strobo ma non spegne un eventuale Dimmer Base attivo
+                    vf.state.blockedByStrobePolicy = true;
+                }
+                else
+                {
+                    // mode == 0 (Dimmer Flash): prevale sul Dimmer Base per lampeggiare davvero
+                    vf.state.hasDimmerCmd = true;
+                    vf.state.dimmer = locDimmer;
+                    vf.state.blockedByStrobePolicy = false;
+                }
+            }
+            else if (localHasDimmer)
+            {
+                vf.state.dimmer = vf.state.hasDimmerCmd
+                    ? juce::jmax(vf.state.dimmer, locDimmer)
+                    : locDimmer;
                 vf.state.hasDimmerCmd = true;
-                vf.state.dimmer = val;
-
-                double hitsPerQ = CurveEvaluator::getStrobeHitsPerQuarter(curve);
-                if (hitsPerQ > 0.0)
-                {
-                    hasMusicalStrobeCmd = true;
-                    strobeHitsPerBeat = hitsPerQ;
-                }
             }
-            else if (param.equalsIgnoreCase("Red"))     vf.state.red = val;
-            else if (param.equalsIgnoreCase("Green"))   vf.state.green = val;
-            else if (param.equalsIgnoreCase("Blue"))    vf.state.blue = val;
-            else if (param.equalsIgnoreCase("White"))   vf.state.white = val;
-            else if (param.equalsIgnoreCase("UV"))      vf.state.uv = val;
-            else if (param.equalsIgnoreCase("Strobe"))  vf.state.strobe = val;
-            else if (param.equalsIgnoreCase("Pan"))
-            {
-                requestedPan = true;
-                if (!curve.equalsIgnoreCase("Static"))
-                    requestedActivePan = true;
 
-                if (vf.panTiltSpec.hasPanChannel)
-                {
-                    vf.state.hasPanCmd = true;
-                    vf.state.panCmd = val;
-                }
-            }
-            else if (param.equalsIgnoreCase("Tilt"))
-            {
-                requestedTilt = true;
-                if (!curve.equalsIgnoreCase("Static"))
-                    requestedActiveTilt = true;
-
-                if (vf.panTiltSpec.hasTiltChannel)
-                {
-                    vf.state.hasTiltCmd = true;
-                    vf.state.tiltCmd = val;
-                }
-            }
+            if (localHasHwStrobe)
+                vf.state.strobe = juce::jmax(vf.state.strobe, locHwStrobe);
         }
 
-        if (hasMusicalStrobeCmd)
+        // Cortesia in Preview Standalone (Tab 2): accende il faro se testi un preset di solo Colore o solo Movimento
+        if (standalonePreviewMode && vf.state.hasAnyCommand && !activeScenes.empty())
         {
-            const double activeBpm = currentMusicalPos.localBpm;
+            const juce::String pool = activeScenes.back().node.getProperty(StateKeys::PresetPool, "Color").toString();
+            const bool hasRgb = (vf.state.red >= 0.0f || vf.state.green >= 0.0f || vf.state.blue >= 0.0f);
+            const bool hasMove = (vf.state.hasPanCmd || vf.state.hasTiltCmd);
 
-            if (vf.strobeSpec.mode == 1 || vf.strobeSpec.mode == 2)
-            {
-                vf.state.dimmer = 1.0f;
-                vf.state.strobe = 1.0f;
-                vf.state.strobeTargetHz = static_cast<float>((activeBpm / 60.0) * strobeHitsPerBeat);
-            }
-            else if (vf.strobeSpec.mode == 3)
-            {
-                vf.state.dimmer = 0.0f;
-                vf.state.blockedByStrobePolicy = true;
-            }
-            // mode == 0 (Dimmer Flash): mantiene il Dimmer Flash 0/255 gia' calcolato da CurveEvaluator
-        }
-
-        if (requestedPan || requestedTilt)
-        {
-            const bool canMoveAnyRequested = (requestedPan && vf.panTiltSpec.hasPanChannel)
-                || (requestedTilt && vf.panTiltSpec.hasTiltChannel);
-            const bool missingOnlyActiveAxis = (requestedActivePan && !vf.panTiltSpec.hasPanChannel && !requestedActiveTilt)
-                || (requestedActiveTilt && !vf.panTiltSpec.hasTiltChannel && !requestedActivePan);
-
-            if (!canMoveAnyRequested || missingOnlyActiveAxis)
-                vf.state.blockedByMovePolicy = true;
-        }
-
-        // 2. Cortesia in Preview Standalone: se stai testando un preset di solo Colore o solo Movimento
-        //    che non scrive il Dimmer, accendiamo la luce in anteprima cosi' vedi subito l'effetto!
-        if (standalonePreviewMode && vf.state.hasAnyCommand)
-        {
-            juce::String pool = activeNode.getProperty(StateKeys::PresetPool, "Color").toString();
-            bool hasRgb = (vf.state.red >= 0.0f || vf.state.green >= 0.0f || vf.state.blue >= 0.0f);
-            bool hasMove = (vf.state.hasPanCmd || vf.state.hasTiltCmd);
-
-            if (!vf.state.hasDimmerCmd && !vf.state.blockedByMovePolicy && 
+            if (!vf.state.hasDimmerCmd && !vf.state.blockedByMovePolicy &&
                 (pool.equalsIgnoreCase("Color") || pool.equalsIgnoreCase("Movement") || hasRgb || hasMove))
             {
                 vf.state.dimmer = (hasMove && !hasRgb) ? 0.85f : 1.0f;
@@ -828,7 +943,7 @@ private:
             }
         }
 
-        // 3. Applica lo shutter hardware calibrato in Hz reali del singolo faro
+        // Shutter hardware calibrato in Hz reali del singolo faro
         applyHardwareStrobeToFixture(vf, currentTimeSec);
     }
 
@@ -1098,8 +1213,8 @@ private:
 
     void computeEffectivePanTilt(const VisualFixture& vf, float& outPanSigned, float& outTiltNorm) const
     {
-        juce::String phaseMode = activeNode.isValid()
-            ? activeNode.getProperty(StateKeys::PhaseMode, "SymmetricalFan").toString()
+        const juce::String phaseMode = vf.state.motionPhaseMode.isNotEmpty()
+            ? vf.state.motionPhaseMode
             : "SymmetricalFan";
 
         const bool mirrorPan = phaseMode.equalsIgnoreCase("SymmetricalFan")
@@ -1421,13 +1536,10 @@ private:
     bool oneShotFinished = false;
     double lastTickMs = 0.0;
 
-    // Stato Scena / Preset attivo
-    juce::ValueTree activeNode;
+    // Stato Scene / Preset attivi in parallelo
+    std::vector<ActiveSceneEntry> activeScenes;
     double currentBeat = 1.0;
     double currentTimeSec = 0.0;
-    double activeSceneStartBeat = 1.0;
-    double activeSceneDuration = 4.0;
-    double activeSceneProgress = 0.0;
     float currentFogDensity = 0.12f;
     juce::String activeSceneName{ "Pronto" };
 

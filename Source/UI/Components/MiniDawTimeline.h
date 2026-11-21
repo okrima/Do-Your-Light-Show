@@ -6,6 +6,7 @@
 #include "TimeMetricManager.h"
 #include <cmath>
 #include <vector>
+#include <algorithm>
 
 class MiniDawTimeline : public juce::Component,
     private juce::Timer,
@@ -19,6 +20,14 @@ public:
     std::function<void(double)> onBeatPositionChanged;
     std::function<void()> onOpenTimeMetricManager;
     std::function<void(juce::ValueTree)> onSceneDragFinished;
+    std::function<void()> onPreferredHeightChanged;
+
+    int getPreferredHeight() const noexcept
+    {
+        const int visibleLanes = juce::jlimit(1, kMaxVisibleLanes, juce::jmax(1, totalSceneLanes));
+        return 125 + visibleLanes * kSceneLaneHeight;
+    }
+
     bool isDraggingAnyScene() const noexcept { return sceneDragMode != SceneDragMode::None; }
 
     MiniDawTimeline(juce::ValueTree& state, StemAudioEngine& engine, BeatTimeMap& beatMap)
@@ -178,6 +187,10 @@ public:
         horizontalScrollBar.addListener(this);
         addAndMakeVisible(horizontalScrollBar);
 
+        verticalLaneScrollBar.setAutoHide(false);
+        verticalLaneScrollBar.addListener(this);
+        addChildComponent(verticalLaneScrollBar);
+
         lastTimerMs = juce::Time::getMillisecondCounterHiRes();
         syncWithAppState();
         startTimerHz(60);
@@ -190,6 +203,7 @@ public:
 
         stopTimer();
         horizontalScrollBar.removeListener(this);
+        verticalLaneScrollBar.removeListener(this);
         thumbnail.removeChangeListener(this);
         appState.removeListener(this);
     }
@@ -225,6 +239,8 @@ public:
         clickBtn.setToggleState(audioEngine.isMetronomeEnabled(), juce::dontSendNotification);
         clickVolSlider.setValue(audioEngine.getMetronomeGain() * 100.0, juce::dontSendNotification);
         alignBtn.setEnabled(audioEngine.hasFullMixLoaded());
+
+        refreshSceneLanesAndNotify(true);
 
         updateScrollBarRange();
         repaint();
@@ -350,13 +366,34 @@ public:
 
         topInfoBounds = topBar;
 
+        recomputeSceneLanes();
+        const int visibleLanes = juce::jlimit(1, kMaxVisibleLanes, juce::jmax(1, totalSceneLanes));
+        const int laneAreaH = visibleLanes * kSceneLaneHeight + 4;
+
         bounds.removeFromTop(4);
         rulerBounds = bounds.removeFromTop(30);
         horizontalScrollBar.setBounds(bounds.removeFromBottom(12));
         bounds.removeFromBottom(2);
-        sceneLaneBounds = bounds.removeFromBottom(30);
+
+        auto fullSceneArea = bounds.removeFromBottom(laneAreaH);
+        if (totalSceneLanes > kMaxVisibleLanes)
+        {
+            verticalLaneScrollBar.setVisible(true);
+            verticalLaneScrollBar.setBounds(fullSceneArea.removeFromRight(10));
+            fullSceneArea.removeFromRight(2);
+        }
+        else
+        {
+            verticalLaneScrollBar.setVisible(false);
+            laneScrollOffsetPx = 0.0;
+        }
+        sceneLaneBounds = fullSceneArea;
+
         bounds.removeFromBottom(2);
         waveformBounds = bounds;
+
+        updateScrollBarRange();
+        updateVerticalLaneScrollBar();
 
         updateScrollBarRange();
     }
@@ -670,6 +707,7 @@ public:
             }
 
             updateScrollBarRange();
+            refreshSceneLanesAndNotify(false);
             repaint();
             return;
         }
@@ -737,6 +775,8 @@ public:
             draggingSceneNode = juce::ValueTree();
             setMouseCursor(juce::MouseCursor::NormalCursor);
 
+            refreshSceneLanesAndNotify(true);
+
             if (onSceneDragFinished && editedNode.isValid())
                 onSceneDragFinished(editedNode);
             repaint();
@@ -789,6 +829,163 @@ private:
 
     enum class SceneDragMode { None, Move, ResizeLeft, ResizeRight };
 
+    static int getSceneLayerPriority(const juce::ValueTree& scene)
+    {
+        const juce::String layer = scene.getProperty(StateKeys::LayerType, "Base").toString();
+        if (layer.equalsIgnoreCase("OverlayFX")) return 2;
+        if (layer.equalsIgnoreCase("Movement"))  return 1;
+        return 0;
+    }
+
+    static juce::Colour getSceneBlockColour(const juce::ValueTree& scene, bool& outHasColorSwatch, juce::Colour& outSwatch)
+    {
+        outHasColorSwatch = false;
+        outSwatch = juce::Colour(0xff38bdf8);
+
+        bool hasCol = false, hasDim = false, hasMove = false, hasStrobe = false;
+        for (int c = 0; c < scene.getNumChildren(); ++c)
+        {
+            auto cmd = scene.getChild(c);
+            if (!cmd.hasType(StateKeys::RoleCommand)) continue;
+
+            const juce::String param = cmd.getProperty(StateKeys::TargetParam, "").toString();
+            const juce::String curve = cmd.getProperty(StateKeys::CurveType, "").toString();
+
+            if (param.equalsIgnoreCase("Red") || param.equalsIgnoreCase("Green") ||
+                param.equalsIgnoreCase("Blue") || param.equalsIgnoreCase("White") ||
+                param.equalsIgnoreCase("UV"))
+                hasCol = true;
+            else if (param.equalsIgnoreCase("Pan") || param.equalsIgnoreCase("Tilt"))
+                hasMove = true;
+            else if (param.equalsIgnoreCase("Strobe") ||
+                (param.equalsIgnoreCase("Dimmer") && curve.startsWithIgnoreCase("Square")))
+                hasStrobe = true;
+            else if (param.equalsIgnoreCase("Dimmer") || param.equalsIgnoreCase("GeyserBlast"))
+                hasDim = true;
+        }
+
+        if (hasCol)
+        {
+            outHasColorSwatch = true;
+            outSwatch = juce::Colour::fromString(scene.getProperty(StateKeys::PresetColor1, "ff38bdf8").toString());
+        }
+
+        if (hasStrobe)                        return juce::Colour(0xff991b1b); // Rosso Strobo
+        if (hasMove && !hasCol && !hasDim)    return juce::Colour(0xff5b21b6); // Viola Movimento
+        if (hasCol && !hasDim && !hasMove)    return juce::Colour(0xff075985); // Blu/Ciano Colore
+        if (hasDim && !hasCol && !hasMove)    return juce::Colour(0xff92400e); // Ambra Dimmer
+        return juce::Colour(0xff115e59);                                       // Petrolio Multi-Attributo
+    }
+
+    void recomputeSceneLanes()
+    {
+        sceneLaneByIndex.clear();
+        auto showNode = appState.getChildWithName(StateKeys::ShowNode);
+        if (!showNode.isValid() || showNode.getNumChildren() == 0)
+        {
+            totalSceneLanes = 1;
+            return;
+        }
+
+        const int n = showNode.getNumChildren();
+        sceneLaneByIndex.assign(static_cast<size_t>(n), 0);
+
+        std::vector<int> order(static_cast<size_t>(n));
+        for (int i = 0; i < n; ++i) order[static_cast<size_t>(i)] = i;
+
+        std::sort(order.begin(), order.end(), [&](int a, int b) {
+            auto sa = showNode.getChild(a);
+            auto sb = showNode.getChild(b);
+            const double startA = static_cast<double>(sa.getProperty(StateKeys::StartBeat, 1.0));
+            const double startB = static_cast<double>(sb.getProperty(StateKeys::StartBeat, 1.0));
+            if (std::abs(startA - startB) > 1e-5)
+                return startA < startB;
+
+            const int prioA = getSceneLayerPriority(sa);
+            const int prioB = getSceneLayerPriority(sb);
+            if (prioA != prioB)
+                return prioA < prioB;
+
+            return a < b;
+            });
+
+        std::vector<double> laneEndBeats;
+        for (int idx : order)
+        {
+            auto sc = showNode.getChild(idx);
+            const double startB = static_cast<double>(sc.getProperty(StateKeys::StartBeat, 1.0));
+            const double durB = juce::jmax(0.25, static_cast<double>(sc.getProperty(StateKeys::DurationBeats, 4.0)));
+            const double endB = startB + durB;
+
+            int assignedLane = -1;
+            for (size_t l = 0; l < laneEndBeats.size(); ++l)
+            {
+                if (laneEndBeats[l] <= startB + 1e-4)
+                {
+                    assignedLane = static_cast<int>(l);
+                    laneEndBeats[l] = endB;
+                    break;
+                }
+            }
+
+            if (assignedLane < 0)
+            {
+                assignedLane = static_cast<int>(laneEndBeats.size());
+                laneEndBeats.push_back(endB);
+            }
+
+            sceneLaneByIndex[static_cast<size_t>(idx)] = assignedLane;
+        }
+
+        totalSceneLanes = juce::jmax(1, static_cast<int>(laneEndBeats.size()));
+    }
+
+    void updateVerticalLaneScrollBar()
+    {
+        const double contentH = static_cast<double>(juce::jmax(1, totalSceneLanes) * kSceneLaneHeight);
+        const double visibleH = static_cast<double>(juce::jmax(kSceneLaneHeight, sceneLaneBounds.getHeight() - 4));
+        const double maxScroll = juce::jmax(0.0, contentH - visibleH);
+        laneScrollOffsetPx = juce::jlimit(0.0, maxScroll, laneScrollOffsetPx);
+
+        isUpdatingScrollBar = true;
+        verticalLaneScrollBar.setRangeLimits(0.0, contentH, juce::dontSendNotification);
+        verticalLaneScrollBar.setCurrentRange(laneScrollOffsetPx, visibleH, juce::dontSendNotification);
+        isUpdatingScrollBar = false;
+    }
+
+    void refreshSceneLanesAndNotify(bool allowShrink = true)
+    {
+        const int prevTotal = totalSceneLanes;
+        const int prevVisible = juce::jlimit(1, kMaxVisibleLanes, juce::jmax(1, prevTotal));
+
+        recomputeSceneLanes();
+
+        if (!allowShrink && totalSceneLanes < prevTotal)
+            totalSceneLanes = prevTotal;
+
+        const int newVisible = juce::jlimit(1, kMaxVisibleLanes, juce::jmax(1, totalSceneLanes));
+        if (newVisible != prevVisible)
+        {
+            if (onPreferredHeightChanged)
+                onPreferredHeightChanged();
+            else
+                resized();
+        }
+        else if (totalSceneLanes != prevTotal)
+        {
+            resized();
+        }
+        else
+        {
+            updateVerticalLaneScrollBar();
+        }
+    }
+
+    int getLaneTopY(int laneIdx) const noexcept
+    {
+        return sceneLaneBounds.getY() + 2 + laneIdx * kSceneLaneHeight - juce::roundToInt(laneScrollOffsetPx);
+    }
+
     SceneDragMode hitTestSceneBlock(juce::Point<int> pt, int& outSceneIdx) const
     {
         outSceneIdx = -1;
@@ -816,10 +1013,13 @@ private:
             const int x2 = timeToPixelX(endSec, clampedStart, visSec);
             const int w = juce::jmax(8, x2 - x1);
 
-            juce::Rectangle<int> blockRect(x1, sceneLaneBounds.getY() + 2, w, sceneLaneBounds.getHeight() - 4);
+            const int laneIdx = (i < static_cast<int>(sceneLaneByIndex.size())) ? sceneLaneByIndex[static_cast<size_t>(i)] : 0;
+            const int yTop = getLaneTopY(laneIdx);
+
+            juce::Rectangle<int> blockRect(x1, yTop, w, kSceneLaneHeight - 3);
             blockRect = blockRect.getIntersection(sceneLaneBounds);
 
-            if (blockRect.expanded(3, 0).contains(pt))
+            if (!blockRect.isEmpty() && blockRect.expanded(3, 0).contains(pt))
             {
                 outSceneIdx = i;
                 const int handleW = juce::jmin(7, juce::jmax(3, blockRect.getWidth() / 4));
@@ -945,13 +1145,22 @@ private:
 
     void scrollBarMoved(juce::ScrollBar* sb, double newRangeStart) override
     {
-        if (isUpdatingScrollBar || sb != &horizontalScrollBar)
+        if (isUpdatingScrollBar)
             return;
 
-        const double totalSec = getEffectiveTimelineDurationSeconds();
-        const double visSec = getVisibleDurationSeconds(totalSec);
-        viewStartSec = juce::jlimit(0.0, juce::jmax(0.0, totalSec - visSec), newRangeStart);
-        repaint();
+        if (sb == &horizontalScrollBar)
+        {
+            const double totalSec = getEffectiveTimelineDurationSeconds();
+            const double visSec = getVisibleDurationSeconds(totalSec);
+            viewStartSec = juce::jlimit(0.0, juce::jmax(0.0, totalSec - visSec), newRangeStart);
+            repaint();
+        }
+        else if (sb == &verticalLaneScrollBar)
+        {
+            const double maxScroll = juce::jmax(0.0, static_cast<double>(totalSceneLanes * kSceneLaneHeight - (sceneLaneBounds.getHeight() - 4)));
+            laneScrollOffsetPx = juce::jlimit(0.0, maxScroll, newRangeStart);
+            repaint();
+        }
     }
 
     static bool meterIdToSignature(int id, int& outNum, int& outDen) noexcept
@@ -1071,9 +1280,14 @@ private:
         }
     }
 
-    void valueTreePropertyChanged(juce::ValueTree& tree, const juce::Identifier&) override
+    void valueTreePropertyChanged(juce::ValueTree& tree, const juce::Identifier& prop) override
     {
         markBeatMapDirtyIfRelevant(tree);
+        if (tree.hasType(StateKeys::Scene) &&
+            (prop == StateKeys::StartBeat || prop == StateKeys::DurationBeats))
+        {
+            refreshSceneLanesAndNotify(sceneDragMode == SceneDragMode::None);
+        }
         repaint();
     }
 
@@ -1081,6 +1295,8 @@ private:
     {
         markBeatMapDirtyIfRelevant(parent);
         markBeatMapDirtyIfRelevant(child);
+        if (parent.hasType(StateKeys::ShowNode) || child.hasType(StateKeys::Scene))
+            refreshSceneLanesAndNotify(true);
         repaint();
     }
 
@@ -1088,10 +1304,18 @@ private:
     {
         markBeatMapDirtyIfRelevant(parent);
         markBeatMapDirtyIfRelevant(child);
+        if (parent.hasType(StateKeys::ShowNode) || child.hasType(StateKeys::Scene))
+            refreshSceneLanesAndNotify(true);
         repaint();
     }
 
-    void valueTreeChildOrderChanged(juce::ValueTree&, int, int) override { repaint(); }
+    void valueTreeChildOrderChanged(juce::ValueTree& parent, int, int) override
+    {
+        if (parent.hasType(StateKeys::ShowNode))
+            refreshSceneLanesAndNotify(true);
+        repaint();
+    }
+
     void valueTreeParentChanged(juce::ValueTree&) override {}
 
     void promptLoadFullMix()
@@ -1979,47 +2203,81 @@ private:
     {
         g.setColour(juce::Colour(0xff16161d));
         g.fillRect(sceneLaneBounds);
-        g.setColour(juce::Colour(0xff2a2a35));
-        g.drawRect(sceneLaneBounds, 1);
 
         const double visSec = vEndSec - vStartSec;
         auto showNode = appState.getChildWithName(StateKeys::ShowNode);
-        if (!showNode.isValid() || visSec <= 0.001 || sceneLaneBounds.getWidth() <= 0)
-            return;
 
-        for (int i = 0; i < showNode.getNumChildren(); ++i)
+        g.saveState();
+        g.reduceClipRegion(sceneLaneBounds.reduced(1));
+
+        // Guide orizzontali delle corsie parallele
+        for (int l = 1; l < totalSceneLanes; ++l)
         {
-            auto scene = showNode.getChild(i);
-            double startB = static_cast<double>(scene.getProperty(StateKeys::StartBeat, 1.0));
-            double durB = static_cast<double>(scene.getProperty(StateKeys::DurationBeats, 4.0));
+            const int ly = getLaneTopY(l) - 2;
+            g.setColour(juce::Colour(0xff232533));
+            g.drawHorizontalLine(ly, static_cast<float>(sceneLaneBounds.getX()), static_cast<float>(sceneLaneBounds.getRight()));
+        }
 
-            double startSec = beatTimeMap.beatToSeconds(startB);
-            double endSec = beatTimeMap.beatToSeconds(startB + durB);
-            if (endSec < vStartSec || startSec > vEndSec)
-                continue;
-
-            int x1 = timeToPixelX(startSec, vStartSec, visSec);
-            int x2 = timeToPixelX(endSec, vStartSec, visSec);
-            int w = juce::jmax(6, x2 - x1);
-
-            juce::Rectangle<int> blockRect(x1, sceneLaneBounds.getY() + 3, w, sceneLaneBounds.getHeight() - 6);
-            blockRect = blockRect.getIntersection(sceneLaneBounds.reduced(1));
-
-            if (!blockRect.isEmpty())
+        if (showNode.isValid() && visSec > 0.001 && sceneLaneBounds.getWidth() > 0)
+        {
+            for (int i = 0; i < showNode.getNumChildren(); ++i)
             {
-                bool isSel = (i == selectedSceneIndex);
-                g.setColour(isSel ? juce::Colour(0xff3b82f6) : juce::Colour(0xff2e3846));
-                g.fillRoundedRectangle(blockRect.toFloat(), 3.0f);
+                auto scene = showNode.getChild(i);
+                const double startB = static_cast<double>(scene.getProperty(StateKeys::StartBeat, 1.0));
+                const double durB = juce::jmax(0.25, static_cast<double>(scene.getProperty(StateKeys::DurationBeats, 4.0)));
 
-                g.setColour(isSel ? juce::Colours::white : juce::Colour(0xff64748b));
-                g.drawRoundedRectangle(blockRect.toFloat(), 3.0f, 1.0f);
+                const double startSec = beatTimeMap.beatToSeconds(startB);
+                const double endSec = beatTimeMap.beatToSeconds(startB + durB);
+                if (endSec < vStartSec || startSec > vEndSec)
+                    continue;
 
-                juce::String name = scene.getProperty(StateKeys::SceneName, "Scena").toString();
-                g.setColour(juce::Colours::white);
-                g.setFont(juce::FontOptions(11.0f));
-                g.drawText(name, blockRect.reduced(4, 0), juce::Justification::centredLeft, true);
+                const int x1 = timeToPixelX(startSec, vStartSec, visSec);
+                const int x2 = timeToPixelX(endSec, vStartSec, visSec);
+                const int w = juce::jmax(6, x2 - x1);
+
+                const int laneIdx = (i < static_cast<int>(sceneLaneByIndex.size())) ? sceneLaneByIndex[static_cast<size_t>(i)] : 0;
+                const int yTop = getLaneTopY(laneIdx);
+
+                juce::Rectangle<int> rawRect(x1, yTop, w, kSceneLaneHeight - 3);
+                auto blockRect = rawRect.getIntersection(sceneLaneBounds.reduced(1));
+
+                if (!blockRect.isEmpty())
+                {
+                    const bool isSel = (i == selectedSceneIndex);
+                    bool hasSwatch = false;
+                    juce::Colour swatchCol;
+                    const juce::Colour baseCol = getSceneBlockColour(scene, hasSwatch, swatchCol);
+
+                    g.setColour(isSel ? baseCol.brighter(0.45f) : baseCol.withAlpha(0.88f));
+                    g.fillRoundedRectangle(blockRect.toFloat(), 3.0f);
+
+                    if (hasSwatch && blockRect.getWidth() >= 10)
+                    {
+                        g.setColour(swatchCol);
+                        g.fillRoundedRectangle(static_cast<float>(blockRect.getX() + 1),
+                            static_cast<float>(blockRect.getY() + 1),
+                            4.0f,
+                            static_cast<float>(blockRect.getHeight() - 2),
+                            2.0f);
+                    }
+
+                    g.setColour(isSel ? juce::Colours::white : baseCol.brighter(0.6f).withAlpha(0.75f));
+                    g.drawRoundedRectangle(blockRect.toFloat(), 3.0f, isSel ? 1.6f : 1.0f);
+
+                    const juce::String name = scene.getProperty(StateKeys::SceneName, "Scena").toString();
+                    g.setColour(juce::Colours::white);
+                    g.setFont(juce::FontOptions(10.5f, isSel ? juce::Font::bold : juce::Font::plain));
+                    const int textLeftPad = hasSwatch ? 8 : 4;
+                    g.drawText(name, blockRect.withTrimmedLeft(textLeftPad).withTrimmedRight(3),
+                        juce::Justification::centredLeft, true);
+                }
             }
         }
+
+        g.restoreState();
+
+        g.setColour(juce::Colour(0xff2a2a35));
+        g.drawRect(sceneLaneBounds, 1);
     }
 
     juce::ValueTree& appState;
@@ -2094,4 +2352,11 @@ private:
     double sceneDragInitialStartBeat = 1.0;
     double sceneDragInitialDurBeat = 4.0;
     double sceneDragGrabOffsetBeat = 0.0;
+
+    static constexpr int kSceneLaneHeight = 24;
+    static constexpr int kMaxVisibleLanes = 5;
+    juce::ScrollBar verticalLaneScrollBar{ true };
+    std::vector<int> sceneLaneByIndex;
+    int totalSceneLanes = 1;
+    double laneScrollOffsetPx = 0.0;
 };
