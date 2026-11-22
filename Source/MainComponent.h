@@ -5,6 +5,28 @@
 #include "UI/Tabs/ExportEngineTab.h"
 #include "UI/Tabs/SceneBuilderTab.h"
 #include "UI/Components/TimeMetricManager.h"
+#include "Engine/DmxLiveEngine.h"
+#include "UI/Components/DmxOutputControlPanel.h"
+
+class LiveTabbedComponent : public juce::TabbedComponent
+{
+public:
+    using juce::TabbedComponent::TabbedComponent;
+
+    std::function<void(int prevTabIndex, int newTabIndex)> onTabChanged;
+
+    void currentTabChanged(int newCurrentTabIndex, const juce::String&) override
+    {
+        const int prev = lastTabIndex;
+        lastTabIndex = newCurrentTabIndex;
+
+        if (onTabChanged && prev != newCurrentTabIndex)
+            onTabChanged(prev, newCurrentTabIndex);
+    }
+
+private:
+    int lastTabIndex = -1;
+};
 
 class MainComponent : public juce::Component
 {
@@ -16,7 +38,8 @@ public:
     void resized() override;
 
 private:
-    juce::TabbedComponent tabbedComponent;
+    DmxLiveEngine dmxLiveEngine;
+    LiveTabbedComponent tabbedComponent;
 
     juce::ValueTree mainState{ "DO_YOUR_LIGHT_SHOW_STATE" };
     BeatTimeMap timeMetricBeatMap;

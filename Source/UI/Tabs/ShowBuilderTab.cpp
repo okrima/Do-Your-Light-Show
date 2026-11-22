@@ -1,4 +1,175 @@
 #include "ShowBuilderTab.h"
+#include "../Components/FileProgressOverlay.h"
+
+namespace
+{
+    void unlockSceneAttributeForCommand(juce::ValueTree& sceneNode,
+        const juce::String& param,
+        const juce::String& curve)
+    {
+        if (!sceneNode.isValid()) return;
+
+        if (param.equalsIgnoreCase("Red") || param.equalsIgnoreCase("Green") ||
+            param.equalsIgnoreCase("Blue") || param.equalsIgnoreCase("White") ||
+            param.equalsIgnoreCase("UV"))
+        {
+            if (sceneNode.hasProperty(StateKeys::PresetUseColor))
+                sceneNode.setProperty(StateKeys::PresetUseColor, true, nullptr);
+        }
+        else if (param.equalsIgnoreCase("Pan") || param.equalsIgnoreCase("Tilt"))
+        {
+            if (sceneNode.hasProperty(StateKeys::PresetUseMove))
+                sceneNode.setProperty(StateKeys::PresetUseMove, true, nullptr);
+        }
+        else if (param.equalsIgnoreCase("Strobe") ||
+            (param.equalsIgnoreCase("Dimmer") && CurveEvaluator::getStrobeHitsPerQuarter(curve) > 0.0))
+        {
+            if (sceneNode.hasProperty(StateKeys::PresetUseStrobe))
+                sceneNode.setProperty(StateKeys::PresetUseStrobe, true, nullptr);
+        }
+        else if (param.equalsIgnoreCase("Dimmer") || param.equalsIgnoreCase("GeyserBlast"))
+        {
+            if (sceneNode.hasProperty(StateKeys::PresetUseDimmer))
+                sceneNode.setProperty(StateKeys::PresetUseDimmer, true, nullptr);
+        }
+    }
+
+    class AiWizardContent : public juce::Component
+    {
+    public:
+        explicit AiWizardContent(juce::Component& panelToHost)
+            : embeddedPanel(panelToHost)
+        {
+            addAndMakeVisible(embeddedPanel);
+
+            closeBtn.setButtonText("Chiudi");
+            closeBtn.setColour(juce::TextButton::buttonColourId, juce::Colour(0xff334155));
+            closeBtn.onClick = [this]() {
+                if (auto* dw = findParentComponentOfClass<juce::DialogWindow>())
+                    dw->closeButtonPressed();
+                };
+            addAndMakeVisible(closeBtn);
+
+            setSize(1160, 295);
+        }
+
+        ~AiWizardContent() override
+        {
+            removeChildComponent(&embeddedPanel);
+        }
+
+        void paint(juce::Graphics& g) override
+        {
+            g.fillAll(juce::Colour(0xff12131a));
+
+            auto area = getLocalBounds().reduced(14, 12);
+
+            // Intestazione Wizard + badge BETA
+            auto hdr = area.removeFromTop(26);
+            g.setColour(juce::Colour(0xffc4b5fd));
+            g.setFont(juce::FontOptions(15.0f, juce::Font::bold));
+            g.drawText("CONFIGURAZIONE GUIDATA SHOW AI", hdr.removeFromLeft(280), juce::Justification::centredLeft, false);
+
+            auto betaPill = hdr.removeFromLeft(54).reduced(0, 4);
+            g.setColour(juce::Colour(0xff7c3aed).withAlpha(0.28f));
+            g.fillRoundedRectangle(betaPill.toFloat(), 4.0f);
+            g.setColour(juce::Colour(0xffa78bfa));
+            g.drawRoundedRectangle(betaPill.toFloat(), 4.0f, 1.0f);
+            g.setFont(juce::FontOptions(10.0f, juce::Font::bold));
+            g.drawText("BETA", betaPill, juce::Justification::centred, false);
+
+            hdr.removeFromLeft(12);
+            g.setColour(juce::Colour(0xff94a3b8));
+            g.setFont(juce::FontOptions(11.5f));
+            g.drawText("Funzione sperimentale: genera una bozza completa modificabile liberamente in Timeline.",
+                hdr, juce::Justification::centredLeft, true);
+
+            area.removeFromTop(8);
+
+            // Guida visiva 3 Step allineata alle 3 sezioni del pannello AI
+            auto stepsRow = area.removeFromTop(42);
+            const int w1 = juce::roundToInt(stepsRow.getWidth() * 0.50f);
+            const int w2 = juce::roundToInt(stepsRow.getWidth() * 0.32f);
+
+            auto drawStep = [&](juce::Rectangle<int> r, const juce::String& num, const juce::String& title, const juce::String& desc, juce::Colour accent)
+                {
+                    auto card = r.reduced(2, 0);
+                    g.setColour(juce::Colour(0xff191b26));
+                    g.fillRoundedRectangle(card.toFloat(), 5.0f);
+                    g.setColour(accent.withAlpha(0.45f));
+                    g.drawRoundedRectangle(card.toFloat(), 5.0f, 1.0f);
+
+                    auto inner = card.reduced(8, 4);
+                    g.setColour(accent);
+                    g.setFont(juce::FontOptions(11.0f, juce::Font::bold));
+                    g.drawText(num + "  " + title, inner.removeFromTop(16), juce::Justification::centredLeft, true);
+                    g.setColour(juce::Colour(0xff94a3b8));
+                    g.setFont(juce::FontOptions(10.0f));
+                    g.drawText(desc, inner, juce::Justification::centredLeft, true);
+                };
+
+            drawStep(stepsRow.removeFromLeft(w1), "STEP 1", "Tracce Audio & Stems",
+                "Carica/trascina almeno il Full Mix (opzionali: Click, Batteria, Basso, Chitarre)", juce::Colour(0xff10b981));
+            drawStep(stepsRow.removeFromLeft(w2), "STEP 2", "Mood & Palette Colori",
+                "Scegli atmosfera, colori chiave e percentuale strobo", juce::Colour(0xff38bdf8));
+            drawStep(stepsRow, "STEP 3", "Avvia Generazione",
+                "Spunta Layering per preservare le scene esistenti", juce::Colour(0xffa855f7));
+
+            // Nota in basso a sinistra
+            auto footer = getLocalBounds().reduced(14, 10).removeFromBottom(28);
+            footer.removeFromRight(100);
+            g.setColour(juce::Colour(0xff64748b));
+            g.setFont(juce::FontOptions(11.0f));
+            g.drawText("Suggerimento: puoi chiudere il wizard in qualsiasi momento (ESC); i file audio caricati restano salvati nello show.",
+                footer, juce::Justification::centredLeft, true);
+        }
+
+        void resized() override
+        {
+            auto b = getLocalBounds().reduced(14, 12);
+            b.removeFromTop(26 + 8 + 42 + 8); // Header + guida 3 step
+
+            auto footer = b.removeFromBottom(28);
+            closeBtn.setBounds(footer.removeFromRight(92));
+            b.removeFromBottom(8);
+
+            embeddedPanel.setBounds(b);
+        }
+
+    private:
+        juce::Component& embeddedPanel;
+        juce::TextButton closeBtn;
+    };
+
+    class AiWizardDialogWindow : public juce::DialogWindow
+    {
+    public:
+        explicit AiWizardDialogWindow(juce::Component& panelToHost)
+            : juce::DialogWindow("Genera Show con AI (Beta)", juce::Colour(0xff12131a), true, true)
+        {
+            setUsingNativeTitleBar(true);
+            setResizable(true, false);
+            setResizeLimits(960, 280, 1600, 420);
+            setContentOwned(new AiWizardContent(panelToHost), true);
+            centreWithSize(getWidth(), getHeight());
+        }
+
+        void closeButtonPressed() override
+        {
+            setVisible(false);
+        }
+
+        bool keyPressed(const juce::KeyPress& key) override
+        {
+            if (key == juce::KeyPress::escapeKey)
+            {
+                closeButtonPressed();
+                return true;
+            }
+            return juce::DialogWindow::keyPressed(key);
+        }
+    };
+}
 
 // =============================================================================
 // SceneEditorPanel Implementation
@@ -69,7 +240,14 @@ SceneEditorPanel::SceneEditorPanel(juce::ValueTree& state) : appState(state)
     paramLabel.setText("Parametro:", juce::dontSendNotification); paramLabel.setColour(juce::Label::textColourId, juce::Colours::lightgrey); addAndMakeVisible(paramLabel);
     paramSelector.addItemList({ "Dimmer", "Pan", "Tilt", "Red", "Green", "Blue", "White", "UV", "Strobe", "GeyserBlast" }, 1);
     paramSelector.setColour(juce::ComboBox::backgroundColourId, juce::Colour(0xff2a2a32));
-    paramSelector.onChange = [this] { if (currentCommandNode.isValid() && !isUpdatingUI) currentCommandNode.setProperty(StateKeys::TargetParam, paramSelector.getText(), nullptr); };
+    paramSelector.onChange = [this] {
+        if (currentCommandNode.isValid() && !isUpdatingUI)
+        {
+            currentCommandNode.setProperty(StateKeys::TargetParam, paramSelector.getText(), nullptr);
+            unlockSceneAttributeForCommand(currentSceneNode, paramSelector.getText(),
+                currentCommandNode.getProperty(StateKeys::CurveType, "Static").toString());
+        }
+        };
     addAndMakeVisible(paramSelector);
 
     curveLabel.setText("Azione/Curva:", juce::dontSendNotification); 
@@ -97,6 +275,8 @@ SceneEditorPanel::SceneEditorPanel(juce::ValueTree& state) : appState(state)
             };
             int idx = juce::jlimit(0, 11, curveSelector.getSelectedId() - 1);
             currentCommandNode.setProperty(StateKeys::CurveType, keys[idx], nullptr);
+            unlockSceneAttributeForCommand(currentSceneNode,
+                currentCommandNode.getProperty(StateKeys::TargetParam, "Dimmer").toString(), keys[idx]);
         }
         };
     addAndMakeVisible(curveSelector);
@@ -281,6 +461,7 @@ void SceneEditorPanel::addNewCommand() {
     newCmd.setProperty(StateKeys::EndValue, 255, nullptr);
     newCmd.setProperty(StateKeys::CurveType, "Static", nullptr);
     currentSceneNode.addChild(newCmd, -1, nullptr);
+    unlockSceneAttributeForCommand(currentSceneNode, "Dimmer", "Static");
     commandList.updateContent();
     commandList.selectRow(currentSceneNode.getNumChildren() - 1);
 }
@@ -400,6 +581,10 @@ ShowBuilderTab::ShowBuilderTab(juce::ValueTree& state) : appState(state), miniDa
         };
 
     aiWizardPanel.onGenerateShowRequested = [this]() {
+
+        if (aiWizardWindow != nullptr)
+            aiWizardWindow->setVisible(false);
+
         audioEngine.pause();
 
         analysisJob = std::make_unique<AudioAnalysisEngine::AnalysisJob>(
@@ -447,7 +632,7 @@ ShowBuilderTab::ShowBuilderTab(juce::ValueTree& state) : appState(state), miniDa
         analysisJob->launchThread();
         };
 
-    addAndMakeVisible(aiWizardPanel);
+    
 
     showNode = appState.getChildWithName(StateKeys::ShowNode);
     if (!showNode.isValid()) {
@@ -471,11 +656,16 @@ ShowBuilderTab::ShowBuilderTab(juce::ValueTree& state) : appState(state), miniDa
     sceneList.setModel(this);
     sceneList.setColour(juce::ListBox::backgroundColourId, juce::Colour(0xff141417));
     sceneList.setColour(juce::ListBox::outlineColourId, juce::Colour(0xff2a2a32));
-    sceneList.addKeyListener(this);
     addAndMakeVisible(sceneList);
 
     addSceneBtn.setButtonText("+ Nuova Scena"); addSceneBtn.setColour(juce::TextButton::buttonColourId, juce::Colour(0xff3a3a45));
     addSceneBtn.onClick = [this]() { addNewSceneToState(); }; addAndMakeVisible(addSceneBtn);
+
+    openAiWizardBtn.setButtonText("Genera Show con AI (Beta)");
+    openAiWizardBtn.setColour(juce::TextButton::buttonColourId, juce::Colour(0xff7c3aed));
+    openAiWizardBtn.setTooltip("Apre il wizard guidato (Beta) per configurare tracce audio, palette colori e generazione automatica");
+    openAiWizardBtn.onClick = [this]() { openAiWizardDialog(); };
+    addAndMakeVisible(openAiWizardBtn);
 
     // Configurazione del bottone Elimina Scena
     deleteSceneBtn.setButtonText("Elimina Scena...");
@@ -507,9 +697,23 @@ ShowBuilderTab::ShowBuilderTab(juce::ValueTree& state) : appState(state), miniDa
     if (showNode.getNumChildren() > 0) sceneList.selectRow(0);
 }
 
-ShowBuilderTab::~ShowBuilderTab() { 
+ShowBuilderTab::~ShowBuilderTab()
+{
+    aiWizardWindow.reset();
     analysisJob.reset();
-    showNode.removeListener(this); 
+    showNode.removeListener(this);
+    presetLibNode.removeListener(this);
+}
+
+void ShowBuilderTab::openAiWizardDialog()
+{
+    aiWizardPanel.syncUIFromState();
+
+    if (aiWizardWindow == nullptr)
+        aiWizardWindow = std::make_unique<AiWizardDialogWindow>(aiWizardPanel);
+
+    aiWizardWindow->setVisible(true);
+    aiWizardWindow->toFront(true);
 }
 
 void ShowBuilderTab::saveSceneAsPreset()
@@ -536,6 +740,11 @@ void ShowBuilderTab::saveSceneAsPreset()
     // Allinea le proprieta' lette dalla Tab 2 (Scene Builder) e dal menu Inserisci Preset
     presetCopy.setProperty(StateKeys::PresetName, sceneName, nullptr);
     presetCopy.setProperty(StateKeys::SceneName, sceneName, nullptr);
+
+    const juce::String newPresetId = juce::Uuid().toString();
+    presetCopy.setProperty(StateKeys::PresetId, newPresetId, nullptr);
+    sourceScene.setProperty(StateKeys::PresetId, newPresetId, nullptr);
+
     if (!presetCopy.hasProperty(StateKeys::PresetPool))
         presetCopy.setProperty(StateKeys::PresetPool, "Color", nullptr);
     if (!presetCopy.hasProperty(StateKeys::LayerType))
@@ -605,13 +814,21 @@ void ShowBuilderTab::insertPresetIntoShow()
         auto chosenPreset = presetLibNode.getChild(result - 1);
         if (!chosenPreset.isValid()) return;
 
+        juce::String srcId = chosenPreset.getProperty(StateKeys::PresetId, "").toString().trim();
+        if (srcId.isEmpty())
+        {
+            srcId = juce::Uuid().toString();
+            chosenPreset.setProperty(StateKeys::PresetId, srcId, nullptr);
+        }
+
         juce::ValueTree newSceneInstance(StateKeys::Scene);
         for (int i = 0; i < chosenPreset.getNumProperties(); ++i)
         {
             auto propName = chosenPreset.getPropertyName(i);
-            if (propName.isValid())
+            if (propName.isValid() && propName != StateKeys::StartBeat)
                 newSceneInstance.setProperty(propName, chosenPreset.getProperty(propName), nullptr);
         }
+        newSceneInstance.setProperty(StateKeys::PresetId, srcId, nullptr);
 
         // Assicura che SceneName sia popolato dal PresetName dello Scene Builder
         juce::String pName = chosenPreset.getProperty(StateKeys::PresetName, "").toString();
@@ -686,7 +903,7 @@ void ShowBuilderTab::paint(juce::Graphics& g)
     g.fillAll(juce::Colour(0xff1a1a1e));
     g.setColour(juce::Colour(0xff2a2a32));
 
-    const float topOffset = static_cast<float>(aiWizardPanel.getBottom() + 4);
+    const float topOffset = static_cast<float>(miniDawTimeline.getBottom() + 4);
     const float dividerX = getLocalBounds().toFloat().proportionOfWidth(0.30f);
     g.fillRect(juce::Rectangle<float>(dividerX, topOffset, 2.0f, static_cast<float>(getHeight()) - topOffset));
 }
@@ -756,17 +973,17 @@ void ShowBuilderTab::resized()
 {
     auto bounds = getLocalBounds();
 
-    // 1. Fascia Superiore: Mini-DAW (145 px) + AI Wizard & Slot Stem (108 px)
-    const int timelineH = juce::jlimit(145, 250, miniDawTimeline.getPreferredHeight());
+    // 1. Fascia Superiore: Mini-DAW piu' ampia (piu' spazio per waveform e corsie parallele)
+    const int timelineH = juce::jlimit(175, 290, miniDawTimeline.getPreferredHeight() + 30);
     miniDawTimeline.setBounds(bounds.removeFromTop(timelineH));
-
-    aiWizardPanel.setBounds(bounds.removeFromTop(136));
     bounds.removeFromTop(4);
 
-    // 2. Parte Inferiore: Lista Scene a sinistra + SceneEditorPanel a destra
+    // 2. Parte Inferiore: Colonna Sinistra (Bottone Wizard AI + Lista Scene + Azioni)
     auto leftPanel = bounds.removeFromLeft(juce::roundToInt(bounds.getWidth() * 0.30f));
-    auto bottomArea = leftPanel.removeFromBottom(240).reduced(10, 5);
 
+    openAiWizardBtn.setBounds(leftPanel.removeFromTop(38).reduced(10, 4));
+
+    auto bottomArea = leftPanel.removeFromBottom(240).reduced(10, 5);
     saveBtn.setBounds(bottomArea.removeFromBottom(28));           bottomArea.removeFromBottom(4);
     loadBtn.setBounds(bottomArea.removeFromBottom(28));           bottomArea.removeFromBottom(4);
     deletePresetBtnUI.setBounds(bottomArea.removeFromBottom(28)); bottomArea.removeFromBottom(4);
@@ -775,10 +992,10 @@ void ShowBuilderTab::resized()
     savePresetBtn.setBounds(bottomArea.removeFromBottom(28));     bottomArea.removeFromBottom(4);
     addSceneBtn.setBounds(bottomArea.removeFromBottom(28));
 
-    sceneList.setBounds(leftPanel.reduced(10));
+    sceneList.setBounds(leftPanel.reduced(10, 4));
     bounds.removeFromLeft(2);
-    
-    // Area Destra: Simulatore Palco 2D + Editor Comandi Scena
+
+    // 3. Area Destra: Simulatore Palco 2D piu' grande + Editor Comandi Scena
     if (stageSimulator.getIsExpanded())
     {
         stageSimulator.setBounds(bounds.reduced(4));
@@ -787,7 +1004,7 @@ void ShowBuilderTab::resized()
     else
     {
         editorPanel.setVisible(true);
-        auto simArea = bounds.removeFromTop(juce::roundToInt(bounds.getHeight() * 0.52f));
+        auto simArea = bounds.removeFromTop(juce::roundToInt(bounds.getHeight() * 0.56f));
         stageSimulator.setBounds(simArea.reduced(4, 2));
         editorPanel.setBounds(bounds);
     }
@@ -926,21 +1143,200 @@ void ShowBuilderTab::deletePresetFromLibrary()
         });
 }
 
-void ShowBuilderTab::addNewSceneToState() {
+void ShowBuilderTab::addNewSceneToState()
+{
     juce::ValueTree newScene(StateKeys::Scene);
-    newScene.setProperty(StateKeys::SceneName, "Scena " + juce::String(showNode.getNumChildren() + 1), nullptr);
+    newScene.setProperty(StateKeys::SceneName, "Nuova Scena " + juce::String(showNode.getNumChildren() + 1), nullptr);
     newScene.setProperty(StateKeys::StartBeat, 1.0, nullptr);
     newScene.setProperty(StateKeys::DurationBeats, 4.0, nullptr);
     showNode.addChild(newScene, -1, nullptr);
     sortScenesByStartBeat(newScene);
 }
 
-void ShowBuilderTab::saveShow() {
-    fileChooser = std::make_unique<juce::FileChooser>("Salva Show", juce::File::getSpecialLocation(juce::File::userDocumentsDirectory).getChildFile("NuovoBrano.show"), "*.show");
-    fileChooser->launchAsync(juce::FileBrowserComponent::saveMode | juce::FileBrowserComponent::canSelectFiles, [this](const juce::FileChooser& fc) {
-        if (fc.getResult() != juce::File{}) PresetManager::saveShow(appState, fc.getResult());
+void ShowBuilderTab::saveShow()
+{
+    fileChooser = std::make_unique<juce::FileChooser>(
+        "Salva Show",
+        juce::File::getSpecialLocation(juce::File::userDocumentsDirectory).getChildFile("NuovoBrano.show"),
+        "*.show");
+
+    juce::Component::SafePointer<ShowBuilderTab> safeThis(this);
+    fileChooser->launchAsync(juce::FileBrowserComponent::saveMode | juce::FileBrowserComponent::canSelectFiles,
+        [safeThis](const juce::FileChooser& fc) {
+            if (safeThis == nullptr) return;
+            auto file = fc.getResult();
+            if (file == juce::File{}) return;
+
+            auto snapshot = safeThis->appState.createCopy();
+            const int sceneCount = safeThis->showNode.isValid() ? safeThis->showNode.getNumChildren() : 0;
+
+            FileProgressRunner::runBackground(
+                "Salvataggio Show",
+                "Preparazione archivio show...",
+                [snapshot, file](std::function<void(double, const juce::String&)> report) mutable -> bool {
+                    report(0.25, "Raccolta scene, patch e tracce audio...");
+                    report(0.55, "Scrittura file " + file.getFileName() + "...");
+                    PresetManager::saveShow(snapshot, file);
+                    report(0.95, "Verifica integrita' file...");
+                    return file.existsAsFile() && file.getSize() > 0;
+                },
+                "Salvataggio Completato",
+                "Lo show '" + file.getFileName() + "' e' stato salvato correttamente.\nScene salvate: "
+                + juce::String(sceneCount),
+                "Errore Salvataggio",
+                "Impossibile completare il salvataggio del file:\n" + file.getFullPathName());
         });
 }
+
+void ShowBuilderTab::restoreLivePresetLibraryAfterLoad(juce::ValueTree originalLibNode,
+    const juce::ValueTree& liveLibSnapshot)
+{
+    // 1. Riaggancia showNode nel caso PresetManager::loadShow lo abbia sostituito
+    auto loadedShow = appState.getChildWithName(StateKeys::ShowNode);
+    if (loadedShow.isValid() && loadedShow != showNode)
+    {
+        if (showNode.isValid()) showNode.removeListener(this);
+        showNode = loadedShow;
+        showNode.addListener(this);
+    }
+
+    // 2. Preserva l'istanza viva di presetLibNode condivisa con la Tab 2 (evita rollback da vecchi .show)
+    if (liveLibSnapshot.isValid() && liveLibSnapshot.getNumChildren() > 0)
+    {
+        auto currentLibInState = appState.getChildWithName(StateKeys::PresetLibNode);
+
+        if (originalLibNode.isValid() && currentLibInState != originalLibNode)
+        {
+            if (currentLibInState.isValid())
+                appState.removeChild(currentLibInState, nullptr);
+            if (originalLibNode.getParent().isValid())
+                originalLibNode.getParent().removeChild(originalLibNode, nullptr);
+            appState.addChild(originalLibNode, -1, nullptr);
+            currentLibInState = originalLibNode;
+        }
+
+        if (currentLibInState.isValid())
+        {
+            if (currentLibInState != presetLibNode)
+            {
+                if (presetLibNode.isValid()) presetLibNode.removeListener(this);
+                presetLibNode = currentLibInState;
+                presetLibNode.addListener(this);
+            }
+
+            presetLibNode.removeAllChildren(nullptr);
+            for (int i = 0; i < liveLibSnapshot.getNumChildren(); ++i)
+                presetLibNode.addChild(liveLibSnapshot.getChild(i).createCopy(), -1, nullptr);
+        }
+    }
+}
+
+int ShowBuilderTab::reconcileShowScenesWithPresetLibrary()
+{
+    if (!showNode.isValid() || !presetLibNode.isValid())
+        return 0;
+
+    auto stripFactoryPrefix = [](juce::String s) -> juce::String {
+        s = s.trim();
+        if (s.startsWithIgnoreCase("[F] "))
+            return s.substring(4).trim();
+        return s;
+        };
+
+    auto findMatchingPreset = [&](const juce::ValueTree& scene) -> juce::ValueTree {
+        const juce::String scenePid = scene.getProperty(StateKeys::PresetId, "").toString().trim();
+
+        // 1. Match diretto per PresetId univoco (funziona anche dopo N cambi di nome)
+        if (scenePid.isNotEmpty())
+        {
+            for (int p = 0; p < presetLibNode.getNumChildren(); ++p)
+            {
+                auto preset = presetLibNode.getChild(p);
+                if (!preset.hasType(StateKeys::ScenePreset)) continue;
+                if (preset.getProperty(StateKeys::PresetId, "").toString().trim() == scenePid)
+                    return preset;
+            }
+        }
+
+        // 2. Fallback per vecchi .show senza PresetId: confronta nome, nome senza "[F] " e PresetAliases
+        const juce::String rawSceneName = scene.getProperty(StateKeys::SceneName, "").toString().trim();
+        const juce::String normSceneName = stripFactoryPrefix(rawSceneName);
+        if (normSceneName.isEmpty())
+            return {};
+
+        for (int p = 0; p < presetLibNode.getNumChildren(); ++p)
+        {
+            auto preset = presetLibNode.getChild(p);
+            if (!preset.hasType(StateKeys::ScenePreset)) continue;
+
+            const juce::String pName = preset.getProperty(StateKeys::PresetName, "").toString().trim();
+            if (pName.equalsIgnoreCase(rawSceneName) || stripFactoryPrefix(pName).equalsIgnoreCase(normSceneName))
+                return preset;
+
+            juce::StringArray aliases;
+            aliases.addTokens(preset.getProperty(StateKeys::PresetAliases, "").toString(), "|", "");
+            for (const auto& alias : aliases)
+            {
+                if (alias.trim().equalsIgnoreCase(rawSceneName) ||
+                    stripFactoryPrefix(alias).equalsIgnoreCase(normSceneName))
+                    return preset;
+            }
+        }
+        return {};
+        };
+
+    int updatedCount = 0;
+
+    for (int i = 0; i < showNode.getNumChildren(); ++i)
+    {
+        auto scene = showNode.getChild(i);
+        if (!scene.hasType(StateKeys::Scene))
+            continue;
+
+        auto matchedPreset = findMatchingPreset(scene);
+        if (!matchedPreset.isValid())
+            continue;
+
+        juce::String pid = matchedPreset.getProperty(StateKeys::PresetId, "").toString().trim();
+        if (pid.isEmpty())
+        {
+            pid = juce::Uuid().toString();
+            matchedPreset.setProperty(StateKeys::PresetId, pid, nullptr);
+        }
+
+        // Aggiorna tutte le caratteristiche dalla Tab 2 preservando posizionamento e durata in timeline
+        for (int propIdx = 0; propIdx < matchedPreset.getNumProperties(); ++propIdx)
+        {
+            const auto key = matchedPreset.getPropertyName(propIdx);
+            if (key == StateKeys::StartBeat || key == StateKeys::DurationBeats)
+                continue;
+
+            scene.setProperty(key, matchedPreset.getProperty(key), nullptr);
+        }
+
+        const juce::String updatedName = matchedPreset.getProperty(StateKeys::PresetName, "Scena").toString();
+        scene.setProperty(StateKeys::SceneName, updatedName, nullptr);
+        scene.setProperty(StateKeys::PresetId, pid, nullptr);
+
+        // Sostituisce i ROLE_COMMAND con quelli aggiornati dal preset
+        for (int c = scene.getNumChildren() - 1; c >= 0; --c)
+        {
+            if (scene.getChild(c).hasType(StateKeys::RoleCommand))
+                scene.removeChild(c, nullptr);
+        }
+        for (int c = 0; c < matchedPreset.getNumChildren(); ++c)
+        {
+            auto cmd = matchedPreset.getChild(c);
+            if (cmd.hasType(StateKeys::RoleCommand))
+                scene.addChild(cmd.createCopy(), -1, nullptr);
+        }
+
+        ++updatedCount;
+    }
+
+    return updatedCount;
+}
+
 void ShowBuilderTab::loadShow()
 {
     fileChooser = std::make_unique<juce::FileChooser>(
@@ -949,30 +1345,72 @@ void ShowBuilderTab::loadShow()
         "*.show");
 
     auto chooserFlags = juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles;
-    fileChooser->launchAsync(chooserFlags, [this](const juce::FileChooser& fc) {
+    juce::Component::SafePointer<ShowBuilderTab> safeThis(this);
+    fileChooser->launchAsync(chooserFlags, [safeThis](const juce::FileChooser& fc) {
+        if (safeThis == nullptr) return;
         auto file = fc.getResult();
         if (file == juce::File{} || !file.existsAsFile())
             return;
 
-        PresetManager::loadShow(appState, file);
+        // Fotografa la libreria Tab 2 prima di caricare lo show
+        juce::ValueTree originalLibNode = safeThis->presetLibNode;
+        juce::ValueTree liveLibSnapshot = originalLibNode.isValid()
+            ? originalLibNode.createCopy()
+            : juce::ValueTree(StateKeys::PresetLibNode);
 
-        ShowArchiveManager::ensureValidAppStateStructure(appState);
-        beatTimeMap.bindToAppState(appState);
+        auto loadedSceneCount = std::make_shared<int>(0);
+        auto syncedSceneCount = std::make_shared<int>(0);
 
-        miniDawTimeline.syncWithAppState();
-        aiWizardPanel.syncUIFromState();
+        std::vector<FileProgressRunner::Step> steps;
+        steps.push_back({ "Lettura archivio " + file.getFileName() + "...", 0.30, [safeThis, file, originalLibNode, liveLibSnapshot]() {
+            if (safeThis == nullptr) return false;
+            PresetManager::loadShow(safeThis->appState, file);
+            ShowArchiveManager::ensureValidAppStateStructure(safeThis->appState);
+            safeThis->restoreLivePresetLibraryAfterLoad(originalLibNode, liveLibSnapshot);
+            return true;
+        } });
+        steps.push_back({ "Sincronizzazione scene con la libreria Tab 2...", 0.60, [safeThis, syncedSceneCount]() {
+            if (safeThis == nullptr) return false;
+            *syncedSceneCount = safeThis->reconcileShowScenesWithPresetLibrary();
+            return true;
+        } });
+        steps.push_back({ "Sincronizzazione BeatMap e tracce audio...", 0.82, [safeThis]() {
+            if (safeThis == nullptr) return false;
+            safeThis->beatTimeMap.bindToAppState(safeThis->appState);
+            safeThis->miniDawTimeline.syncWithAppState();
+            safeThis->aiWizardPanel.syncUIFromState();
+            return true;
+        } });
+        steps.push_back({ "Ordinamento scene e aggiornamento simulatore...", 1.0, [safeThis, loadedSceneCount]() {
+            if (safeThis == nullptr) return false;
+            safeThis->sortScenesByStartBeat();
+            safeThis->sceneList.updateContent();
+            *loadedSceneCount = safeThis->showNode.getNumChildren();
+            if (*loadedSceneCount > 0)
+                safeThis->sceneList.selectRow(0);
+            else
+                safeThis->editorPanel.setSceneNode(juce::ValueTree());
+            if (safeThis->stageSimulator.getIsExpanded())
+                safeThis->editorPanel.setVisible(false);
+            safeThis->sceneList.repaint();
+            safeThis->miniDawTimeline.repaint();
+            safeThis->stageSimulator.repaint();
+            return true;
+        } });
 
-        sortScenesByStartBeat();
-
-        sceneList.updateContent();
-
-        if (showNode.getNumChildren() > 0)
-            sceneList.selectRow(0);
-        else
-            editorPanel.setSceneNode(juce::ValueTree());
-
-        sceneList.repaint();
-        stageSimulator.repaint();
+        FileProgressRunner::runStepped(
+            "Caricamento Show",
+            std::move(steps),
+            "Caricamento Completato",
+            [file, loadedSceneCount, syncedSceneCount]() {
+                juce::String msg = "Lo show '" + file.getFileName() + "' e' stato caricato correttamente.\nScene caricate: "
+                    + juce::String(*loadedSceneCount);
+                if (*syncedSceneCount > 0)
+                    msg += "\nScene riallineate alla libreria Tab 2: " + juce::String(*syncedSceneCount);
+                return msg;
+            },
+            "Errore Caricamento",
+            "Impossibile caricare lo show selezionato.");
         });
 }
 
@@ -997,6 +1435,29 @@ juce::File getPresetLibraryFile()
         .getChildFile("DoYourLightShow");
     dir.createDirectory(); // Assicura che la cartella esista
     return dir.getChildFile("preset_library.xml");
+}
+
+void ShowBuilderTab::visibilityChanged()
+{
+    if (!isVisible())
+        return;
+
+    stageSimulator.stopFixtureTestIfActive();
+
+    sceneList.updateContent();
+    sceneList.repaint();
+
+    const int selRow = sceneList.getSelectedRow();
+    if (showNode.isValid() && selRow >= 0 && selRow < showNode.getNumChildren())
+        editorPanel.setSceneNode(showNode.getChild(selRow));
+    else
+        editorPanel.setSceneNode(juce::ValueTree());
+
+    if (stageSimulator.getIsExpanded())
+        editorPanel.setVisible(false);
+
+    miniDawTimeline.repaint();
+    stageSimulator.repaint();
 }
 
 void ShowBuilderTab::savePresetLibraryToDisk()

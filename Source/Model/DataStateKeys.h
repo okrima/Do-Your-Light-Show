@@ -12,6 +12,8 @@ namespace StateKeys
     const juce::Identifier PresetLibNode{ "PRESET_LIBRARY" };
     const juce::Identifier ScenePreset{ "SCENE_PRESET" };
     const juce::Identifier PresetName{ "presetName" };
+    const juce::Identifier PresetId{ "presetId" };
+    const juce::Identifier PresetAliases{ "presetAliases" };
     const juce::Identifier PresetPool{ "presetPool" };       // "Color" | "Dimmer" | "Strobe" | "Movement" | "ImpactFX"
     const juce::Identifier LayerType{ "layerType" };         // "Base" | "Movement" | "OverlayFX"
     const juce::Identifier IsOneShot{ "isOneShot" };         // bool (true = Blinder/Geyser one-shot)
@@ -30,6 +32,10 @@ namespace StateKeys
     const juce::Identifier PresetMoveSpeed{ "presetMoveSpeed" };             // "Sine_4Bars" | "Sine_2Bars" | "Sine_1Bar"
     const juce::Identifier PresetMoveAmpPan{ "presetMoveAmpPan" };           // 0..100 %
     const juce::Identifier PresetMoveAmpTilt{ "presetMoveAmpTilt" };         // 0..100 %
+    const juce::Identifier PresetMovePanCenter{ "presetMovePanCenter" };
+    const juce::Identifier PresetMoveTiltCenter{ "presetMoveTiltCenter" };
+    const juce::Identifier PresetMovePanFan{ "presetMovePanFan" };
+    const juce::Identifier PresetMoveTiltFan{ "presetMoveTiltFan" };
     const juce::Identifier PresetUseColor{ "presetUseColor" };
     const juce::Identifier PresetUseDimmer{ "presetUseDimmer" };
     const juce::Identifier PresetUseMove{ "presetUseMove" };

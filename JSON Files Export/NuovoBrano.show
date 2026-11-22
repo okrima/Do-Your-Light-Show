@@ -9,7 +9,7 @@
           "presetName": "Crescendo Bianco",
           "presetPool": "Dimmer",
           "layerType": "Base",
-          "durationBeats": 128.0,
+          "durationBeats": 120.0,
           "isOneShot": "1",
           "phaseMode": "Sync",
           "targetRolesCsv": "Aria: Wash Controluce (Fondale)|Terra: Controluce / Sotto-Batteria",
@@ -24,6 +24,10 @@
           "presetMoveSpeed": "Sine_4Bars",
           "presetMoveAmpPan": "80",
           "presetMoveAmpTilt": "60",
+          "presetUseColor": false,
+          "presetUseDimmer": true,
+          "presetUseMove": false,
+          "presetUseStrobe": false,
           "sceneName": "Crescendo Bianco",
           "startBeat": 1.0,
           "children": [
@@ -49,1452 +53,88 @@
         },
         {
           "nodeType": "SCENE",
-          "presetName": "Decrescendo Bianco",
-          "presetPool": "Dimmer",
-          "layerType": "Base",
-          "durationBeats": 4.0,
-          "isOneShot": "1",
-          "phaseMode": "Sync",
-          "targetRolesCsv": "Aria: Wash Controluce (Fondale)|Terra: Controluce / Sotto-Batteria",
-          "presetColor1": "ffffffff",
-          "presetColor2": "ffffffff",
-          "presetDimmerMin": "255",
-          "presetDimmerMax": "0",
-          "presetCurve": "Decay",
-          "presetStrobeUseHw": "0",
-          "presetStrobeSubdiv": "1/8",
-          "presetMoveShape": "PanSweep",
-          "presetMoveSpeed": "Sine_4Bars",
-          "presetMoveAmpPan": "80",
-          "presetMoveAmpTilt": "60",
-          "sceneName": "Decrescendo Bianco",
-          "startBeat": 129.0,
-          "children": [
-            {
-              "nodeType": "ROLE_COMMAND",
-              "roleName": "Aria: Wash Controluce (Fondale)",
-              "parameter": "Dimmer",
-              "startValue": "255",
-              "endValue": "0",
-              "curve": "Decay",
-              "commandColor": "ffffffff"
-            },
-            {
-              "nodeType": "ROLE_COMMAND",
-              "roleName": "Terra: Controluce / Sotto-Batteria",
-              "parameter": "Dimmer",
-              "startValue": "255",
-              "endValue": "0",
-              "curve": "Decay",
-              "commandColor": "ffffffff"
-            }
-          ]
-        },
-        {
-          "nodeType": "SCENE",
-          "presetName": "Cerchio Rosso Sangue / Ambra",
-          "presetPool": "Movement",
-          "layerType": "Movement",
-          "durationBeats": 32.0,
-          "isOneShot": "0",
-          "phaseMode": "SymmetricalFan",
-          "targetRolesCsv": "Aria: Wash Controluce (Fondale)|Aria: Teste Mobili / Beam|Terra: Controluce / Sotto-Batteria",
-          "presetColor1": "ffdc2626",
-          "presetColor2": "fff59e0b",
-          "presetDimmerMin": "0",
-          "presetDimmerMax": "255",
-          "presetCurve": "Static",
-          "presetStrobeUseHw": "0",
-          "presetStrobeSubdiv": "1/8",
-          "presetMoveShape": "Circle",
-          "presetMoveSpeed": "Sine_2Bars",
-          "presetMoveAmpPan": 74,
-          "presetMoveAmpTilt": 70,
-          "sceneName": "Cerchio Rosso Sangue / Ambra",
-          "startBeat": 133.0,
-          "children": [
-            {
-              "nodeType": "ROLE_COMMAND",
-              "roleName": "Aria: Wash Controluce (Fondale)",
-              "parameter": "Red",
-              "startValue": 220,
-              "endValue": 220,
-              "curve": "Static",
-              "commandColor": "ffdc2626"
-            },
-            {
-              "nodeType": "ROLE_COMMAND",
-              "roleName": "Aria: Wash Controluce (Fondale)",
-              "parameter": "Green",
-              "startValue": 38,
-              "endValue": 38,
-              "curve": "Static",
-              "commandColor": "ffdc2626"
-            },
-            {
-              "nodeType": "ROLE_COMMAND",
-              "roleName": "Aria: Wash Controluce (Fondale)",
-              "parameter": "Blue",
-              "startValue": 38,
-              "endValue": 38,
-              "curve": "Static",
-              "commandColor": "ffdc2626"
-            },
-            {
-              "nodeType": "ROLE_COMMAND",
-              "roleName": "Aria: Wash Controluce (Fondale)",
-              "parameter": "Dimmer",
-              "startValue": 255,
-              "endValue": 255,
-              "curve": "Static",
-              "commandColor": "ffdc2626"
-            },
-            {
-              "nodeType": "ROLE_COMMAND",
-              "roleName": "Aria: Wash Controluce (Fondale)",
-              "parameter": "Pan",
-              "startValue": 34,
-              "endValue": 222,
-              "curve": "Sine_2Bars",
-              "commandColor": "ffdc2626"
-            },
-            {
-              "nodeType": "ROLE_COMMAND",
-              "roleName": "Aria: Wash Controluce (Fondale)",
-              "parameter": "Tilt",
-              "startValue": 39,
-              "endValue": 217,
-              "curve": "Cosine_2Bars",
-              "commandColor": "ffdc2626"
-            },
-            {
-              "nodeType": "ROLE_COMMAND",
-              "roleName": "Aria: Teste Mobili / Beam",
-              "parameter": "Red",
-              "startValue": 220,
-              "endValue": 220,
-              "curve": "Static",
-              "commandColor": "ffdc2626"
-            },
-            {
-              "nodeType": "ROLE_COMMAND",
-              "roleName": "Aria: Teste Mobili / Beam",
-              "parameter": "Green",
-              "startValue": 38,
-              "endValue": 38,
-              "curve": "Static",
-              "commandColor": "ffdc2626"
-            },
-            {
-              "nodeType": "ROLE_COMMAND",
-              "roleName": "Aria: Teste Mobili / Beam",
-              "parameter": "Blue",
-              "startValue": 38,
-              "endValue": 38,
-              "curve": "Static",
-              "commandColor": "ffdc2626"
-            },
-            {
-              "nodeType": "ROLE_COMMAND",
-              "roleName": "Aria: Teste Mobili / Beam",
-              "parameter": "Dimmer",
-              "startValue": 255,
-              "endValue": 255,
-              "curve": "Static",
-              "commandColor": "ffdc2626"
-            },
-            {
-              "nodeType": "ROLE_COMMAND",
-              "roleName": "Aria: Teste Mobili / Beam",
-              "parameter": "Pan",
-              "startValue": 34,
-              "endValue": 222,
-              "curve": "Sine_2Bars",
-              "commandColor": "ffdc2626"
-            },
-            {
-              "nodeType": "ROLE_COMMAND",
-              "roleName": "Aria: Teste Mobili / Beam",
-              "parameter": "Tilt",
-              "startValue": 39,
-              "endValue": 217,
-              "curve": "Cosine_2Bars",
-              "commandColor": "ffdc2626"
-            },
-            {
-              "nodeType": "ROLE_COMMAND",
-              "roleName": "Terra: Controluce / Sotto-Batteria",
-              "parameter": "Red",
-              "startValue": 245,
-              "endValue": 245,
-              "curve": "Static",
-              "commandColor": "fff59e0b"
-            },
-            {
-              "nodeType": "ROLE_COMMAND",
-              "roleName": "Terra: Controluce / Sotto-Batteria",
-              "parameter": "Green",
-              "startValue": 158,
-              "endValue": 158,
-              "curve": "Static",
-              "commandColor": "fff59e0b"
-            },
-            {
-              "nodeType": "ROLE_COMMAND",
-              "roleName": "Terra: Controluce / Sotto-Batteria",
-              "parameter": "Blue",
-              "startValue": 11,
-              "endValue": 11,
-              "curve": "Static",
-              "commandColor": "fff59e0b"
-            },
-            {
-              "nodeType": "ROLE_COMMAND",
-              "roleName": "Terra: Controluce / Sotto-Batteria",
-              "parameter": "Dimmer",
-              "startValue": 255,
-              "endValue": 255,
-              "curve": "Static",
-              "commandColor": "fff59e0b"
-            },
-            {
-              "nodeType": "ROLE_COMMAND",
-              "roleName": "Terra: Controluce / Sotto-Batteria",
-              "parameter": "Pan",
-              "startValue": 34,
-              "endValue": 222,
-              "curve": "Sine_2Bars",
-              "commandColor": "fff59e0b"
-            },
-            {
-              "nodeType": "ROLE_COMMAND",
-              "roleName": "Terra: Controluce / Sotto-Batteria",
-              "parameter": "Tilt",
-              "startValue": 39,
-              "endValue": 217,
-              "curve": "Cosine_2Bars",
-              "commandColor": "fff59e0b"
-            }
-          ]
-        },
-        {
-          "nodeType": "SCENE",
-          "presetName": "Cerchio Rosso Sangue / Ambra + Strobo",
-          "presetPool": "Strobe",
-          "layerType": "OverlayFX",
-          "durationBeats": 16.0,
-          "isOneShot": "0",
-          "phaseMode": "SymmetricalFan",
-          "targetRolesCsv": "Aria: Wash Controluce (Fondale)|Aria: Teste Mobili / Beam|Terra: Controluce / Sotto-Batteria",
-          "presetColor1": "ffdc2626",
-          "presetColor2": "fff59e0b",
-          "presetDimmerMin": "0",
-          "presetDimmerMax": "255",
-          "presetCurve": "Static",
-          "presetStrobeUseHw": "0",
-          "presetStrobeSubdiv": "1/8",
-          "presetMoveShape": "Circle",
-          "presetMoveSpeed": "Sine_2Bars",
-          "presetMoveAmpPan": 74,
-          "presetMoveAmpTilt": 70,
-          "sceneName": "Cerchio Rosso Sangue / Ambra + Strobo",
-          "startBeat": 165.0,
-          "children": [
-            {
-              "nodeType": "ROLE_COMMAND",
-              "roleName": "Aria: Wash Controluce (Fondale)",
-              "parameter": "Red",
-              "startValue": 220,
-              "endValue": 220,
-              "curve": "Static",
-              "commandColor": "ffdc2626"
-            },
-            {
-              "nodeType": "ROLE_COMMAND",
-              "roleName": "Aria: Wash Controluce (Fondale)",
-              "parameter": "Green",
-              "startValue": 38,
-              "endValue": 38,
-              "curve": "Static",
-              "commandColor": "ffdc2626"
-            },
-            {
-              "nodeType": "ROLE_COMMAND",
-              "roleName": "Aria: Wash Controluce (Fondale)",
-              "parameter": "Blue",
-              "startValue": 38,
-              "endValue": 38,
-              "curve": "Static",
-              "commandColor": "ffdc2626"
-            },
-            {
-              "nodeType": "ROLE_COMMAND",
-              "roleName": "Aria: Wash Controluce (Fondale)",
-              "parameter": "Dimmer",
-              "startValue": 0,
-              "endValue": 255,
-              "curve": "Square_1_8",
-              "commandColor": "ffdc2626"
-            },
-            {
-              "nodeType": "ROLE_COMMAND",
-              "roleName": "Aria: Wash Controluce (Fondale)",
-              "parameter": "Pan",
-              "startValue": 34,
-              "endValue": 222,
-              "curve": "Sine_2Bars",
-              "commandColor": "ffdc2626"
-            },
-            {
-              "nodeType": "ROLE_COMMAND",
-              "roleName": "Aria: Wash Controluce (Fondale)",
-              "parameter": "Tilt",
-              "startValue": 39,
-              "endValue": 217,
-              "curve": "Cosine_2Bars",
-              "commandColor": "ffdc2626"
-            },
-            {
-              "nodeType": "ROLE_COMMAND",
-              "roleName": "Aria: Teste Mobili / Beam",
-              "parameter": "Red",
-              "startValue": 220,
-              "endValue": 220,
-              "curve": "Static",
-              "commandColor": "ffdc2626"
-            },
-            {
-              "nodeType": "ROLE_COMMAND",
-              "roleName": "Aria: Teste Mobili / Beam",
-              "parameter": "Green",
-              "startValue": 38,
-              "endValue": 38,
-              "curve": "Static",
-              "commandColor": "ffdc2626"
-            },
-            {
-              "nodeType": "ROLE_COMMAND",
-              "roleName": "Aria: Teste Mobili / Beam",
-              "parameter": "Blue",
-              "startValue": 38,
-              "endValue": 38,
-              "curve": "Static",
-              "commandColor": "ffdc2626"
-            },
-            {
-              "nodeType": "ROLE_COMMAND",
-              "roleName": "Aria: Teste Mobili / Beam",
-              "parameter": "Dimmer",
-              "startValue": 0,
-              "endValue": 255,
-              "curve": "Square_1_8",
-              "commandColor": "ffdc2626"
-            },
-            {
-              "nodeType": "ROLE_COMMAND",
-              "roleName": "Aria: Teste Mobili / Beam",
-              "parameter": "Pan",
-              "startValue": 34,
-              "endValue": 222,
-              "curve": "Sine_2Bars",
-              "commandColor": "ffdc2626"
-            },
-            {
-              "nodeType": "ROLE_COMMAND",
-              "roleName": "Aria: Teste Mobili / Beam",
-              "parameter": "Tilt",
-              "startValue": 39,
-              "endValue": 217,
-              "curve": "Cosine_2Bars",
-              "commandColor": "ffdc2626"
-            },
-            {
-              "nodeType": "ROLE_COMMAND",
-              "roleName": "Terra: Controluce / Sotto-Batteria",
-              "parameter": "Red",
-              "startValue": 245,
-              "endValue": 245,
-              "curve": "Static",
-              "commandColor": "fff59e0b"
-            },
-            {
-              "nodeType": "ROLE_COMMAND",
-              "roleName": "Terra: Controluce / Sotto-Batteria",
-              "parameter": "Green",
-              "startValue": 158,
-              "endValue": 158,
-              "curve": "Static",
-              "commandColor": "fff59e0b"
-            },
-            {
-              "nodeType": "ROLE_COMMAND",
-              "roleName": "Terra: Controluce / Sotto-Batteria",
-              "parameter": "Blue",
-              "startValue": 11,
-              "endValue": 11,
-              "curve": "Static",
-              "commandColor": "fff59e0b"
-            },
-            {
-              "nodeType": "ROLE_COMMAND",
-              "roleName": "Terra: Controluce / Sotto-Batteria",
-              "parameter": "Dimmer",
-              "startValue": 0,
-              "endValue": 255,
-              "curve": "Square_1_8",
-              "commandColor": "fff59e0b"
-            },
-            {
-              "nodeType": "ROLE_COMMAND",
-              "roleName": "Terra: Controluce / Sotto-Batteria",
-              "parameter": "Pan",
-              "startValue": 34,
-              "endValue": 222,
-              "curve": "Sine_2Bars",
-              "commandColor": "fff59e0b"
-            },
-            {
-              "nodeType": "ROLE_COMMAND",
-              "roleName": "Terra: Controluce / Sotto-Batteria",
-              "parameter": "Tilt",
-              "startValue": 39,
-              "endValue": 217,
-              "curve": "Cosine_2Bars",
-              "commandColor": "fff59e0b"
-            }
-          ]
-        },
-        {
-          "nodeType": "SCENE",
-          "presetName": "Cerchio Rosso Sangue / Ambra",
-          "presetPool": "Movement",
-          "layerType": "Movement",
-          "durationBeats": 32.0,
-          "isOneShot": "0",
-          "phaseMode": "SymmetricalFan",
-          "targetRolesCsv": "Aria: Wash Controluce (Fondale)|Aria: Teste Mobili / Beam|Terra: Controluce / Sotto-Batteria",
-          "presetColor1": "ffdc2626",
-          "presetColor2": "fff59e0b",
-          "presetDimmerMin": "0",
-          "presetDimmerMax": "255",
-          "presetCurve": "Static",
-          "presetStrobeUseHw": "0",
-          "presetStrobeSubdiv": "1/8",
-          "presetMoveShape": "Circle",
-          "presetMoveSpeed": "Sine_2Bars",
-          "presetMoveAmpPan": 74,
-          "presetMoveAmpTilt": 70,
-          "sceneName": "Cerchio Rosso Sangue / Ambra (Copia)",
-          "startBeat": 181.0,
-          "children": [
-            {
-              "nodeType": "ROLE_COMMAND",
-              "roleName": "Aria: Wash Controluce (Fondale)",
-              "parameter": "Red",
-              "startValue": 220,
-              "endValue": 220,
-              "curve": "Static",
-              "commandColor": "ffdc2626"
-            },
-            {
-              "nodeType": "ROLE_COMMAND",
-              "roleName": "Aria: Wash Controluce (Fondale)",
-              "parameter": "Green",
-              "startValue": 38,
-              "endValue": 38,
-              "curve": "Static",
-              "commandColor": "ffdc2626"
-            },
-            {
-              "nodeType": "ROLE_COMMAND",
-              "roleName": "Aria: Wash Controluce (Fondale)",
-              "parameter": "Blue",
-              "startValue": 38,
-              "endValue": 38,
-              "curve": "Static",
-              "commandColor": "ffdc2626"
-            },
-            {
-              "nodeType": "ROLE_COMMAND",
-              "roleName": "Aria: Wash Controluce (Fondale)",
-              "parameter": "Dimmer",
-              "startValue": 255,
-              "endValue": 255,
-              "curve": "Static",
-              "commandColor": "ffdc2626"
-            },
-            {
-              "nodeType": "ROLE_COMMAND",
-              "roleName": "Aria: Wash Controluce (Fondale)",
-              "parameter": "Pan",
-              "startValue": 34,
-              "endValue": 222,
-              "curve": "Sine_2Bars",
-              "commandColor": "ffdc2626"
-            },
-            {
-              "nodeType": "ROLE_COMMAND",
-              "roleName": "Aria: Wash Controluce (Fondale)",
-              "parameter": "Tilt",
-              "startValue": 39,
-              "endValue": 217,
-              "curve": "Cosine_2Bars",
-              "commandColor": "ffdc2626"
-            },
-            {
-              "nodeType": "ROLE_COMMAND",
-              "roleName": "Aria: Teste Mobili / Beam",
-              "parameter": "Red",
-              "startValue": 220,
-              "endValue": 220,
-              "curve": "Static",
-              "commandColor": "ffdc2626"
-            },
-            {
-              "nodeType": "ROLE_COMMAND",
-              "roleName": "Aria: Teste Mobili / Beam",
-              "parameter": "Green",
-              "startValue": 38,
-              "endValue": 38,
-              "curve": "Static",
-              "commandColor": "ffdc2626"
-            },
-            {
-              "nodeType": "ROLE_COMMAND",
-              "roleName": "Aria: Teste Mobili / Beam",
-              "parameter": "Blue",
-              "startValue": 38,
-              "endValue": 38,
-              "curve": "Static",
-              "commandColor": "ffdc2626"
-            },
-            {
-              "nodeType": "ROLE_COMMAND",
-              "roleName": "Aria: Teste Mobili / Beam",
-              "parameter": "Dimmer",
-              "startValue": 255,
-              "endValue": 255,
-              "curve": "Static",
-              "commandColor": "ffdc2626"
-            },
-            {
-              "nodeType": "ROLE_COMMAND",
-              "roleName": "Aria: Teste Mobili / Beam",
-              "parameter": "Pan",
-              "startValue": 34,
-              "endValue": 222,
-              "curve": "Sine_2Bars",
-              "commandColor": "ffdc2626"
-            },
-            {
-              "nodeType": "ROLE_COMMAND",
-              "roleName": "Aria: Teste Mobili / Beam",
-              "parameter": "Tilt",
-              "startValue": 39,
-              "endValue": 217,
-              "curve": "Cosine_2Bars",
-              "commandColor": "ffdc2626"
-            },
-            {
-              "nodeType": "ROLE_COMMAND",
-              "roleName": "Terra: Controluce / Sotto-Batteria",
-              "parameter": "Red",
-              "startValue": 245,
-              "endValue": 245,
-              "curve": "Static",
-              "commandColor": "fff59e0b"
-            },
-            {
-              "nodeType": "ROLE_COMMAND",
-              "roleName": "Terra: Controluce / Sotto-Batteria",
-              "parameter": "Green",
-              "startValue": 158,
-              "endValue": 158,
-              "curve": "Static",
-              "commandColor": "fff59e0b"
-            },
-            {
-              "nodeType": "ROLE_COMMAND",
-              "roleName": "Terra: Controluce / Sotto-Batteria",
-              "parameter": "Blue",
-              "startValue": 11,
-              "endValue": 11,
-              "curve": "Static",
-              "commandColor": "fff59e0b"
-            },
-            {
-              "nodeType": "ROLE_COMMAND",
-              "roleName": "Terra: Controluce / Sotto-Batteria",
-              "parameter": "Dimmer",
-              "startValue": 255,
-              "endValue": 255,
-              "curve": "Static",
-              "commandColor": "fff59e0b"
-            },
-            {
-              "nodeType": "ROLE_COMMAND",
-              "roleName": "Terra: Controluce / Sotto-Batteria",
-              "parameter": "Pan",
-              "startValue": 34,
-              "endValue": 222,
-              "curve": "Sine_2Bars",
-              "commandColor": "fff59e0b"
-            },
-            {
-              "nodeType": "ROLE_COMMAND",
-              "roleName": "Terra: Controluce / Sotto-Batteria",
-              "parameter": "Tilt",
-              "startValue": 39,
-              "endValue": 217,
-              "curve": "Cosine_2Bars",
-              "commandColor": "fff59e0b"
-            }
-          ]
-        },
-        {
-          "nodeType": "SCENE",
-          "presetName": "Cerchio Rosso Sangue / Ambra + Strobo",
-          "presetPool": "Strobe",
-          "layerType": "OverlayFX",
-          "durationBeats": 16.0,
-          "isOneShot": "0",
-          "phaseMode": "SymmetricalFan",
-          "targetRolesCsv": "Aria: Wash Controluce (Fondale)|Aria: Teste Mobili / Beam|Terra: Controluce / Sotto-Batteria",
-          "presetColor1": "ffdc2626",
-          "presetColor2": "fff59e0b",
-          "presetDimmerMin": "0",
-          "presetDimmerMax": "255",
-          "presetCurve": "Static",
-          "presetStrobeUseHw": "0",
-          "presetStrobeSubdiv": "1/8",
-          "presetMoveShape": "Circle",
-          "presetMoveSpeed": "Sine_2Bars",
-          "presetMoveAmpPan": 74,
-          "presetMoveAmpTilt": 70,
-          "sceneName": "Cerchio Rosso Sangue / Ambra + Strobo (Copia)",
-          "startBeat": 213.0,
-          "children": [
-            {
-              "nodeType": "ROLE_COMMAND",
-              "roleName": "Aria: Wash Controluce (Fondale)",
-              "parameter": "Red",
-              "startValue": 220,
-              "endValue": 220,
-              "curve": "Static",
-              "commandColor": "ffdc2626"
-            },
-            {
-              "nodeType": "ROLE_COMMAND",
-              "roleName": "Aria: Wash Controluce (Fondale)",
-              "parameter": "Green",
-              "startValue": 38,
-              "endValue": 38,
-              "curve": "Static",
-              "commandColor": "ffdc2626"
-            },
-            {
-              "nodeType": "ROLE_COMMAND",
-              "roleName": "Aria: Wash Controluce (Fondale)",
-              "parameter": "Blue",
-              "startValue": 38,
-              "endValue": 38,
-              "curve": "Static",
-              "commandColor": "ffdc2626"
-            },
-            {
-              "nodeType": "ROLE_COMMAND",
-              "roleName": "Aria: Wash Controluce (Fondale)",
-              "parameter": "Dimmer",
-              "startValue": 0,
-              "endValue": 255,
-              "curve": "Square_1_8",
-              "commandColor": "ffdc2626"
-            },
-            {
-              "nodeType": "ROLE_COMMAND",
-              "roleName": "Aria: Wash Controluce (Fondale)",
-              "parameter": "Pan",
-              "startValue": 34,
-              "endValue": 222,
-              "curve": "Sine_2Bars",
-              "commandColor": "ffdc2626"
-            },
-            {
-              "nodeType": "ROLE_COMMAND",
-              "roleName": "Aria: Wash Controluce (Fondale)",
-              "parameter": "Tilt",
-              "startValue": 39,
-              "endValue": 217,
-              "curve": "Cosine_2Bars",
-              "commandColor": "ffdc2626"
-            },
-            {
-              "nodeType": "ROLE_COMMAND",
-              "roleName": "Aria: Teste Mobili / Beam",
-              "parameter": "Red",
-              "startValue": 220,
-              "endValue": 220,
-              "curve": "Static",
-              "commandColor": "ffdc2626"
-            },
-            {
-              "nodeType": "ROLE_COMMAND",
-              "roleName": "Aria: Teste Mobili / Beam",
-              "parameter": "Green",
-              "startValue": 38,
-              "endValue": 38,
-              "curve": "Static",
-              "commandColor": "ffdc2626"
-            },
-            {
-              "nodeType": "ROLE_COMMAND",
-              "roleName": "Aria: Teste Mobili / Beam",
-              "parameter": "Blue",
-              "startValue": 38,
-              "endValue": 38,
-              "curve": "Static",
-              "commandColor": "ffdc2626"
-            },
-            {
-              "nodeType": "ROLE_COMMAND",
-              "roleName": "Aria: Teste Mobili / Beam",
-              "parameter": "Dimmer",
-              "startValue": 0,
-              "endValue": 255,
-              "curve": "Square_1_8",
-              "commandColor": "ffdc2626"
-            },
-            {
-              "nodeType": "ROLE_COMMAND",
-              "roleName": "Aria: Teste Mobili / Beam",
-              "parameter": "Pan",
-              "startValue": 34,
-              "endValue": 222,
-              "curve": "Sine_2Bars",
-              "commandColor": "ffdc2626"
-            },
-            {
-              "nodeType": "ROLE_COMMAND",
-              "roleName": "Aria: Teste Mobili / Beam",
-              "parameter": "Tilt",
-              "startValue": 39,
-              "endValue": 217,
-              "curve": "Cosine_2Bars",
-              "commandColor": "ffdc2626"
-            },
-            {
-              "nodeType": "ROLE_COMMAND",
-              "roleName": "Terra: Controluce / Sotto-Batteria",
-              "parameter": "Red",
-              "startValue": 245,
-              "endValue": 245,
-              "curve": "Static",
-              "commandColor": "fff59e0b"
-            },
-            {
-              "nodeType": "ROLE_COMMAND",
-              "roleName": "Terra: Controluce / Sotto-Batteria",
-              "parameter": "Green",
-              "startValue": 158,
-              "endValue": 158,
-              "curve": "Static",
-              "commandColor": "fff59e0b"
-            },
-            {
-              "nodeType": "ROLE_COMMAND",
-              "roleName": "Terra: Controluce / Sotto-Batteria",
-              "parameter": "Blue",
-              "startValue": 11,
-              "endValue": 11,
-              "curve": "Static",
-              "commandColor": "fff59e0b"
-            },
-            {
-              "nodeType": "ROLE_COMMAND",
-              "roleName": "Terra: Controluce / Sotto-Batteria",
-              "parameter": "Dimmer",
-              "startValue": 0,
-              "endValue": 255,
-              "curve": "Square_1_8",
-              "commandColor": "fff59e0b"
-            },
-            {
-              "nodeType": "ROLE_COMMAND",
-              "roleName": "Terra: Controluce / Sotto-Batteria",
-              "parameter": "Pan",
-              "startValue": 34,
-              "endValue": 222,
-              "curve": "Sine_2Bars",
-              "commandColor": "fff59e0b"
-            },
-            {
-              "nodeType": "ROLE_COMMAND",
-              "roleName": "Terra: Controluce / Sotto-Batteria",
-              "parameter": "Tilt",
-              "startValue": 39,
-              "endValue": 217,
-              "curve": "Cosine_2Bars",
-              "commandColor": "fff59e0b"
-            }
-          ]
-        },
-        {
-          "nodeType": "SCENE",
-          "presetName": "Strobo 1/8 Up",
-          "presetPool": "Strobe",
-          "layerType": "OverlayFX",
-          "durationBeats": 28.0,
-          "isOneShot": "0",
-          "phaseMode": "Sync",
-          "targetRolesCsv": "Aria: Wash Controluce (Fondale)|Aria: Teste Mobili / Beam",
-          "presetColor1": "ffffffff",
-          "presetColor2": "ffffffff",
-          "presetDimmerMin": "0",
-          "presetDimmerMax": "255",
-          "presetCurve": "Square_1_8",
-          "presetStrobeUseHw": "0",
-          "presetStrobeSubdiv": "1/8",
-          "presetMoveShape": "Fixed",
-          "presetMoveSpeed": "Sine_1Bar",
-          "presetMoveAmpPan": "0",
-          "presetMoveAmpTilt": "0",
-          "sceneName": "Strobo 1/8 Up",
-          "startBeat": 229.0,
-          "children": [
-            {
-              "nodeType": "ROLE_COMMAND",
-              "roleName": "Aria: Wash Controluce (Fondale)",
-              "parameter": "Red",
-              "startValue": 255,
-              "endValue": 255,
-              "curve": "Static",
-              "commandColor": "ffffffff"
-            },
-            {
-              "nodeType": "ROLE_COMMAND",
-              "roleName": "Aria: Wash Controluce (Fondale)",
-              "parameter": "Green",
-              "startValue": 255,
-              "endValue": 255,
-              "curve": "Static",
-              "commandColor": "ffffffff"
-            },
-            {
-              "nodeType": "ROLE_COMMAND",
-              "roleName": "Aria: Wash Controluce (Fondale)",
-              "parameter": "Blue",
-              "startValue": 255,
-              "endValue": 255,
-              "curve": "Static",
-              "commandColor": "ffffffff"
-            },
-            {
-              "nodeType": "ROLE_COMMAND",
-              "roleName": "Aria: Wash Controluce (Fondale)",
-              "parameter": "Dimmer",
-              "startValue": 0,
-              "endValue": 255,
-              "curve": "Square_1_8",
-              "commandColor": "ffffffff"
-            },
-            {
-              "nodeType": "ROLE_COMMAND",
-              "roleName": "Aria: Teste Mobili / Beam",
-              "parameter": "Red",
-              "startValue": 255,
-              "endValue": 255,
-              "curve": "Static",
-              "commandColor": "ffffffff"
-            },
-            {
-              "nodeType": "ROLE_COMMAND",
-              "roleName": "Aria: Teste Mobili / Beam",
-              "parameter": "Green",
-              "startValue": 255,
-              "endValue": 255,
-              "curve": "Static",
-              "commandColor": "ffffffff"
-            },
-            {
-              "nodeType": "ROLE_COMMAND",
-              "roleName": "Aria: Teste Mobili / Beam",
-              "parameter": "Blue",
-              "startValue": 255,
-              "endValue": 255,
-              "curve": "Static",
-              "commandColor": "ffffffff"
-            },
-            {
-              "nodeType": "ROLE_COMMAND",
-              "roleName": "Aria: Teste Mobili / Beam",
-              "parameter": "Dimmer",
-              "startValue": 0,
-              "endValue": 255,
-              "curve": "Square_1_8",
-              "commandColor": "ffffffff"
-            }
-          ]
-        },
-        {
-          "nodeType": "SCENE",
-          "presetName": "Strobo 1/8 Down",
-          "presetPool": "Strobe",
-          "layerType": "OverlayFX",
-          "durationBeats": "4.0",
-          "isOneShot": "0",
-          "phaseMode": "Sync",
-          "targetRolesCsv": "Terra: Controluce / Sotto-Batteria",
-          "presetColor1": "ffdc2626",
-          "presetColor2": "ffdc2626",
-          "presetDimmerMin": "0",
-          "presetDimmerMax": "255",
-          "presetCurve": "Square_1_8",
-          "presetStrobeUseHw": "0",
-          "presetStrobeSubdiv": "1/8",
-          "presetMoveShape": "Fixed",
-          "presetMoveSpeed": "Sine_1Bar",
-          "presetMoveAmpPan": "0",
-          "presetMoveAmpTilt": "0",
-          "sceneName": "Strobo 1/8 Down (Copia)",
-          "startBeat": 257.0,
-          "children": [
-            {
-              "nodeType": "ROLE_COMMAND",
-              "roleName": "Terra: Controluce / Sotto-Batteria",
-              "parameter": "Red",
-              "startValue": 220,
-              "endValue": 220,
-              "curve": "Static",
-              "commandColor": "ffdc2626"
-            },
-            {
-              "nodeType": "ROLE_COMMAND",
-              "roleName": "Terra: Controluce / Sotto-Batteria",
-              "parameter": "Green",
-              "startValue": 38,
-              "endValue": 38,
-              "curve": "Static",
-              "commandColor": "ffdc2626"
-            },
-            {
-              "nodeType": "ROLE_COMMAND",
-              "roleName": "Terra: Controluce / Sotto-Batteria",
-              "parameter": "Blue",
-              "startValue": 38,
-              "endValue": 38,
-              "curve": "Static",
-              "commandColor": "ffdc2626"
-            },
-            {
-              "nodeType": "ROLE_COMMAND",
-              "roleName": "Terra: Controluce / Sotto-Batteria",
-              "parameter": "Dimmer",
-              "startValue": 0,
-              "endValue": 255,
-              "curve": "Square_1_8",
-              "commandColor": "ffdc2626"
-            }
-          ]
-        },
-        {
-          "nodeType": "SCENE",
-          "presetName": "Strobo 1/8 Up",
-          "presetPool": "Strobe",
-          "layerType": "OverlayFX",
-          "durationBeats": 28.0,
-          "isOneShot": "0",
-          "phaseMode": "Sync",
-          "targetRolesCsv": "Aria: Wash Controluce (Fondale)|Aria: Teste Mobili / Beam",
-          "presetColor1": "ffffffff",
-          "presetColor2": "ffffffff",
-          "presetDimmerMin": "0",
-          "presetDimmerMax": "255",
-          "presetCurve": "Square_1_8",
-          "presetStrobeUseHw": "0",
-          "presetStrobeSubdiv": "1/8",
-          "presetMoveShape": "Fixed",
-          "presetMoveSpeed": "Sine_1Bar",
-          "presetMoveAmpPan": "0",
-          "presetMoveAmpTilt": "0",
-          "sceneName": "Strobo 1/8 Up (Copia)",
-          "startBeat": 261.0,
-          "children": [
-            {
-              "nodeType": "ROLE_COMMAND",
-              "roleName": "Aria: Wash Controluce (Fondale)",
-              "parameter": "Red",
-              "startValue": 255,
-              "endValue": 255,
-              "curve": "Static",
-              "commandColor": "ffffffff"
-            },
-            {
-              "nodeType": "ROLE_COMMAND",
-              "roleName": "Aria: Wash Controluce (Fondale)",
-              "parameter": "Green",
-              "startValue": 255,
-              "endValue": 255,
-              "curve": "Static",
-              "commandColor": "ffffffff"
-            },
-            {
-              "nodeType": "ROLE_COMMAND",
-              "roleName": "Aria: Wash Controluce (Fondale)",
-              "parameter": "Blue",
-              "startValue": 255,
-              "endValue": 255,
-              "curve": "Static",
-              "commandColor": "ffffffff"
-            },
-            {
-              "nodeType": "ROLE_COMMAND",
-              "roleName": "Aria: Wash Controluce (Fondale)",
-              "parameter": "Dimmer",
-              "startValue": 0,
-              "endValue": 255,
-              "curve": "Square_1_8",
-              "commandColor": "ffffffff"
-            },
-            {
-              "nodeType": "ROLE_COMMAND",
-              "roleName": "Aria: Teste Mobili / Beam",
-              "parameter": "Red",
-              "startValue": 255,
-              "endValue": 255,
-              "curve": "Static",
-              "commandColor": "ffffffff"
-            },
-            {
-              "nodeType": "ROLE_COMMAND",
-              "roleName": "Aria: Teste Mobili / Beam",
-              "parameter": "Green",
-              "startValue": 255,
-              "endValue": 255,
-              "curve": "Static",
-              "commandColor": "ffffffff"
-            },
-            {
-              "nodeType": "ROLE_COMMAND",
-              "roleName": "Aria: Teste Mobili / Beam",
-              "parameter": "Blue",
-              "startValue": 255,
-              "endValue": 255,
-              "curve": "Static",
-              "commandColor": "ffffffff"
-            },
-            {
-              "nodeType": "ROLE_COMMAND",
-              "roleName": "Aria: Teste Mobili / Beam",
-              "parameter": "Dimmer",
-              "startValue": 0,
-              "endValue": 255,
-              "curve": "Square_1_8",
-              "commandColor": "ffffffff"
-            }
-          ]
-        },
-        {
-          "nodeType": "SCENE",
-          "presetName": "Strobo 1/8 Down",
-          "presetPool": "Strobe",
-          "layerType": "OverlayFX",
-          "durationBeats": "4.0",
-          "isOneShot": "0",
-          "phaseMode": "Sync",
-          "targetRolesCsv": "Terra: Controluce / Sotto-Batteria",
-          "presetColor1": "ffdc2626",
-          "presetColor2": "ffdc2626",
-          "presetDimmerMin": "0",
-          "presetDimmerMax": "255",
-          "presetCurve": "Square_1_8",
-          "presetStrobeUseHw": "0",
-          "presetStrobeSubdiv": "1/8",
-          "presetMoveShape": "Fixed",
-          "presetMoveSpeed": "Sine_1Bar",
-          "presetMoveAmpPan": "0",
-          "presetMoveAmpTilt": "0",
-          "sceneName": "Strobo 1/8 Down",
-          "startBeat": 289.0,
-          "children": [
-            {
-              "nodeType": "ROLE_COMMAND",
-              "roleName": "Terra: Controluce / Sotto-Batteria",
-              "parameter": "Red",
-              "startValue": 220,
-              "endValue": 220,
-              "curve": "Static",
-              "commandColor": "ffdc2626"
-            },
-            {
-              "nodeType": "ROLE_COMMAND",
-              "roleName": "Terra: Controluce / Sotto-Batteria",
-              "parameter": "Green",
-              "startValue": 38,
-              "endValue": 38,
-              "curve": "Static",
-              "commandColor": "ffdc2626"
-            },
-            {
-              "nodeType": "ROLE_COMMAND",
-              "roleName": "Terra: Controluce / Sotto-Batteria",
-              "parameter": "Blue",
-              "startValue": 38,
-              "endValue": 38,
-              "curve": "Static",
-              "commandColor": "ffdc2626"
-            },
-            {
-              "nodeType": "ROLE_COMMAND",
-              "roleName": "Terra: Controluce / Sotto-Batteria",
-              "parameter": "Dimmer",
-              "startValue": 0,
-              "endValue": 255,
-              "curve": "Square_1_8",
-              "commandColor": "ffdc2626"
-            }
-          ]
-        },
-        {
-          "nodeType": "SCENE",
-          "presetName": "Cerchio Rosso Sangue / Ambra + Strobo",
-          "presetPool": "Strobe",
-          "layerType": "OverlayFX",
-          "durationBeats": 60.0,
-          "isOneShot": "0",
-          "phaseMode": "SymmetricalFan",
-          "targetRolesCsv": "Aria: Wash Controluce (Fondale)|Aria: Teste Mobili / Beam|Terra: Controluce / Sotto-Batteria",
-          "presetColor1": "ffdc2626",
-          "presetColor2": "fff59e0b",
-          "presetDimmerMin": "0",
-          "presetDimmerMax": "255",
-          "presetCurve": "Static",
-          "presetStrobeUseHw": "0",
-          "presetStrobeSubdiv": "1/8",
-          "presetMoveShape": "Circle",
-          "presetMoveSpeed": "Sine_2Bars",
-          "presetMoveAmpPan": 74,
-          "presetMoveAmpTilt": 70,
-          "sceneName": "Cerchio Rosso Sangue / Ambra + Strobo",
-          "startBeat": 293.0,
-          "children": [
-            {
-              "nodeType": "ROLE_COMMAND",
-              "roleName": "Aria: Wash Controluce (Fondale)",
-              "parameter": "Red",
-              "startValue": 220,
-              "endValue": 220,
-              "curve": "Static",
-              "commandColor": "ffdc2626"
-            },
-            {
-              "nodeType": "ROLE_COMMAND",
-              "roleName": "Aria: Wash Controluce (Fondale)",
-              "parameter": "Green",
-              "startValue": 38,
-              "endValue": 38,
-              "curve": "Static",
-              "commandColor": "ffdc2626"
-            },
-            {
-              "nodeType": "ROLE_COMMAND",
-              "roleName": "Aria: Wash Controluce (Fondale)",
-              "parameter": "Blue",
-              "startValue": 38,
-              "endValue": 38,
-              "curve": "Static",
-              "commandColor": "ffdc2626"
-            },
-            {
-              "nodeType": "ROLE_COMMAND",
-              "roleName": "Aria: Wash Controluce (Fondale)",
-              "parameter": "Dimmer",
-              "startValue": 0,
-              "endValue": 255,
-              "curve": "Square_1_8",
-              "commandColor": "ffdc2626"
-            },
-            {
-              "nodeType": "ROLE_COMMAND",
-              "roleName": "Aria: Wash Controluce (Fondale)",
-              "parameter": "Pan",
-              "startValue": 34,
-              "endValue": 222,
-              "curve": "Sine_2Bars",
-              "commandColor": "ffdc2626"
-            },
-            {
-              "nodeType": "ROLE_COMMAND",
-              "roleName": "Aria: Wash Controluce (Fondale)",
-              "parameter": "Tilt",
-              "startValue": 39,
-              "endValue": 217,
-              "curve": "Cosine_2Bars",
-              "commandColor": "ffdc2626"
-            },
-            {
-              "nodeType": "ROLE_COMMAND",
-              "roleName": "Aria: Teste Mobili / Beam",
-              "parameter": "Red",
-              "startValue": 220,
-              "endValue": 220,
-              "curve": "Static",
-              "commandColor": "ffdc2626"
-            },
-            {
-              "nodeType": "ROLE_COMMAND",
-              "roleName": "Aria: Teste Mobili / Beam",
-              "parameter": "Green",
-              "startValue": 38,
-              "endValue": 38,
-              "curve": "Static",
-              "commandColor": "ffdc2626"
-            },
-            {
-              "nodeType": "ROLE_COMMAND",
-              "roleName": "Aria: Teste Mobili / Beam",
-              "parameter": "Blue",
-              "startValue": 38,
-              "endValue": 38,
-              "curve": "Static",
-              "commandColor": "ffdc2626"
-            },
-            {
-              "nodeType": "ROLE_COMMAND",
-              "roleName": "Aria: Teste Mobili / Beam",
-              "parameter": "Dimmer",
-              "startValue": 0,
-              "endValue": 255,
-              "curve": "Square_1_8",
-              "commandColor": "ffdc2626"
-            },
-            {
-              "nodeType": "ROLE_COMMAND",
-              "roleName": "Aria: Teste Mobili / Beam",
-              "parameter": "Pan",
-              "startValue": 34,
-              "endValue": 222,
-              "curve": "Sine_2Bars",
-              "commandColor": "ffdc2626"
-            },
-            {
-              "nodeType": "ROLE_COMMAND",
-              "roleName": "Aria: Teste Mobili / Beam",
-              "parameter": "Tilt",
-              "startValue": 39,
-              "endValue": 217,
-              "curve": "Cosine_2Bars",
-              "commandColor": "ffdc2626"
-            },
-            {
-              "nodeType": "ROLE_COMMAND",
-              "roleName": "Terra: Controluce / Sotto-Batteria",
-              "parameter": "Red",
-              "startValue": 245,
-              "endValue": 245,
-              "curve": "Static",
-              "commandColor": "fff59e0b"
-            },
-            {
-              "nodeType": "ROLE_COMMAND",
-              "roleName": "Terra: Controluce / Sotto-Batteria",
-              "parameter": "Green",
-              "startValue": 158,
-              "endValue": 158,
-              "curve": "Static",
-              "commandColor": "fff59e0b"
-            },
-            {
-              "nodeType": "ROLE_COMMAND",
-              "roleName": "Terra: Controluce / Sotto-Batteria",
-              "parameter": "Blue",
-              "startValue": 11,
-              "endValue": 11,
-              "curve": "Static",
-              "commandColor": "fff59e0b"
-            },
-            {
-              "nodeType": "ROLE_COMMAND",
-              "roleName": "Terra: Controluce / Sotto-Batteria",
-              "parameter": "Dimmer",
-              "startValue": 0,
-              "endValue": 255,
-              "curve": "Square_1_8",
-              "commandColor": "fff59e0b"
-            },
-            {
-              "nodeType": "ROLE_COMMAND",
-              "roleName": "Terra: Controluce / Sotto-Batteria",
-              "parameter": "Pan",
-              "startValue": 34,
-              "endValue": 222,
-              "curve": "Sine_2Bars",
-              "commandColor": "fff59e0b"
-            },
-            {
-              "nodeType": "ROLE_COMMAND",
-              "roleName": "Terra: Controluce / Sotto-Batteria",
-              "parameter": "Tilt",
-              "startValue": 39,
-              "endValue": 217,
-              "curve": "Cosine_2Bars",
-              "commandColor": "fff59e0b"
-            }
-          ]
-        },
-        {
-          "nodeType": "SCENE",
-          "sceneName": "Orange Floor",
-          "startBeat": 353.0,
-          "durationBeats": 4.0,
-          "presetName": "Orange Floor",
-          "targetRolesCsv": "Terra: Controluce / Sotto-Batteria|Terra: Par / Barre Laterali (Taglio)|Terra: Teste Mobili a Terra",
+          "presetName": "[F] Split Blu Notte / Ghiaccio",
           "presetPool": "Color",
           "layerType": "Base",
-          "presetColor1": "ffdc2626",
-          "presetColor2": "fff59e0b",
+          "durationBeats": 132.0,
+          "isOneShot": "0",
+          "phaseMode": "Sync",
+          "targetRolesCsv": "Aria: Wash Controluce (Fondale)|Aria: Par / Spot Frontali (Band)|Terra: Controluce / Sotto-Batteria",
+          "presetColor1": "ff1d4ed8",
+          "presetColor2": "ff38bdf8",
           "presetDimmerMin": "0",
           "presetDimmerMax": "255",
           "presetCurve": "Static",
-          "presetStrobeUseHw": "1",
-          "presetStrobeSubdiv": "1/16",
-          "presetMoveShape": "Fixed",
-          "children": [
-            {
-              "nodeType": "ROLE_COMMAND",
-              "roleName": "Terra: Controluce / Sotto-Batteria",
-              "parameter": "Red",
-              "startValue": 245,
-              "endValue": 245,
-              "curve": "Static",
-              "commandColor": "fff59e0b"
-            },
-            {
-              "nodeType": "ROLE_COMMAND",
-              "roleName": "Terra: Controluce / Sotto-Batteria",
-              "parameter": "Green",
-              "startValue": 158,
-              "endValue": 158,
-              "curve": "Static",
-              "commandColor": "fff59e0b"
-            },
-            {
-              "nodeType": "ROLE_COMMAND",
-              "roleName": "Terra: Controluce / Sotto-Batteria",
-              "parameter": "Blue",
-              "startValue": 11,
-              "endValue": 11,
-              "curve": "Static",
-              "commandColor": "fff59e0b"
-            },
-            {
-              "nodeType": "ROLE_COMMAND",
-              "roleName": "Terra: Controluce / Sotto-Batteria",
-              "parameter": "Dimmer",
-              "startValue": 255,
-              "endValue": 255,
-              "curve": "Static",
-              "commandColor": "fff59e0b"
-            },
-            {
-              "nodeType": "ROLE_COMMAND",
-              "roleName": "Terra: Par / Barre Laterali (Taglio)",
-              "parameter": "Red",
-              "startValue": 245,
-              "endValue": 245,
-              "curve": "Static",
-              "commandColor": "fff59e0b"
-            },
-            {
-              "nodeType": "ROLE_COMMAND",
-              "roleName": "Terra: Par / Barre Laterali (Taglio)",
-              "parameter": "Green",
-              "startValue": 158,
-              "endValue": 158,
-              "curve": "Static",
-              "commandColor": "fff59e0b"
-            },
-            {
-              "nodeType": "ROLE_COMMAND",
-              "roleName": "Terra: Par / Barre Laterali (Taglio)",
-              "parameter": "Blue",
-              "startValue": 11,
-              "endValue": 11,
-              "curve": "Static",
-              "commandColor": "fff59e0b"
-            },
-            {
-              "nodeType": "ROLE_COMMAND",
-              "roleName": "Terra: Par / Barre Laterali (Taglio)",
-              "parameter": "Dimmer",
-              "startValue": 255,
-              "endValue": 255,
-              "curve": "Static",
-              "commandColor": "fff59e0b"
-            },
-            {
-              "nodeType": "ROLE_COMMAND",
-              "roleName": "Terra: Teste Mobili a Terra",
-              "parameter": "Red",
-              "startValue": 245,
-              "endValue": 245,
-              "curve": "Static",
-              "commandColor": "fff59e0b"
-            },
-            {
-              "nodeType": "ROLE_COMMAND",
-              "roleName": "Terra: Teste Mobili a Terra",
-              "parameter": "Green",
-              "startValue": 158,
-              "endValue": 158,
-              "curve": "Static",
-              "commandColor": "fff59e0b"
-            },
-            {
-              "nodeType": "ROLE_COMMAND",
-              "roleName": "Terra: Teste Mobili a Terra",
-              "parameter": "Blue",
-              "startValue": 11,
-              "endValue": 11,
-              "curve": "Static",
-              "commandColor": "fff59e0b"
-            },
-            {
-              "nodeType": "ROLE_COMMAND",
-              "roleName": "Terra: Teste Mobili a Terra",
-              "parameter": "Dimmer",
-              "startValue": 255,
-              "endValue": 255,
-              "curve": "Static",
-              "commandColor": "fff59e0b"
-            }
-          ]
-        },
-        {
-          "nodeType": "SCENE",
-          "presetName": "Respiro Atmosferico (4 Bars / 16 Q) UP",
-          "presetPool": "Dimmer",
-          "layerType": "Base",
-          "durationBeats": 96.0,
-          "isOneShot": "0",
-          "phaseMode": "Sync",
-          "targetRolesCsv": "Aria: Wash Controluce (Fondale)",
-          "presetColor1": "ff38bdf8",
-          "presetColor2": "ff1d4ed8",
-          "presetDimmerMin": "40",
-          "presetDimmerMax": "240",
-          "presetCurve": "Sine_4Bars",
           "presetStrobeUseHw": "0",
           "presetStrobeSubdiv": "1/8",
           "presetMoveShape": "Fixed",
           "presetMoveSpeed": "Sine_4Bars",
           "presetMoveAmpPan": "0",
           "presetMoveAmpTilt": "0",
-          "sceneName": "Respiro Atmosferico (4 Bars / 16 Q) UP",
-          "startBeat": 357.0,
+          "sceneName": "[F] Split Blu Notte / Ghiaccio",
+          "presetUseColor": true,
+          "presetUseDimmer": false,
+          "presetUseMove": false,
+          "presetUseStrobe": false,
+          "startBeat": 1.0,
           "children": [
             {
               "nodeType": "ROLE_COMMAND",
               "roleName": "Aria: Wash Controluce (Fondale)",
+              "parameter": "Red",
+              "startValue": 29,
+              "endValue": 29,
+              "curve": "Static",
+              "commandColor": "ff1d4ed8"
+            },
+            {
+              "nodeType": "ROLE_COMMAND",
+              "roleName": "Aria: Wash Controluce (Fondale)",
+              "parameter": "Green",
+              "startValue": 78,
+              "endValue": 78,
+              "curve": "Static",
+              "commandColor": "ff1d4ed8"
+            },
+            {
+              "nodeType": "ROLE_COMMAND",
+              "roleName": "Aria: Wash Controluce (Fondale)",
+              "parameter": "Blue",
+              "startValue": 216,
+              "endValue": 216,
+              "curve": "Static",
+              "commandColor": "ff1d4ed8"
+            },
+            {
+              "nodeType": "ROLE_COMMAND",
+              "roleName": "Aria: Par / Spot Frontali (Band)",
+              "parameter": "Red",
+              "startValue": 29,
+              "endValue": 29,
+              "curve": "Static",
+              "commandColor": "ff1d4ed8"
+            },
+            {
+              "nodeType": "ROLE_COMMAND",
+              "roleName": "Aria: Par / Spot Frontali (Band)",
+              "parameter": "Green",
+              "startValue": 78,
+              "endValue": 78,
+              "curve": "Static",
+              "commandColor": "ff1d4ed8"
+            },
+            {
+              "nodeType": "ROLE_COMMAND",
+              "roleName": "Aria: Par / Spot Frontali (Band)",
+              "parameter": "Blue",
+              "startValue": 216,
+              "endValue": 216,
+              "curve": "Static",
+              "commandColor": "ff1d4ed8"
+            },
+            {
+              "nodeType": "ROLE_COMMAND",
+              "roleName": "Terra: Controluce / Sotto-Batteria",
               "parameter": "Red",
               "startValue": 56,
               "endValue": 56,
@@ -1503,7 +143,7 @@
             },
             {
               "nodeType": "ROLE_COMMAND",
-              "roleName": "Aria: Wash Controluce (Fondale)",
+              "roleName": "Terra: Controluce / Sotto-Batteria",
               "parameter": "Green",
               "startValue": 189,
               "endValue": 189,
@@ -1512,208 +152,151 @@
             },
             {
               "nodeType": "ROLE_COMMAND",
-              "roleName": "Aria: Wash Controluce (Fondale)",
+              "roleName": "Terra: Controluce / Sotto-Batteria",
               "parameter": "Blue",
               "startValue": 248,
               "endValue": 248,
               "curve": "Static",
-              "commandColor": "ff38bdf8"
-            },
-            {
-              "nodeType": "ROLE_COMMAND",
-              "roleName": "Aria: Wash Controluce (Fondale)",
-              "parameter": "Dimmer",
-              "startValue": 40,
-              "endValue": 240,
-              "curve": "Sine_4Bars",
               "commandColor": "ff38bdf8"
             }
           ]
         },
         {
           "nodeType": "SCENE",
-          "presetName": "Cerchio Rosso Sangue / Ambra",
-          "presetPool": "Movement",
-          "layerType": "Movement",
-          "durationBeats": 116.0,
-          "isOneShot": "0",
-          "phaseMode": "SymmetricalFan",
-          "targetRolesCsv": "Aria: Wash Controluce (Fondale)|Aria: Teste Mobili / Beam|Terra: Controluce / Sotto-Batteria",
-          "presetColor1": "ffdc2626",
-          "presetColor2": "fff59e0b",
+          "presetName": "[F] Fade In Lento (16 Q)",
+          "sceneName": "[F] Fade In Lento (16 Q)",
+          "presetPool": "Dimmer",
+          "layerType": "Base",
+          "durationBeats": 75.0,
+          "isOneShot": "1",
+          "phaseMode": "Sync",
+          "targetRolesCsv": "Aria: Wash Controluce (Fondale)|Aria: Par / Spot Frontali (Band)|Aria: Teste Mobili / Beam|Terra: Controluce / Sotto-Batteria|Terra: Par / Barre Laterali (Taglio)|Terra: Teste Mobili a Terra",
+          "presetUseColor": false,
+          "presetUseDimmer": true,
+          "presetUseMove": false,
+          "presetUseStrobe": false,
+          "presetColor1": "ffffffff",
+          "presetColor2": "ffffffff",
           "presetDimmerMin": "0",
           "presetDimmerMax": "255",
-          "presetCurve": "Static",
+          "presetCurve": "Linear",
           "presetStrobeUseHw": "0",
           "presetStrobeSubdiv": "1/8",
-          "presetMoveShape": "Circle",
-          "presetMoveSpeed": "Sine_2Bars",
-          "presetMoveAmpPan": 74,
-          "presetMoveAmpTilt": 70,
-          "sceneName": "Cerchio Rosso Sangue / Ambra",
-          "startBeat": 453.0,
+          "presetMoveShape": "Fixed",
+          "presetMoveSpeed": "Sine_4Bars",
+          "presetMoveAmpPan": "0",
+          "presetMoveAmpTilt": "0",
+          "startBeat": 46.0,
           "children": [
             {
               "nodeType": "ROLE_COMMAND",
               "roleName": "Aria: Wash Controluce (Fondale)",
-              "parameter": "Red",
-              "startValue": 220,
-              "endValue": 220,
-              "curve": "Static",
-              "commandColor": "ffdc2626"
-            },
-            {
-              "nodeType": "ROLE_COMMAND",
-              "roleName": "Aria: Wash Controluce (Fondale)",
-              "parameter": "Green",
-              "startValue": 38,
-              "endValue": 38,
-              "curve": "Static",
-              "commandColor": "ffdc2626"
-            },
-            {
-              "nodeType": "ROLE_COMMAND",
-              "roleName": "Aria: Wash Controluce (Fondale)",
-              "parameter": "Blue",
-              "startValue": 38,
-              "endValue": 38,
-              "curve": "Static",
-              "commandColor": "ffdc2626"
-            },
-            {
-              "nodeType": "ROLE_COMMAND",
-              "roleName": "Aria: Wash Controluce (Fondale)",
               "parameter": "Dimmer",
-              "startValue": 255,
+              "startValue": 0,
               "endValue": 255,
-              "curve": "Static",
-              "commandColor": "ffdc2626"
+              "curve": "Linear",
+              "commandColor": "ffffffff"
             },
             {
               "nodeType": "ROLE_COMMAND",
-              "roleName": "Aria: Wash Controluce (Fondale)",
-              "parameter": "Pan",
-              "startValue": 34,
-              "endValue": 222,
-              "curve": "Sine_2Bars",
-              "commandColor": "ffdc2626"
-            },
-            {
-              "nodeType": "ROLE_COMMAND",
-              "roleName": "Aria: Wash Controluce (Fondale)",
-              "parameter": "Tilt",
-              "startValue": 39,
-              "endValue": 217,
-              "curve": "Cosine_2Bars",
-              "commandColor": "ffdc2626"
-            },
-            {
-              "nodeType": "ROLE_COMMAND",
-              "roleName": "Aria: Teste Mobili / Beam",
-              "parameter": "Red",
-              "startValue": 220,
-              "endValue": 220,
-              "curve": "Static",
-              "commandColor": "ffdc2626"
-            },
-            {
-              "nodeType": "ROLE_COMMAND",
-              "roleName": "Aria: Teste Mobili / Beam",
-              "parameter": "Green",
-              "startValue": 38,
-              "endValue": 38,
-              "curve": "Static",
-              "commandColor": "ffdc2626"
-            },
-            {
-              "nodeType": "ROLE_COMMAND",
-              "roleName": "Aria: Teste Mobili / Beam",
-              "parameter": "Blue",
-              "startValue": 38,
-              "endValue": 38,
-              "curve": "Static",
-              "commandColor": "ffdc2626"
+              "roleName": "Aria: Par / Spot Frontali (Band)",
+              "parameter": "Dimmer",
+              "startValue": 0,
+              "endValue": 255,
+              "curve": "Linear",
+              "commandColor": "ffffffff"
             },
             {
               "nodeType": "ROLE_COMMAND",
               "roleName": "Aria: Teste Mobili / Beam",
               "parameter": "Dimmer",
-              "startValue": 255,
+              "startValue": 0,
               "endValue": 255,
-              "curve": "Static",
-              "commandColor": "ffdc2626"
+              "curve": "Linear",
+              "commandColor": "ffffffff"
+            },
+            {
+              "nodeType": "ROLE_COMMAND",
+              "roleName": "Terra: Controluce / Sotto-Batteria",
+              "parameter": "Dimmer",
+              "startValue": 0,
+              "endValue": 255,
+              "curve": "Linear",
+              "commandColor": "ffffffff"
+            },
+            {
+              "nodeType": "ROLE_COMMAND",
+              "roleName": "Terra: Par / Barre Laterali (Taglio)",
+              "parameter": "Dimmer",
+              "startValue": 0,
+              "endValue": 255,
+              "curve": "Linear",
+              "commandColor": "ffffffff"
+            },
+            {
+              "nodeType": "ROLE_COMMAND",
+              "roleName": "Terra: Teste Mobili a Terra",
+              "parameter": "Dimmer",
+              "startValue": 0,
+              "endValue": 255,
+              "curve": "Linear",
+              "commandColor": "ffffffff"
+            }
+          ]
+        },
+        {
+          "nodeType": "SCENE",
+          "presetName": "Decrescendo Dimmer",
+          "presetPool": "Dimmer",
+          "layerType": "Base",
+          "durationBeats": 12.0,
+          "isOneShot": "1",
+          "phaseMode": "Sync",
+          "targetRolesCsv": "Aria: Wash Controluce (Fondale)|Aria: Teste Mobili / Beam|Terra: Controluce / Sotto-Batteria",
+          "presetColor1": "ffffffff",
+          "presetColor2": "ffffffff",
+          "presetDimmerMin": 0,
+          "presetDimmerMax": 255,
+          "presetCurve": "Decay",
+          "presetStrobeUseHw": "0",
+          "presetStrobeSubdiv": "1/8",
+          "presetMoveShape": "PanSweep",
+          "presetMoveSpeed": "Sine_4Bars",
+          "presetMoveAmpPan": "80",
+          "presetMoveAmpTilt": "60",
+          "presetUseColor": false,
+          "presetUseDimmer": true,
+          "presetUseMove": false,
+          "presetUseStrobe": false,
+          "sceneName": "Decrescendo Dimmer",
+          "startBeat": 121.0,
+          "children": [
+            {
+              "nodeType": "ROLE_COMMAND",
+              "roleName": "Aria: Wash Controluce (Fondale)",
+              "parameter": "Dimmer",
+              "startValue": 255,
+              "endValue": 0,
+              "curve": "Decay",
+              "commandColor": "ffffffff"
             },
             {
               "nodeType": "ROLE_COMMAND",
               "roleName": "Aria: Teste Mobili / Beam",
-              "parameter": "Pan",
-              "startValue": 34,
-              "endValue": 222,
-              "curve": "Sine_2Bars",
-              "commandColor": "ffdc2626"
-            },
-            {
-              "nodeType": "ROLE_COMMAND",
-              "roleName": "Aria: Teste Mobili / Beam",
-              "parameter": "Tilt",
-              "startValue": 39,
-              "endValue": 217,
-              "curve": "Cosine_2Bars",
-              "commandColor": "ffdc2626"
-            },
-            {
-              "nodeType": "ROLE_COMMAND",
-              "roleName": "Terra: Controluce / Sotto-Batteria",
-              "parameter": "Red",
-              "startValue": 245,
-              "endValue": 245,
-              "curve": "Static",
-              "commandColor": "fff59e0b"
-            },
-            {
-              "nodeType": "ROLE_COMMAND",
-              "roleName": "Terra: Controluce / Sotto-Batteria",
-              "parameter": "Green",
-              "startValue": 158,
-              "endValue": 158,
-              "curve": "Static",
-              "commandColor": "fff59e0b"
-            },
-            {
-              "nodeType": "ROLE_COMMAND",
-              "roleName": "Terra: Controluce / Sotto-Batteria",
-              "parameter": "Blue",
-              "startValue": 11,
-              "endValue": 11,
-              "curve": "Static",
-              "commandColor": "fff59e0b"
+              "parameter": "Dimmer",
+              "startValue": 255,
+              "endValue": 0,
+              "curve": "Decay",
+              "commandColor": "ffffffff"
             },
             {
               "nodeType": "ROLE_COMMAND",
               "roleName": "Terra: Controluce / Sotto-Batteria",
               "parameter": "Dimmer",
               "startValue": 255,
-              "endValue": 255,
-              "curve": "Static",
-              "commandColor": "fff59e0b"
-            },
-            {
-              "nodeType": "ROLE_COMMAND",
-              "roleName": "Terra: Controluce / Sotto-Batteria",
-              "parameter": "Pan",
-              "startValue": 34,
-              "endValue": 222,
-              "curve": "Sine_2Bars",
-              "commandColor": "fff59e0b"
-            },
-            {
-              "nodeType": "ROLE_COMMAND",
-              "roleName": "Terra: Controluce / Sotto-Batteria",
-              "parameter": "Tilt",
-              "startValue": 39,
-              "endValue": 217,
-              "curve": "Cosine_2Bars",
-              "commandColor": "fff59e0b"
+              "endValue": 0,
+              "curve": "Decay",
+              "commandColor": "ffffffff"
             }
           ]
         }

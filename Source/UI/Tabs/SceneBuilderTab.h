@@ -3,13 +3,15 @@
 #include "../../Model/DataStateKeys.h"
 #include "../../Model/StageRoleCatalog.h"
 #include "../Components/StageSimulatorView.h"
+#include "../Components/FileProgressOverlay.h"
 #include <vector>
 #include <memory>
 #include <map>
 
 class SceneBuilderTab : public juce::Component,
-    public juce::ListBoxModel,
-    private juce::ValueTree::Listener
+                        public juce::ListBoxModel,
+                        private juce::ValueTree::Listener,
+                        private juce::AsyncUpdater
 {
 public:
     explicit SceneBuilderTab(juce::ValueTree& state)
@@ -31,8 +33,7 @@ public:
                 if (child.hasProperty(StateKeys::PresetPool))
                 {
                     hasModernPreset = true;
-                    if (child.getNumChildren() == 0)
-                        rebuildPresetCommands(child);
+                    sanitizePresetNode(child);
                 }
                 else
                 {
@@ -43,6 +44,8 @@ public:
 
         if (!hasModernPreset)
             populateStarterPresets();
+
+        savePresetLibraryToDefaultDisk();
 
         presetLibNode.addListener(this);
 
@@ -68,7 +71,20 @@ public:
 
     ~SceneBuilderTab() override
     {
+        cancelPendingUpdate();
         presetLibNode.removeListener(this);
+        savePresetLibraryToDefaultDisk();
+    }
+
+    void visibilityChanged() override
+    {
+        if (isVisible())
+            previewSimulator.stopFixtureTestIfActive();
+    }
+
+    void setDmxLiveEngine(DmxLiveEngine* engine) noexcept
+    {
+        previewSimulator.setDmxLiveEngine(engine);
     }
 
     // --- ListBoxModel ---
@@ -244,6 +260,109 @@ private:
         }
     }
 
+    class PositionAimPad : public juce::Component,
+                           public juce::SettableTooltipClient
+    {
+    public:
+        std::function<void(int panPct, int tiltPct)> onAimChanged;
+
+        void setAimValues(int panPct, int tiltPct, int fanPanPct)
+        {
+            panVal = juce::jlimit(-100, 100, panPct);
+            tiltVal = juce::jlimit(-100, 100, tiltPct);
+            fanVal = juce::jlimit(-100, 100, fanPanPct);
+            repaint();
+        }
+
+        void paint(juce::Graphics& g) override
+        {
+            auto r = getLocalBounds().toFloat().reduced(1.0f);
+            g.setColour(juce::Colour(0xff0f111a));
+            g.fillRoundedRectangle(r, 5.0f);
+            g.setColour(juce::Colour(0xff334155));
+            g.drawRoundedRectangle(r, 5.0f, 1.0f);
+
+            const float cx = r.getCentreX();
+            const float cy = r.getCentreY();
+
+            // Assi di riferimento SX/DX e Pubblico/Band
+            g.setColour(juce::Colour(0xff263042));
+            g.drawHorizontalLine(juce::roundToInt(cy), r.getX() + 4.0f, r.getRight() - 4.0f);
+            g.drawVerticalLine(juce::roundToInt(cx), r.getY() + 4.0f, r.getBottom() - 4.0f);
+
+            g.setColour(juce::Colour(0xff64748b));
+            g.setFont(juce::FontOptions(8.5f, juce::Font::bold));
+            g.drawText("PUBBLICO", r.toNearestInt().withHeight(12), juce::Justification::centredTop, false);
+            g.drawText("BAND", r.toNearestInt().withTop(r.toNearestInt().getBottom() - 12), juce::Justification::centredBottom, false);
+            g.drawText("SX", r.toNearestInt().reduced(3, 0), juce::Justification::centredLeft, false);
+            g.drawText("DX", r.toNearestInt().reduced(3, 0), juce::Justification::centredRight, false);
+
+            auto toPoint = [&](float pPct, float tPct) -> juce::Point<float> {
+                const float x = r.getX() + 8.0f + ((pPct + 100.0f) / 200.0f) * (r.getWidth() - 16.0f);
+                const float y = r.getBottom() - 8.0f - ((tPct + 100.0f) / 200.0f) * (r.getHeight() - 16.0f);
+                return { x, y };
+                };
+
+            const auto targetPt = toPoint(static_cast<float>(panVal), static_cast<float>(tiltVal));
+
+            // Anteprima grafica del Fan Pan (due punti laterali SX/DX)
+            if (std::abs(fanVal) > 2)
+            {
+                const auto leftPt = toPoint(juce::jlimit(-100.0f, 100.0f, static_cast<float>(panVal - fanVal)), static_cast<float>(tiltVal));
+                const auto rightPt = toPoint(juce::jlimit(-100.0f, 100.0f, static_cast<float>(panVal + fanVal)), static_cast<float>(tiltVal));
+                g.setColour(fanVal > 0 ? juce::Colour(0xff38bdf8).withAlpha(0.55f) : juce::Colour(0xfff59e0b).withAlpha(0.55f));
+                g.drawLine(leftPt.x, leftPt.y, rightPt.x, rightPt.y, 1.5f);
+                g.fillEllipse(leftPt.x - 3.0f, leftPt.y - 3.0f, 6.0f, 6.0f);
+                g.fillEllipse(rightPt.x - 3.0f, rightPt.y - 3.0f, 6.0f, 6.0f);
+            }
+
+            // Mirino punto target principale
+            g.setColour(juce::Colour(0xff00d2ff).withAlpha(0.30f));
+            g.fillEllipse(targetPt.x - 9.0f, targetPt.y - 9.0f, 18.0f, 18.0f);
+            g.setColour(juce::Colours::white);
+            g.fillEllipse(targetPt.x - 4.0f, targetPt.y - 4.0f, 8.0f, 8.0f);
+            g.setColour(juce::Colour(0xff00d2ff));
+            g.drawEllipse(targetPt.x - 5.0f, targetPt.y - 5.0f, 10.0f, 10.0f, 1.4f);
+        }
+
+        void mouseDown(const juce::MouseEvent& e) override
+        {
+            if (e.getNumberOfClicks() >= 2)
+            {
+                panVal = 0;
+                tiltVal = 0;
+                repaint();
+                if (onAimChanged) onAimChanged(0, 0);
+                return;
+            }
+            updateFromMouse(e.position);
+        }
+
+        void mouseDrag(const juce::MouseEvent& e) override
+        {
+            updateFromMouse(e.position);
+        }
+
+    private:
+        void updateFromMouse(juce::Point<float> pt)
+        {
+            auto r = getLocalBounds().toFloat().reduced(8.0f);
+            if (r.getWidth() <= 1.0f || r.getHeight() <= 1.0f) return;
+
+            const float nx = juce::jlimit(0.0f, 1.0f, (pt.x - r.getX()) / r.getWidth());
+            const float ny = juce::jlimit(0.0f, 1.0f, (r.getBottom() - pt.y) / r.getHeight());
+
+            panVal = juce::roundToInt(nx * 200.0f - 100.0f);
+            tiltVal = juce::roundToInt(ny * 200.0f - 100.0f);
+            repaint();
+            if (onAimChanged) onAimChanged(panVal, tiltVal);
+        }
+
+        int panVal = 0;
+        int tiltVal = 0;
+        int fanVal = 0;
+    };
+
     static void resolvePresetFeatureFlags(const juce::ValueTree& p,
         bool& useColor, bool& useDimmer, bool& useMove, bool& useStrobe)
     {
@@ -280,9 +399,182 @@ private:
         currentPreset.setProperty(StateKeys::PresetUseMove, useMoveToggle.getToggleState(), nullptr);
         currentPreset.setProperty(StateKeys::PresetUseStrobe, useStrobeToggle.getToggleState(), nullptr);
     }
+    
+    static void sanitizePresetNode(juce::ValueTree& p)
+    {
+        if (!p.isValid() || !p.hasType(StateKeys::ScenePreset))
+            return;
+
+        ensurePresetId(p);
+
+        bool uCol = false, uDim = false, uMov = false, uStr = false;
+        resolvePresetFeatureFlags(p, uCol, uDim, uMov, uStr);
+
+        // Rende espliciti i 4 flag attributo sul nodo
+        p.setProperty(StateKeys::PresetUseColor, uCol, nullptr);
+        p.setProperty(StateKeys::PresetUseDimmer, uDim, nullptr);
+        p.setProperty(StateKeys::PresetUseMove, uMov, nullptr);
+        p.setProperty(StateKeys::PresetUseStrobe, uStr, nullptr);
+
+        // Preset gestito dallo Scene Builder: rigenera comandi puliti eliminando residui RGB/Dimmer/Move
+        if (p.hasProperty(StateKeys::TargetRolesCsv))
+        {
+            rebuildPresetCommands(p);
+            return;
+        }
+
+        // Scena manuale salvata da Tab 3: rimuove solo i comandi degli attributi disattivati
+        for (int i = p.getNumChildren() - 1; i >= 0; --i)
+        {
+            auto cmd = p.getChild(i);
+            if (!cmd.hasType(StateKeys::RoleCommand)) continue;
+
+            const juce::String param = cmd.getProperty(StateKeys::TargetParam, "").toString();
+            const juce::String curve = cmd.getProperty(StateKeys::CurveType, "").toString();
+
+            const bool isColorParam = param.equalsIgnoreCase("Red") || param.equalsIgnoreCase("Green")
+                || param.equalsIgnoreCase("Blue") || param.equalsIgnoreCase("White") || param.equalsIgnoreCase("UV");
+            const bool isMoveParam = param.equalsIgnoreCase("Pan") || param.equalsIgnoreCase("Tilt");
+            const bool isStrobeCmd = param.equalsIgnoreCase("Strobe")
+                || (param.equalsIgnoreCase("Dimmer") && CurveEvaluator::getStrobeHitsPerQuarter(curve) > 0.0);
+            const bool isDimmerCmd = (param.equalsIgnoreCase("Dimmer") && !isStrobeCmd)
+                || param.equalsIgnoreCase("GeyserBlast");
+
+            if ((isColorParam && !uCol) || (isMoveParam && !uMov) ||
+                (isStrobeCmd && !uStr) || (isDimmerCmd && !uDim))
+            {
+                p.removeChild(i, nullptr);
+            }
+        }
+    }
+
+    static juce::String ensurePresetId(juce::ValueTree& preset)
+    {
+        if (!preset.isValid()) return {};
+        juce::String id = preset.getProperty(StateKeys::PresetId, "").toString().trim();
+        if (id.isEmpty())
+        {
+            id = juce::Uuid().toString();
+            preset.setProperty(StateKeys::PresetId, id, nullptr);
+        }
+        return id;
+    }
+
+    static void rememberPresetAlias(juce::ValueTree& preset, const juce::String& oldName)
+    {
+        const juce::String trimmed = oldName.trim();
+        if (!preset.isValid() || trimmed.isEmpty())
+            return;
+
+        juce::StringArray aliases;
+        aliases.addTokens(preset.getProperty(StateKeys::PresetAliases, "").toString(), "|", "");
+        aliases.removeEmptyStrings();
+
+        for (const auto& existing : aliases)
+            if (existing.equalsIgnoreCase(trimmed))
+                return;
+
+        aliases.add(trimmed);
+        preset.setProperty(StateKeys::PresetAliases, aliases.joinIntoString("|"), nullptr);
+    }
+
+    void syncLinkedScenesInShow(juce::ValueTree preset, bool syncDuration, const juce::String& fallbackOldName)
+    {
+        if (!preset.isValid())
+            return;
+
+        auto showNode = appState.getChildWithName(StateKeys::ShowNode);
+        if (!showNode.isValid())
+            return;
+
+        const juce::String presetId = ensurePresetId(preset);
+        const juce::String currentName = preset.getProperty(StateKeys::PresetName, "Scena").toString();
+
+        for (int i = 0; i < showNode.getNumChildren(); ++i)
+        {
+            auto scene = showNode.getChild(i);
+            if (!scene.hasType(StateKeys::Scene))
+                continue;
+
+            const juce::String scenePresetId = scene.getProperty(StateKeys::PresetId, "").toString().trim();
+            bool isLinked = scenePresetId.isNotEmpty() && (scenePresetId == presetId);
+
+            // Retrocompatibilita': aggancia scene gia' presenti in Tab 3 senza PresetId tramite nome
+            if (!isLinked && scenePresetId.isEmpty())
+            {
+                const juce::String sceneName = scene.getProperty(StateKeys::SceneName, "").toString();
+                if ((fallbackOldName.isNotEmpty() && sceneName.equalsIgnoreCase(fallbackOldName)) ||
+                    (currentName.isNotEmpty() && sceneName.equalsIgnoreCase(currentName)))
+                {
+                    isLinked = true;
+                    scene.setProperty(StateKeys::PresetId, presetId, nullptr);
+                }
+            }
+
+            if (!isLinked)
+                continue;
+
+            // Copia tutte le proprieta' del preset preservando StartBeat (e DurationBeats se non modificata)
+            for (int pIdx = 0; pIdx < preset.getNumProperties(); ++pIdx)
+            {
+                const auto propKey = preset.getPropertyName(pIdx);
+                if (propKey == StateKeys::StartBeat)
+                    continue;
+                if (propKey == StateKeys::DurationBeats && !syncDuration)
+                    continue;
+
+                scene.setProperty(propKey, preset.getProperty(propKey), nullptr);
+            }
+            scene.setProperty(StateKeys::SceneName, currentName, nullptr);
+            scene.setProperty(StateKeys::PresetId, presetId, nullptr);
+
+            // Sostituisce tutti i ROLE_COMMAND della scena con quelli aggiornati del preset
+            for (int c = scene.getNumChildren() - 1; c >= 0; --c)
+            {
+                if (scene.getChild(c).hasType(StateKeys::RoleCommand))
+                    scene.removeChild(c, nullptr);
+            }
+            for (int c = 0; c < preset.getNumChildren(); ++c)
+            {
+                auto cmd = preset.getChild(c);
+                if (cmd.hasType(StateKeys::RoleCommand))
+                    scene.addChild(cmd.createCopy(), -1, nullptr);
+            }
+        }
+    }
+
+    void handleAsyncUpdate() override
+    {
+        if (!pendingSyncPreset.isValid())
+            return;
+
+        auto presetToSync = pendingSyncPreset;
+        const bool syncDur = pendingSyncDuration;
+        pendingSyncPreset = juce::ValueTree();
+        pendingSyncDuration = false;
+
+        const juce::String currentName = presetToSync.getProperty(StateKeys::PresetName, "").toString();
+        const juce::String fallbackName = (presetToSync == currentPreset)
+            ? selectedPresetLastSyncedName
+            : currentName;
+
+        if (fallbackName.isNotEmpty() && !fallbackName.equalsIgnoreCase(currentName))
+        {
+            juce::ScopedValueSetter<bool> suppressGuard(isSuppressingShowSync, true);
+            rememberPresetAlias(presetToSync, fallbackName);
+        }
+
+        syncLinkedScenesInShow(presetToSync, syncDur, fallbackName);
+        savePresetLibraryToDefaultDisk();
+
+        if (presetToSync == currentPreset)
+            selectedPresetLastSyncedName = currentName;
+    }
 
     static void migrateLegacyPreset(juce::ValueTree& p)
     {
+        ensurePresetId(p);
+
         if (!p.hasProperty(StateKeys::PresetName))
         {
             juce::String legacyName = p.getProperty(StateKeys::SceneName, "Preset Legacy").toString();
@@ -442,11 +734,23 @@ private:
         if (parent == presetLibNode)
             rebuildFilteredList();
     }
-    void valueTreePropertyChanged(juce::ValueTree& tree, const juce::Identifier&) override
+
+    void valueTreePropertyChanged(juce::ValueTree& tree, const juce::Identifier& prop) override
     {
         if (tree.hasType(StateKeys::ScenePreset))
+        {
             presetList.repaint();
+
+            if (!isSuppressingShowSync && tree == currentPreset)
+            {
+                pendingSyncPreset = tree;
+                if (prop == StateKeys::DurationBeats)
+                    pendingSyncDuration = true;
+                triggerAsyncUpdate();
+            }
+        }
     }
+
     void valueTreeParentChanged(juce::ValueTree&) override {}
 
     void initLeftLibraryUI()
@@ -502,6 +806,7 @@ private:
         factoryPresetsBtn.setColour(juce::TextButton::buttonColourId, juce::Colour(0xff0f766e));
         factoryPresetsBtn.setTooltip("Aggiunge tutti i preset professionali mancanti senza toccare i tuoi");
         factoryPresetsBtn.onClick = [this]() {
+            juce::ScopedValueSetter<bool> suppressGuard(isSuppressingShowSync, true);
             const int added = populateStarterPresets(true);
             rebuildFilteredList();
             savePresetLibraryToDefaultDisk();
@@ -543,11 +848,14 @@ private:
         setupLbl(phaseLbl, "Sfasamento:");
 
         nameEdit.setColour(juce::TextEditor::backgroundColourId, juce::Colour(0xff222430));
+
         nameEdit.onTextChange = [this]() {
             if (isUpdatingUI || !currentPreset.isValid()) return;
             currentPreset.setProperty(StateKeys::PresetName, nameEdit.getText(), nullptr);
+            currentPreset.setProperty(StateKeys::SceneName, nameEdit.getText(), nullptr);
             presetList.repaint();
             };
+
         addAndMakeVisible(nameEdit);
 
         poolCombo.addItem("Color", 1);
@@ -741,22 +1049,28 @@ private:
         setupLbl(curveLbl, "Curva:");
 
         dimMinSlider.setSliderStyle(juce::Slider::LinearHorizontal);
-        dimMinSlider.setTextBoxStyle(juce::Slider::TextBoxRight, false, 38, 20);
-        dimMinSlider.setRange(0, 255, 1);
+        dimMinSlider.setTextBoxStyle(juce::Slider::TextBoxRight, false, 44, 20);
+        dimMinSlider.setRange(0, 100, 1);
+        dimMinSlider.setTextValueSuffix("%");
+        dimMinSlider.setTooltip("Intensita' minima (0-100%, rimappata automaticamente sul range Dimmer sicuro di ogni faro)");
         dimMinSlider.onValueChange = [this]() {
             if (isUpdatingUI || !currentPreset.isValid()) return;
-            currentPreset.setProperty(StateKeys::PresetDimmerMin, static_cast<int>(dimMinSlider.getValue()), nullptr);
+            const int raw255 = juce::jlimit(0, 255, juce::roundToInt((dimMinSlider.getValue() / 100.0) * 255.0));
+            currentPreset.setProperty(StateKeys::PresetDimmerMin, raw255, nullptr);
             rebuildPresetCommands(currentPreset);
             previewSimulator.notifyPresetEdited();
             };
         addAndMakeVisible(dimMinSlider);
 
         dimMaxSlider.setSliderStyle(juce::Slider::LinearHorizontal);
-        dimMaxSlider.setTextBoxStyle(juce::Slider::TextBoxRight, false, 38, 20);
-        dimMaxSlider.setRange(0, 255, 1);
+        dimMaxSlider.setTextBoxStyle(juce::Slider::TextBoxRight, false, 44, 20);
+        dimMaxSlider.setRange(0, 100, 1);
+        dimMaxSlider.setTextValueSuffix("%");
+        dimMaxSlider.setTooltip("Intensita' massima (100% = piena luce fissa, mai strobo anche su canali condivisi)");
         dimMaxSlider.onValueChange = [this]() {
             if (isUpdatingUI || !currentPreset.isValid()) return;
-            currentPreset.setProperty(StateKeys::PresetDimmerMax, static_cast<int>(dimMaxSlider.getValue()), nullptr);
+            const int raw255 = juce::jlimit(0, 255, juce::roundToInt((dimMaxSlider.getValue() / 100.0) * 255.0));
+            currentPreset.setProperty(StateKeys::PresetDimmerMax, raw255, nullptr);
             rebuildPresetCommands(currentPreset);
             previewSimulator.notifyPresetEdited();
             };
@@ -805,7 +1119,7 @@ private:
         setupLbl(ampPanLbl, "Amp. Pan %:");
         setupLbl(ampTiltLbl, "Amp. Tilt %:");
 
-        moveShapeCombo.addItem("Fixed (Posizione Home)", 1);
+        moveShapeCombo.addItem("Fixed (Posizione Statica / Fan)", 1);
         moveShapeCombo.addItem("PanSweep (Spazzata Pan)", 2);
         moveShapeCombo.addItem("TiltWave (Onda Verticale)", 3);
         moveShapeCombo.addItem("Circle (Cerchio Pan+Tilt)", 4);
@@ -816,6 +1130,7 @@ private:
             int idx = juce::jlimit(0, 4, moveShapeCombo.getSelectedId() - 1);
             currentPreset.setProperty(StateKeys::PresetMoveShape, shapes[idx], nullptr);
             rebuildPresetCommands(currentPreset);
+            resized();
             previewSimulator.notifyPresetEdited();
             };
         addAndMakeVisible(moveShapeCombo);
@@ -858,6 +1173,87 @@ private:
             previewSimulator.notifyPresetEdited();
             };
         addAndMakeVisible(ampTiltSlider);
+
+        // 4b. Controlli Posizione Fissa & Fan (stile MA3 / Avolites / SoundSwitch)
+        setupLbl(panCenterLbl, "Pan Base:");
+        setupLbl(tiltCenterLbl, "Tilt Base:");
+        setupLbl(panFanLbl, "Fan Pan <>:");
+        setupLbl(tiltFanLbl, "Fan Tilt:");
+
+        auto setupSignedPctSlider = [this](juce::Slider& s, const juce::Identifier& key, const juce::String& tip)
+            {
+                s.setSliderStyle(juce::Slider::LinearHorizontal);
+                s.setTextBoxStyle(juce::Slider::TextBoxRight, false, 44, 18);
+                s.setRange(-100, 100, 1);
+                s.setTextValueSuffix("%");
+                s.setTooltip(tip);
+                s.onValueChange = [this, key, &s]() {
+                    if (isUpdatingUI || !currentPreset.isValid()) return;
+                    currentPreset.setProperty(key, static_cast<int>(s.getValue()), nullptr);
+                    positionAimPad.setAimValues(
+                        static_cast<int>(panCenterSlider.getValue()),
+                        static_cast<int>(tiltCenterSlider.getValue()),
+                        static_cast<int>(panFanSlider.getValue()));
+                    rebuildPresetCommands(currentPreset);
+                    previewSimulator.notifyPresetEdited();
+                    };
+                addAndMakeVisible(s);
+            };
+
+        setupSignedPctSlider(panCenterSlider, StateKeys::PresetMovePanCenter, "Direzione orizzontale (-100% SX, 0% Centro, +100% DX)");
+        setupSignedPctSlider(tiltCenterSlider, StateKeys::PresetMoveTiltCenter, "Altezza fascio (-100% Band/Giu, 0% Centro, +100% Pubblico/Su)");
+        setupSignedPctSlider(panFanSlider, StateKeys::PresetMovePanFan, "Apertura Pan: negativo = Incrocio X (><), 0 = Parallelo, positivo = Ventaglio (<>)");
+        setupSignedPctSlider(tiltFanSlider, StateKeys::PresetMoveTiltFan, "Apertura Tilt (segue Sfasamento: Arco simmetrico, Alternato o Diagonale)");
+
+        positionAimPad.setTooltip("Trascina per puntare Pan & Tilt live (doppio click = torna a Home 0/0)");
+        positionAimPad.onAimChanged = [this](int pPct, int tPct) {
+            if (!currentPreset.isValid()) return;
+            {
+                juce::ScopedValueSetter<bool> guard(isUpdatingUI, true);
+                panCenterSlider.setValue(pPct, juce::dontSendNotification);
+                tiltCenterSlider.setValue(tPct, juce::dontSendNotification);
+            }
+            currentPreset.setProperty(StateKeys::PresetMovePanCenter, pPct, nullptr);
+            currentPreset.setProperty(StateKeys::PresetMoveTiltCenter, tPct, nullptr);
+            rebuildPresetCommands(currentPreset);
+            previewSimulator.notifyPresetEdited();
+            };
+        addAndMakeVisible(positionAimPad);
+
+        struct QuickPos { const char* label; int pan; int tilt; int fanP; int fanT; };
+        const QuickPos quickPositions[6] = {
+            { "Home",        0,    0,   0,  0 },
+            { "Ventaglio",   0,   20,  70,  0 },
+            { "Incrocio X",  0,   15, -75,  0 },
+            { "Focus Band",  0,  -45, -35,  0 },
+            { "Pubblico",    0,   75,  45,  0 },
+            { "Cielo",       0,  100,  20,  0 }
+        };
+
+        for (const auto& qp : quickPositions)
+        {
+            auto btn = std::make_unique<juce::TextButton>(qp.label);
+            btn->setColour(juce::TextButton::buttonColourId, juce::Colour(0xff272b3d));
+            btn->onClick = [this, qp]() {
+                if (!currentPreset.isValid()) return;
+                currentPreset.setProperty(StateKeys::PresetMovePanCenter, qp.pan, nullptr);
+                currentPreset.setProperty(StateKeys::PresetMoveTiltCenter, qp.tilt, nullptr);
+                currentPreset.setProperty(StateKeys::PresetMovePanFan, qp.fanP, nullptr);
+                currentPreset.setProperty(StateKeys::PresetMoveTiltFan, qp.fanT, nullptr);
+                {
+                    juce::ScopedValueSetter<bool> guard(isUpdatingUI, true);
+                    panCenterSlider.setValue(qp.pan, juce::dontSendNotification);
+                    tiltCenterSlider.setValue(qp.tilt, juce::dontSendNotification);
+                    panFanSlider.setValue(qp.fanP, juce::dontSendNotification);
+                    tiltFanSlider.setValue(qp.fanT, juce::dontSendNotification);
+                }
+                positionAimPad.setAimValues(qp.pan, qp.tilt, qp.fanP);
+                rebuildPresetCommands(currentPreset);
+                previewSimulator.notifyPresetEdited();
+                };
+            addAndMakeVisible(*btn);
+            quickPosBtns.push_back(std::move(btn));
+        }
     }
 
     void initRightPreviewUI()
@@ -1030,10 +1426,23 @@ private:
 
         strobeSubdivLbl.setVisible(showStrobe); strobeSubdivCombo.setVisible(showStrobe);
 
-        moveShapeLbl.setVisible(showMove);  moveShapeCombo.setVisible(showMove);
-        moveSpeedLbl.setVisible(showMove);  moveSpeedCombo.setVisible(showMove);
-        ampPanLbl.setVisible(showMove);     ampPanSlider.setVisible(showMove);
-        ampTiltLbl.setVisible(showMove);    ampTiltSlider.setVisible(showMove);
+        const juce::String curShape = currentPreset.isValid()
+            ? currentPreset.getProperty(StateKeys::PresetMoveShape, "PanSweep").toString()
+            : "PanSweep";
+        const bool isFixedMove = showMove && curShape.equalsIgnoreCase("Fixed");
+        const bool isDynamicMove = showMove && !isFixedMove;
+
+        moveShapeLbl.setVisible(showMove);      moveShapeCombo.setVisible(showMove);
+        moveSpeedLbl.setVisible(isDynamicMove); moveSpeedCombo.setVisible(isDynamicMove);
+        ampPanLbl.setVisible(isDynamicMove);    ampPanSlider.setVisible(isDynamicMove);
+        ampTiltLbl.setVisible(isDynamicMove);   ampTiltSlider.setVisible(isDynamicMove);
+
+        positionAimPad.setVisible(isFixedMove);
+        panCenterLbl.setVisible(isFixedMove);   panCenterSlider.setVisible(isFixedMove);
+        tiltCenterLbl.setVisible(isFixedMove);  tiltCenterSlider.setVisible(isFixedMove);
+        panFanLbl.setVisible(isFixedMove);      panFanSlider.setVisible(isFixedMove);
+        tiltFanLbl.setVisible(isFixedMove);     tiltFanSlider.setVisible(isFixedMove);
+        for (auto& btn : quickPosBtns)          btn->setVisible(isFixedMove);
 
         // Posizionamento compatto: tutte e 4 le sezioni convivono senza sovrapporsi
         if (showStrobe && area.getHeight() >= 24)
@@ -1044,7 +1453,7 @@ private:
             area.removeFromTop(5);
         }
 
-        if (showMove && area.getHeight() >= 96)
+        if (isDynamicMove && area.getHeight() >= 96)
         {
             auto mr1 = area.removeFromTop(22);
             moveShapeLbl.setBounds(mr1.removeFromLeft(85));
@@ -1061,6 +1470,44 @@ private:
             auto mr4 = area.removeFromTop(22);
             ampTiltLbl.setBounds(mr4.removeFromLeft(85));
             ampTiltSlider.setBounds(mr4);
+            area.removeFromTop(6);
+        }
+        else if (isFixedMove && area.getHeight() >= 118)
+        {
+            auto mr1 = area.removeFromTop(22);
+            moveShapeLbl.setBounds(mr1.removeFromLeft(85));
+            moveShapeCombo.setBounds(mr1);
+            area.removeFromTop(4);
+
+            auto qpRow = area.removeFromTop(22);
+            const int qpW = juce::jmax(40, qpRow.getWidth() / juce::jmax(1, static_cast<int>(quickPosBtns.size())));
+            for (auto& btn : quickPosBtns)
+                btn->setBounds(qpRow.removeFromLeft(qpW).reduced(1));
+            area.removeFromTop(5);
+
+            auto aimBlock = area.removeFromTop(92);
+            positionAimPad.setBounds(aimBlock.removeFromLeft(118).reduced(1));
+            aimBlock.removeFromLeft(8);
+
+            auto pr1 = aimBlock.removeFromTop(21);
+            panCenterLbl.setBounds(pr1.removeFromLeft(74));
+            panCenterSlider.setBounds(pr1);
+            aimBlock.removeFromTop(2);
+
+            auto pr2 = aimBlock.removeFromTop(21);
+            tiltCenterLbl.setBounds(pr2.removeFromLeft(74));
+            tiltCenterSlider.setBounds(pr2);
+            aimBlock.removeFromTop(2);
+
+            auto pr3 = aimBlock.removeFromTop(21);
+            panFanLbl.setBounds(pr3.removeFromLeft(74));
+            panFanSlider.setBounds(pr3);
+            aimBlock.removeFromTop(2);
+
+            auto pr4 = aimBlock.removeFromTop(21);
+            tiltFanLbl.setBounds(pr4.removeFromLeft(74));
+            tiltFanSlider.setBounds(pr4);
+
             area.removeFromTop(6);
         }
 
@@ -1133,7 +1580,18 @@ private:
 
     void selectPresetNode(juce::ValueTree node)
     {
+        handleUpdateNowIfNeeded(); // Completa eventuali sync del preset precedente prima di cambiare selezione
         currentPreset = node;
+        if (currentPreset.isValid())
+        {
+            juce::ScopedValueSetter<bool> suppressGuard(isSuppressingShowSync, true);
+            ensurePresetId(currentPreset);
+            selectedPresetLastSyncedName = currentPreset.getProperty(StateKeys::PresetName, "").toString();
+        }
+        else
+        {
+            selectedPresetLastSyncedName.clear();
+        }
         updateEditorFromPreset();
         resized();
         previewSimulator.setPreviewPreset(currentPreset);
@@ -1217,8 +1675,10 @@ private:
         juce::Colour c1 = juce::Colour::fromString(currentPreset.getProperty(StateKeys::PresetColor1, "ff38bdf8").toString());
         updateRgbSlidersFromColor(c1);
 
-        dimMinSlider.setValue(static_cast<double>(currentPreset.getProperty(StateKeys::PresetDimmerMin, 0)), juce::dontSendNotification);
-        dimMaxSlider.setValue(static_cast<double>(currentPreset.getProperty(StateKeys::PresetDimmerMax, 255)), juce::dontSendNotification);
+        const int rawDimMin = static_cast<int>(currentPreset.getProperty(StateKeys::PresetDimmerMin, 0));
+        const int rawDimMax = static_cast<int>(currentPreset.getProperty(StateKeys::PresetDimmerMax, 255));
+        dimMinSlider.setValue(juce::roundToInt((static_cast<double>(rawDimMin) / 255.0) * 100.0), juce::dontSendNotification);
+        dimMaxSlider.setValue(juce::roundToInt((static_cast<double>(rawDimMax) / 255.0) * 100.0), juce::dontSendNotification);
 
         juce::String curve = currentPreset.getProperty(StateKeys::PresetCurve, "Sine_2Bars").toString();
         if (curve == "Static")             curveCombo.setSelectedId(1, juce::dontSendNotification);
@@ -1250,6 +1710,16 @@ private:
 
         ampPanSlider.setValue(static_cast<double>(currentPreset.getProperty(StateKeys::PresetMoveAmpPan, 80)), juce::dontSendNotification);
         ampTiltSlider.setValue(static_cast<double>(currentPreset.getProperty(StateKeys::PresetMoveAmpTilt, 60)), juce::dontSendNotification);
+
+        const int panC = static_cast<int>(currentPreset.getProperty(StateKeys::PresetMovePanCenter, 0));
+        const int tiltC = static_cast<int>(currentPreset.getProperty(StateKeys::PresetMoveTiltCenter, 0));
+        const int panF = static_cast<int>(currentPreset.getProperty(StateKeys::PresetMovePanFan, 0));
+        const int tiltF = static_cast<int>(currentPreset.getProperty(StateKeys::PresetMoveTiltFan, 0));
+        panCenterSlider.setValue(panC, juce::dontSendNotification);
+        tiltCenterSlider.setValue(tiltC, juce::dontSendNotification);
+        panFanSlider.setValue(panF, juce::dontSendNotification);
+        tiltFanSlider.setValue(tiltF, juce::dontSendNotification);
+        positionAimPad.setAimValues(panC, tiltC, panF);
     }
 
     void updateRgbSlidersFromColor(juce::Colour c)
@@ -1332,7 +1802,9 @@ private:
             const bool isFloorRole = (cat == StageRoleCatalog::Category::FloorBackSilhouette ||
                 cat == StageRoleCatalog::Category::FloorSideWash ||
                 cat == StageRoleCatalog::Category::FloorMovingBeam);
-            const juce::Colour useCol = isFloorRole ? c2 : c1;
+            const juce::Colour useCol = useColor
+                ? (isFloorRole ? c2 : c1)
+                : juce::Colours::white;
 
             // 1. Colore (solo se spuntato)
             if (useColor)
@@ -1367,8 +1839,12 @@ private:
             {
                 if (shape == "Fixed")
                 {
-                    addCmd(role, "Pan", 128, 128, "Static", useCol);
-                    addCmd(role, "Tilt", 128, 128, "Static", useCol);
+                    const int panC = static_cast<int>(preset.getProperty(StateKeys::PresetMovePanCenter, 0));
+                    const int tiltC = static_cast<int>(preset.getProperty(StateKeys::PresetMoveTiltCenter, 0));
+                    const int panDmx = juce::jlimit(0, 255, 128 + juce::roundToInt(static_cast<float>(panC) * 1.27f));
+                    const int tiltDmx = juce::jlimit(0, 255, 128 + juce::roundToInt(static_cast<float>(tiltC) * 1.27f));
+                    addCmd(role, "Pan", panDmx, panDmx, "Static", useCol);
+                    addCmd(role, "Tilt", tiltDmx, tiltDmx, "Static", useCol);
                 }
                 else if (shape == "PanSweep")
                 {
@@ -1479,20 +1955,30 @@ private:
 
                 if (onlyAddMissing)
                 {
-                    if (findPresetByName(factoryName).isValid())
+                    if (auto existingF = findPresetByName(factoryName); existingF.isValid())
+                    {
+                        sanitizePresetNode(existingF);
                         return;
+                    }
 
-                    // Se il preset factory era gia' stato importato senza [F], lo rinomina sul posto senza duplicarlo
                     if (auto existing = findPresetByName(name); existing.isValid())
                     {
                         existing.setProperty(StateKeys::PresetName, factoryName, nullptr);
                         existing.setProperty(StateKeys::SceneName, factoryName, nullptr);
+                        existing.setProperty(StateKeys::PresetUseColor, useCol, nullptr);
+                        existing.setProperty(StateKeys::PresetUseDimmer, useDim, nullptr);
+                        existing.setProperty(StateKeys::PresetUseMove, useMov, nullptr);
+                        existing.setProperty(StateKeys::PresetUseStrobe, useStr, nullptr);
+                        rebuildPresetCommands(existing);
                         ++addedCount;
                         return;
                     }
                 }
 
                 juce::ValueTree p(StateKeys::ScenePreset);
+
+                ensurePresetId(p);
+
                 p.setProperty(StateKeys::PresetName, factoryName, nullptr);
                 p.setProperty(StateKeys::SceneName, factoryName, nullptr);
                 p.setProperty(StateKeys::PresetPool, pool, nullptr);
@@ -1602,6 +2088,27 @@ private:
         addStarter("Posizione Home (Centro Fisso)", "Movement", "Movement", 4.0, false, "Sync", allMovers,
             false, false, true, false, "ff38bdf8", "ff38bdf8", 0, 255, "Static", false, "1/8", "Fixed", "Sine_4Bars", 0, 0);
 
+        auto addStaticPos = [&](const juce::String& name, int panC, int tiltC, int fanP, int fanT)
+            {
+                const int before = presetLibNode.getNumChildren();
+                addStarter(name, "Movement", "Movement", 4.0, false, "SymmetricalFan", allMovers,
+                    false, false, true, false, "ff38bdf8", "ff38bdf8", 0, 255, "Static", false, "1/8", "Fixed", "Sine_4Bars", 0, 0);
+                if (presetLibNode.getNumChildren() > before)
+                {
+                    auto p = presetLibNode.getChild(presetLibNode.getNumChildren() - 1);
+                    p.setProperty(StateKeys::PresetMovePanCenter, panC, nullptr);
+                    p.setProperty(StateKeys::PresetMoveTiltCenter, tiltC, nullptr);
+                    p.setProperty(StateKeys::PresetMovePanFan, fanP, nullptr);
+                    p.setProperty(StateKeys::PresetMoveTiltFan, fanT, nullptr);
+                    rebuildPresetCommands(p);
+                }
+            };
+
+        addStaticPos("Posizione: Ventaglio Aperto (<>)", 0, 20, 70, 0);
+        addStaticPos("Posizione: Incrocio X (><)", 0, 15, -75, 0);
+        addStaticPos("Posizione: Focus Centro Band", 0, -45, -35, 0);
+        addStaticPos("Posizione: Pubblico (Crowd)", 0, 75, 45, 0);
+
         addStarter("Sweep Lento Ventaglio (4 Bars / 16 Q)", "Movement", "Movement", 16.0, false, "SymmetricalFan", allMovers,
             false, false, true, false, "ff38bdf8", "ff38bdf8", 0, 255, "Static", false, "1/8", "PanSweep", "Sine_4Bars", 85, 0);
 
@@ -1690,6 +2197,9 @@ private:
     {
         juce::String pool = (activePoolFilter == "Tutti") ? "Color" : activePoolFilter;
         juce::ValueTree p(StateKeys::ScenePreset);
+
+        ensurePresetId(p);
+
         p.setProperty(StateKeys::PresetName, "Nuovo " + pool + " " + juce::String(presetLibNode.getNumChildren() + 1), nullptr);
         p.setProperty(StateKeys::PresetPool, pool, nullptr);
         p.setProperty(StateKeys::LayerType, pool == "Movement" ? "Movement" : ((pool == "Strobe" || pool == "ImpactFX") ? "OverlayFX" : "Base"), nullptr);
@@ -1732,8 +2242,8 @@ private:
     {
         if (!currentPreset.isValid()) return;
         auto copy = currentPreset.createCopy();
-        copy.setProperty(StateKeys::PresetName,
-            copy.getProperty(StateKeys::PresetName, "Preset").toString() + " (Copia)", nullptr);
+        copy.setProperty(StateKeys::PresetId, juce::Uuid().toString(), nullptr);
+        copy.removeProperty(StateKeys::PresetAliases, nullptr);
         presetLibNode.addChild(copy, -1, nullptr);
         rebuildFilteredList();
     }
@@ -1757,43 +2267,92 @@ private:
             "*.presets");
 
         auto chooserFlags = juce::FileBrowserComponent::saveMode | juce::FileBrowserComponent::canSelectFiles;
-        fileChooser->launchAsync(chooserFlags, [this](const juce::FileChooser& fc) {
+        juce::Component::SafePointer<SceneBuilderTab> safeThis(this);
+        fileChooser->launchAsync(chooserFlags, [safeThis](const juce::FileChooser& fc) {
+            if (safeThis == nullptr) return;
             auto file = fc.getResult();
-            if (file != juce::File{})
-            {
-                if (auto xml = presetLibNode.createXml())
-                    xml->writeTo(file);
-            }
+            if (file == juce::File{}) return;
+
+            auto snapshot = safeThis->presetLibNode.createCopy();
+            const int count = snapshot.getNumChildren();
+
+            FileProgressRunner::runBackground(
+                "Salvataggio Libreria Preset",
+                "Preparazione libreria (" + juce::String(count) + " preset)...",
+                [snapshot, file](std::function<void(double, const juce::String&)> report) -> bool {
+                    report(0.25, "Serializzazione XML...");
+                    auto xml = snapshot.createXml();
+                    if (xml == nullptr) return false;
+
+                    report(0.70, "Scrittura su disco: " + file.getFileName() + "...");
+                    return xml->writeTo(file);
+                },
+                "Salvataggio Completato",
+                "Libreria '" + file.getFileName() + "' salvata correttamente (" + juce::String(count) + " preset).",
+                "Errore Salvataggio",
+                "Impossibile salvare la libreria in:\n" + file.getFullPathName());
             });
     }
 
     void loadPresetLibrary()
     {
+        juce::ScopedValueSetter<bool> suppressGuard(isSuppressingShowSync, true);
+
         fileChooser = std::make_unique<juce::FileChooser>(
             "Carica Libreria Preset Scene Builder",
             juce::File::getSpecialLocation(juce::File::userDocumentsDirectory),
             "*.presets");
 
         auto chooserFlags = juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles;
-        fileChooser->launchAsync(chooserFlags, [this](const juce::FileChooser& fc) {
+        juce::Component::SafePointer<SceneBuilderTab> safeThis(this);
+        fileChooser->launchAsync(chooserFlags, [safeThis](const juce::FileChooser& fc) {
+            if (safeThis == nullptr) return;
             auto file = fc.getResult();
-            if (file.existsAsFile())
-            {
+            if (!file.existsAsFile()) return;
+
+            auto parsedTree = std::make_shared<juce::ValueTree>();
+            auto loadedCount = std::make_shared<int>(0);
+
+            std::vector<FileProgressRunner::Step> steps;
+            steps.push_back({ "Lettura file " + file.getFileName() + "...", 0.35, [file, parsedTree]() {
                 if (auto xml = juce::XmlDocument::parse(file))
                 {
-                    auto loaded = juce::ValueTree::fromXml(*xml);
-                    if (loaded.isValid() && loaded.hasType(StateKeys::PresetLibNode))
-                    {
-                        presetLibNode.removeAllChildren(nullptr);
-                        for (int i = 0; i < loaded.getNumChildren(); ++i)
-                            presetLibNode.addChild(loaded.getChild(i).createCopy(), -1, nullptr);
-
-                        rebuildFilteredList();
-                        if (!filteredPresets.empty())
-                            presetList.selectRow(0);
-                    }
+                    *parsedTree = juce::ValueTree::fromXml(*xml);
+                    return parsedTree->isValid() && parsedTree->hasType(StateKeys::PresetLibNode);
                 }
-            }
+                return false;
+            } });
+            steps.push_back({ "Importazione e verifica attributi preset...", 0.80, [safeThis, parsedTree, loadedCount]() {
+                if (safeThis == nullptr) return false;
+                safeThis->presetLibNode.removeAllChildren(nullptr);
+                for (int i = 0; i < parsedTree->getNumChildren(); ++i)
+                {
+                    auto copy = parsedTree->getChild(i).createCopy();
+                    sanitizePresetNode(copy);
+                    safeThis->presetLibNode.addChild(copy, -1, nullptr);
+                }
+                *loadedCount = safeThis->presetLibNode.getNumChildren();
+                safeThis->savePresetLibraryToDefaultDisk();
+                return true;
+            } });
+            steps.push_back({ "Aggiornamento interfaccia...", 1.0, [safeThis]() {
+                if (safeThis == nullptr) return false;
+                safeThis->rebuildFilteredList();
+                if (!safeThis->filteredPresets.empty())
+                    safeThis->presetList.selectRow(0);
+                return true;
+            } });
+
+            FileProgressRunner::runStepped(
+                "Caricamento Libreria Preset",
+                std::move(steps),
+                "Caricamento Completato",
+                [file, loadedCount]() {
+                    return "Libreria '" + file.getFileName() + "' caricata correttamente ("
+                        + juce::String(*loadedCount) + " preset).";
+                },
+                "Errore Caricamento",
+                "Il file selezionato non e' una libreria preset valida.");
             });
     }
 
@@ -1856,6 +2415,11 @@ private:
     juce::ComboBox moveShapeCombo, moveSpeedCombo;
     juce::Slider ampPanSlider, ampTiltSlider;
 
+    PositionAimPad positionAimPad;
+    juce::Label panCenterLbl, tiltCenterLbl, panFanLbl, tiltFanLbl;
+    juce::Slider panCenterSlider, tiltCenterSlider, panFanSlider, tiltFanSlider;
+    std::vector<std::unique_ptr<juce::TextButton>> quickPosBtns;
+
     // Colonna Destra
     juce::TextButton playPreviewBtn, triggerOneShotBtn;
     juce::Label bpmLabel, strobeHzInfoLabel;
@@ -1867,6 +2431,11 @@ private:
     std::unique_ptr<juce::FileChooser> fileChooser;
 
     juce::TextButton addPresetBtn, dupPresetBtn, delPresetBtn, factoryPresetsBtn, saveLibBtn, loadLibBtn;
+
+    bool isSuppressingShowSync = false;
+    juce::ValueTree pendingSyncPreset;
+    bool pendingSyncDuration = false;
+    juce::String selectedPresetLastSyncedName;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(SceneBuilderTab)
 };

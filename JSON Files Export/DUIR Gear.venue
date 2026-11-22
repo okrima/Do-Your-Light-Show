@@ -1,0 +1,83 @@
+{
+  "nodeType": "VENUE",
+  "children": [
+    {
+      "nodeType": "FIXTURE",
+      "name": "Wash Brugo",
+      "quantity": 1,
+      "startAddress": 1,
+      "channelCount": 9,
+      "role": "Terra: Controluce / Sotto-Batteria",
+      "map_Dimmer": 3,
+      "map_Red": 4,
+      "map_Green": 5,
+      "map_Blue": 6,
+      "strobeMode": 2,
+      "dimmerMaxVal": 134,
+      "strobeOpenVal": 0,
+      "strobeMinVal": 135,
+      "strobeMinHz": 0.5,
+      "strobeMaxVal": 239,
+      "strobeMaxHz": 40.0,
+      "panMin": 85,
+      "panMax": 170,
+      "tiltMin": 128,
+      "tiltMax": 195,
+      "swapPanTilt": false,
+      "invertPan": false,
+      "invertTilt": false,
+      "map_Pan": 1,
+      "map_Tilt": 2,
+      "map_White": 7,
+      "map_Strobe": 3,
+      "children": [
+        {
+          "nodeType": "FIXTURE_UNIT",
+          "unitIndex": 1,
+          "isPlaced": false,
+          "posX": 0.5,
+          "posY": 0.12
+        }
+      ]
+    },
+    {
+      "nodeType": "FIXTURE",
+      "name": "Wash Thomas",
+      "quantity": 1,
+      "startAddress": 10,
+      "channelCount": 9,
+      "role": "Terra: Controluce / Sotto-Batteria",
+      "map_Dimmer": 3,
+      "map_Red": 4,
+      "map_Green": 5,
+      "map_Blue": 6,
+      "strobeMode": 2,
+      "dimmerMaxVal": 134,
+      "strobeOpenVal": 0,
+      "strobeMinVal": 135,
+      "strobeMinHz": 0.5,
+      "strobeMaxVal": 239,
+      "strobeMaxHz": 40.0,
+      "panMin": 85,
+      "panMax": 170,
+      "tiltMin": 128,
+      "tiltMax": 195,
+      "swapPanTilt": false,
+      "invertPan": false,
+      "invertTilt": false,
+      "map_Pan": 1,
+      "map_Tilt": 2,
+      "map_White": 7,
+      "map_Strobe": 3,
+      "children": [
+        {
+          "nodeType": "FIXTURE_UNIT",
+          "unitIndex": 1,
+          "isPlaced": false,
+          "posX": 0.5,
+          "posY": 0.12
+        }
+      ]
+    }
+  ]
+}

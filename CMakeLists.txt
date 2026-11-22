@@ -57,7 +57,7 @@ target_sources(DoYourLightShow
         
         # Utils
         Source/Utils/PresetManager.h
- "Source/UI/Tabs/SceneBuilderTab.h" "Source/Model/CurveEvaluator.h" "Source/UI/Components/PanTiltCalibrationWizard.h" "Source/UI/Components/TimeMetricManager.h" "Source/UI/Components/StageArtworkHelper.h")
+ "Source/UI/Tabs/SceneBuilderTab.h" "Source/Model/CurveEvaluator.h" "Source/UI/Components/PanTiltCalibrationWizard.h" "Source/UI/Components/TimeMetricManager.h" "Source/UI/Components/StageArtworkHelper.h" "Source/UI/Components/FileProgressOverlay.h" "Source/Engine/DmxOutputDriver.h" "Source/Engine/ArtNetDmxDriver.h" "Source/Engine/EnttecProDmxDriver.h" "Source/Engine/DmxOutputManager.h" "Source/Engine/SacnDmxDriver.h" "Source/Engine/DmxLiveEngine.h" "Source/UI/Components/DmxOutputControlPanel.h")
 
 # 4. Include directory
 target_include_directories(DoYourLightShow

@@ -4,7 +4,9 @@
 #include "../../Model/DataStateKeys.h"
 #include "../../Utils/PresetManager.h"
 #include "../../Model/StageRoleCatalog.h"
+#include "../../Engine/DmxLiveEngine.h"
 
+#include <array>
 #include <vector>
 #include <memory>
 
@@ -290,9 +292,19 @@ public:
     void paint(juce::Graphics& g) override;
     void resized() override;
 
+    void setDmxLiveEngine(DmxLiveEngine* engine) noexcept { dmxLiveEngine = engine; }
+    void forceStopFixtureTest();
+    void visibilityChanged() override;
+
 private:
     void addNewFixtureToState();
     void removeSelectedFixture();
+
+    void duplicateSelectedFixture();
+    void updateFixtureTestOutput();
+    static int computeFixtureDmxFootprint(const juce::ValueTree& fix);
+    int findNextFreeDmxAddress(int preferredStart, int neededChannels) const;
+
     void saveVenue();
     void loadVenue();
 
@@ -304,10 +316,13 @@ private:
 
     juce::ValueTree& appState;
     juce::ValueTree venueNode;
+	DmxLiveEngine* dmxLiveEngine = nullptr;
 
     juce::ListBox fixtureList;
     juce::TextButton addFixtureBtn;
     juce::TextButton removeFixtureBtn;
+    juce::TextButton duplicateFixtureBtn;
+    juce::TextButton testFixtureBtn;
     juce::TextButton saveBtn;
     juce::TextButton loadBtn;
 

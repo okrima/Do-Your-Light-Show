@@ -5,6 +5,7 @@
 #include "../../Model/StageRoleCatalog.h"
 #include "../../Audio/StemAudioEngine.h"
 #include "../../Model/CurveEvaluator.h"
+#include "../../Engine/DmxLiveEngine.h"
 #include "StageArtworkHelper.h"
 #include <vector>
 #include <map>
@@ -17,6 +18,14 @@ class StageSimulatorView : public juce::Component,
 public:
     std::function<void()> onToggleExpandRequested;
     std::function<void(bool)> onPreviewPlaybackChanged;
+
+    void setDmxLiveEngine(DmxLiveEngine* engine) noexcept { dmxLiveEngine = engine; }
+
+    void stopFixtureTestIfActive()
+    {
+        if (dmxLiveEngine != nullptr && dmxLiveEngine->isFixtureTestActive())
+            dmxLiveEngine->stopFixtureTest();
+    }
 
     // 1. Costruttore Timeline (usato in ShowBuilderTab)
     StageSimulatorView(juce::ValueTree& state,
@@ -337,6 +346,8 @@ private:
     int previewTimeSigNum = 4;
     int previewTimeSigDen = 4;
     BeatTimeMap::MusicalPosition currentMusicalPos;
+    DmxLiveEngine* dmxLiveEngine = nullptr;
+    bool wasTab3PlayingDmx = false;
 
     juce::Rectangle<float> getStageRect() const
     {
@@ -484,7 +495,11 @@ private:
         bool hasTiltCmd = false;
         float panCmd = 0.5f;
         float tiltCmd = 0.5f;
-        juce::Colour fallbackColor{ 0xff1e3a8a };
+        bool panIsStatic = false;
+        bool tiltIsStatic = false;
+        float motionPanFan = 0.0f;
+        float motionTiltFan = 0.0f;
+        juce::Colour fallbackColor{ 0xffffffff };
         juce::String motionPhaseMode{ "SymmetricalFan" };
 
         juce::Colour getEffectiveColour() const
@@ -502,6 +517,11 @@ private:
                     return juce::Colour(r, g, b);
             }
             return fallbackColor;
+        }
+
+        bool hasExplicitColor() const noexcept
+        {
+            return red >= 0.0f || green >= 0.0f || blue >= 0.0f || white >= 0.0f || uv >= 0.0f;
         }
     };
 
@@ -570,6 +590,37 @@ private:
         }
 
         updateFogFromActiveScenes(dtSec);
+        if (dmxLiveEngine != nullptr && dmxLiveEngine->isOutputActive())
+        {
+            if (!isShowing())
+            {
+                wasTab3PlayingDmx = false;
+            }
+            else
+            {
+                const bool shouldSendDmx = standalonePreviewMode || audioEngine->isPlaying();
+
+                if (shouldSendDmx)
+                {
+                    if (!standalonePreviewMode)
+                        wasTab3PlayingDmx = true;
+
+                    std::vector<DmxLiveEngine::LiveSceneInput> liveInputs;
+                    if (!standalonePreviewMode || !oneShotFinished)
+                    {
+                        liveInputs.reserve(activeScenes.size());
+                        for (const auto& entry : activeScenes)
+                            liveInputs.push_back({ entry.node, entry.startBeat, entry.durationBeats, entry.progress });
+                    }
+                    dmxLiveEngine->renderLiveFrame(appState, liveInputs, currentBeat, currentMusicalPos, standalonePreviewMode);
+                }
+                else if (wasTab3PlayingDmx)
+                {
+                    wasTab3PlayingDmx = false;
+                    dmxLiveEngine->clearAllOutput();
+                }
+            }
+        }
         repaint();
     }
 
@@ -676,6 +727,38 @@ private:
             activeSceneName += " (+" + juce::String(static_cast<int>(activeScenes.size()) - maxNames) + ")";
     }
 
+    static bool isCommandAllowedBySceneMask(const juce::ValueTree& sceneNode,
+        const juce::String& param,
+        const juce::String& curve)
+    {
+        if (!sceneNode.isValid())
+            return true;
+
+        const bool isColorParam = param.equalsIgnoreCase("Red") || param.equalsIgnoreCase("Green")
+            || param.equalsIgnoreCase("Blue") || param.equalsIgnoreCase("White") || param.equalsIgnoreCase("UV");
+        if (isColorParam)
+            return !sceneNode.hasProperty(StateKeys::PresetUseColor)
+            || static_cast<bool>(sceneNode.getProperty(StateKeys::PresetUseColor));
+
+        const bool isMoveParam = param.equalsIgnoreCase("Pan") || param.equalsIgnoreCase("Tilt");
+        if (isMoveParam)
+            return !sceneNode.hasProperty(StateKeys::PresetUseMove)
+            || static_cast<bool>(sceneNode.getProperty(StateKeys::PresetUseMove));
+
+        const bool isStrobeCmd = param.equalsIgnoreCase("Strobe")
+            || (param.equalsIgnoreCase("Dimmer") && CurveEvaluator::getStrobeHitsPerQuarter(curve) > 0.0);
+        if (isStrobeCmd)
+            return !sceneNode.hasProperty(StateKeys::PresetUseStrobe)
+            || static_cast<bool>(sceneNode.getProperty(StateKeys::PresetUseStrobe));
+
+        const bool isDimmerCmd = param.equalsIgnoreCase("Dimmer") || param.equalsIgnoreCase("GeyserBlast");
+        if (isDimmerCmd)
+            return !sceneNode.hasProperty(StateKeys::PresetUseDimmer)
+            || static_cast<bool>(sceneNode.getProperty(StateKeys::PresetUseDimmer));
+
+        return true;
+    }
+
     void updateFogFromActiveScenes(double dtSec)
     {
         if (!isSimulationRunning())
@@ -702,10 +785,15 @@ private:
                     const float sVal = static_cast<float>(static_cast<int>(cmd.getProperty(StateKeys::StartValue, 0))) / 255.0f;
                     const float eVal = static_cast<float>(static_cast<int>(cmd.getProperty(StateKeys::EndValue, 255))) / 255.0f;
                     const juce::String curve = cmd.getProperty(StateKeys::CurveType, "Linear").toString();
+
+                    if (!isCommandAllowedBySceneMask(entry.node, param, curve))
+                        continue;
+
                     smokeOut = juce::jmax(smokeOut,
                         CurveEvaluator::evaluate(curve, sVal, eVal,
                             static_cast<float>(entry.progress), currentMusicalPos, 0.0, false, clipElapsedBars));
                 }
+
             }
         }
 
@@ -764,6 +852,7 @@ private:
             float locHwStrobe = 0.0f;
 
             bool localHasPan = false, localHasTilt = false;
+            bool localPanStatic = false, localTiltStatic = false;
             float locPan = 0.5f, locTilt = 0.5f;
             bool requestedPan = false, requestedTilt = false;
             bool requestedActivePan = false, requestedActiveTilt = false;
@@ -789,6 +878,9 @@ private:
                 const juce::String curve = cmd.getProperty(StateKeys::CurveType, "Linear").toString();
                 const juce::String defaultHex = entry.node.getProperty(StateKeys::PresetColor1, "ff1e3a8a").toString();
                 const juce::String colHex = cmd.getProperty(StateKeys::CommandColor, defaultHex).toString();
+
+                if (!isCommandAllowedBySceneMask(entry.node, param, curve))
+                    continue;
 
                 const bool isPanOrTilt = param.equalsIgnoreCase("Pan") || param.equalsIgnoreCase("Tilt");
                 const float val = CurveEvaluator::evaluate(curve, startVal, endVal,
@@ -818,6 +910,7 @@ private:
                 else if (param.equalsIgnoreCase("Strobe")) { localHasHwStrobe = true; locHwStrobe = val; }
                 else if (param.equalsIgnoreCase("Pan"))
                 {
+                    localPanStatic = curve.equalsIgnoreCase("Static");
                     requestedPan = true;
                     if (!curve.equalsIgnoreCase("Static"))
                         requestedActivePan = true;
@@ -830,6 +923,7 @@ private:
                 }
                 else if (param.equalsIgnoreCase("Tilt"))
                 {
+                    localTiltStatic = curve.equalsIgnoreCase("Static");
                     requestedTilt = true;
                     if (!curve.equalsIgnoreCase("Static"))
                         requestedActiveTilt = true;
@@ -857,23 +951,26 @@ private:
                 vf.state.uv = locUv;
                 vf.state.fallbackColor = locFallback;
             }
-            else if (vf.state.red < 0.0f && vf.state.green < 0.0f && vf.state.blue < 0.0f &&
-                vf.state.white < 0.0f && vf.state.uv < 0.0f)
-            {
-                vf.state.fallbackColor = locFallback;
-            }
 
             // 2. MOVIMENTO PAN/TILT -> LTP (mantiene il PhaseMode della scena di movimento)
+            const bool isFixedShape = entry.node.getProperty(StateKeys::PresetMoveShape, "Fixed").toString().equalsIgnoreCase("Fixed");
+            const float scenePanFan = isFixedShape ? (static_cast<float>(static_cast<double>(entry.node.getProperty(StateKeys::PresetMovePanFan, 0))) / 100.0f) : 0.0f;
+            const float sceneTiltFan = isFixedShape ? (static_cast<float>(static_cast<double>(entry.node.getProperty(StateKeys::PresetMoveTiltFan, 0))) / 100.0f) : 0.0f;
+
             if (localHasPan)
             {
                 vf.state.hasPanCmd = true;
                 vf.state.panCmd = locPan;
+                vf.state.panIsStatic = localPanStatic;
+                vf.state.motionPanFan = scenePanFan;
                 vf.state.motionPhaseMode = phaseMode;
             }
             if (localHasTilt)
             {
                 vf.state.hasTiltCmd = true;
                 vf.state.tiltCmd = locTilt;
+                vf.state.tiltIsStatic = localTiltStatic;
+                vf.state.motionTiltFan = sceneTiltFan;
                 vf.state.motionPhaseMode = phaseMode;
             }
 
@@ -931,15 +1028,13 @@ private:
         if (standalonePreviewMode && vf.state.hasAnyCommand && !activeScenes.empty())
         {
             const juce::String pool = activeScenes.back().node.getProperty(StateKeys::PresetPool, "Color").toString();
-            const bool hasRgb = (vf.state.red >= 0.0f || vf.state.green >= 0.0f || vf.state.blue >= 0.0f);
+            const bool hasCol = vf.state.hasExplicitColor();
             const bool hasMove = (vf.state.hasPanCmd || vf.state.hasTiltCmd);
 
             if (!vf.state.hasDimmerCmd && !vf.state.blockedByMovePolicy &&
-                (pool.equalsIgnoreCase("Color") || pool.equalsIgnoreCase("Movement") || hasRgb || hasMove))
+                (pool.equalsIgnoreCase("Color") || pool.equalsIgnoreCase("Movement") || hasCol || hasMove))
             {
-                vf.state.dimmer = (hasMove && !hasRgb) ? 0.85f : 1.0f;
-                if (hasMove && !hasRgb)
-                    vf.state.fallbackColor = juce::Colour(0xff38bdf8);
+                vf.state.dimmer = (hasMove && !hasCol) ? 0.85f : 1.0f;
             }
         }
 
@@ -1162,7 +1257,9 @@ private:
                 vf.state.dimmer > frontIllumination)
             {
                 frontIllumination = vf.state.dimmer;
-                frontTint = vf.state.getEffectiveColour();
+                frontTint = vf.state.hasExplicitColor()
+                    ? vf.state.getEffectiveColour()
+                    : juce::Colour(0xff94a3b8);
             }
         }
 
@@ -1217,14 +1314,30 @@ private:
             ? vf.state.motionPhaseMode
             : "SymmetricalFan";
 
-        const bool mirrorPan = phaseMode.equalsIgnoreCase("SymmetricalFan")
+        float effPan = vf.state.hasPanCmd ? vf.state.panCmd : 0.5f;
+        float effTilt = vf.state.hasTiltCmd ? vf.state.tiltCmd : 0.5f;
+
+        if (vf.state.panIsStatic || vf.state.tiltIsStatic)
+        {
+            float fannedPan = effPan, fannedTilt = effTilt;
+            StageRoleCatalog::PanTiltHardwareSpec::applyPositionFan(
+                effPan, effTilt,
+                vf.state.panIsStatic ? vf.state.motionPanFan : 0.0f,
+                vf.state.tiltIsStatic ? vf.state.motionTiltFan : 0.0f,
+                vf.roleSpatialIndex, vf.roleSpatialTotal, phaseMode,
+                fannedPan, fannedTilt);
+            effPan = fannedPan;
+            effTilt = fannedTilt;
+        }
+
+        const bool mirrorPan = !vf.state.panIsStatic
+            && phaseMode.equalsIgnoreCase("SymmetricalFan")
             && vf.roleSpatialTotal > 1
             && vf.normX > 0.501f;
 
         if (vf.panTiltSpec.hasPanChannel)
         {
-            const float rawPan = vf.state.hasPanCmd ? vf.state.panCmd : 0.5f;
-            const int panDmx = vf.panTiltSpec.mapStagePanToDmx(rawPan, mirrorPan);
+            const int panDmx = vf.panTiltSpec.mapStagePanToDmx(effPan, mirrorPan);
 
             const float panCenter = 0.5f * static_cast<float>(vf.panTiltSpec.panLeft + vf.panTiltSpec.panRight);
             const float panHalfSpan = 0.5f * static_cast<float>(vf.panTiltSpec.panRight - vf.panTiltSpec.panLeft);
@@ -1243,8 +1356,7 @@ private:
 
         if (vf.panTiltSpec.hasTiltChannel)
         {
-            const float rawTilt = vf.state.hasTiltCmd ? vf.state.tiltCmd : 0.5f;
-            const int tiltDmx = vf.panTiltSpec.mapStageTiltToDmx(rawTilt);
+            const int tiltDmx = vf.panTiltSpec.mapStageTiltToDmx(effTilt);
 
             const float tiltCenter = 0.5f * static_cast<float>(vf.panTiltSpec.tiltLow + vf.panTiltSpec.tiltHigh);
             const float tiltHalfSpan = 0.5f * static_cast<float>(vf.panTiltSpec.tiltHigh - vf.panTiltSpec.tiltLow);
@@ -1274,6 +1386,10 @@ private:
 
         using Cat = StageRoleCatalog::Category;
         juce::Colour col = vf.state.getEffectiveColour();
+
+        const bool isColorless = !vf.state.hasExplicitColor();
+        if (isColorless)
+            col = juce::Colours::white;
 
         float fogBoost = 0.75f + 0.45f * currentFogDensity;
         float beamAlpha = juce::jlimit(0.0f, 0.92f, dim * 0.55f * fogBoost);
@@ -1305,16 +1421,25 @@ private:
             float perspectiveEndW = baseEndW * (0.55f + 0.45f * reachFactor);
 
             drawLightCone(g, vf.pos, { targetX, targetY }, startW, perspectiveEndW, col,
-                isBeam ? juce::jmin(0.95f, beamAlpha * 1.35f) : beamAlpha);
+                isBeam ? juce::jmin(0.95f, beamAlpha * 1.35f) : beamAlpha, isColorless);
+            
 
             if (tiltNorm > 0.65f)
             {
                 float eyeFactor = (tiltNorm - 0.65f) / 0.35f;
                 float flareRad = (isBeam ? 45.0f : 32.0f) * eyeFactor * dim;
-                juce::ColourGradient flare(juce::Colours::white.withAlpha(eyeFactor * dim * 0.85f), targetX, targetY,
-                    col.withAlpha(0.0f), targetX + flareRad, targetY, true);
-                g.setGradientFill(flare);
-                g.fillEllipse(targetX - flareRad, targetY - flareRad, flareRad * 2.0f, flareRad * 2.0f);
+                if (isColorless)
+                {
+                    g.setColour(juce::Colours::white.withAlpha(eyeFactor * dim * 0.7f));
+                    g.drawEllipse(targetX - flareRad * 0.5f, targetY - flareRad * 0.5f, flareRad, flareRad, 1.3f);
+                }
+                else
+                {
+                    juce::ColourGradient flare(juce::Colours::white.withAlpha(eyeFactor * dim * 0.85f), targetX, targetY,
+                        col.withAlpha(0.0f), targetX + flareRad, targetY, true);
+                    g.setGradientFill(flare);
+                    g.fillEllipse(targetX - flareRad, targetY - flareRad, flareRad * 2.0f, flareRad * 2.0f);
+                }
             }
             break;
         }
@@ -1332,7 +1457,7 @@ private:
             float targetY = vf.pos.y - stageSpanH * upReach;
             float endW = isBeam ? 50.0f : stageRect.getWidth() * 0.23f;
 
-            drawLightCone(g, vf.pos, { targetX, targetY }, isBeam ? 6.0f : 14.0f, endW, col, beamAlpha * 1.2f);
+            drawLightCone(g, vf.pos, { targetX, targetY }, isBeam ? 6.0f : 14.0f, endW, col, beamAlpha * 1.2f, isColorless);
             break;
         }
 
@@ -1342,36 +1467,56 @@ private:
             float targetX = isLeft ? (stageRect.getX() + stageRect.getWidth() * 0.72f)
                 : (stageRect.getX() + stageRect.getWidth() * 0.28f);
             float targetY = floorY - stageSpanH * juce::jlimit(0.05f, 0.75f, tiltNorm * 0.65f);
-            drawLightCone(g, vf.pos, { targetX, targetY }, 10.0f, 90.0f, col, beamAlpha);
+            drawLightCone(g, vf.pos, { targetX, targetY }, 10.0f, 90.0f, col, beamAlpha, isColorless);
             break;
         }
 
         case Cat::ImpactBlinder:
         {
-            juce::Colour blindCol = juce::Colour(0xfffffbeb).interpolatedWith(col, 0.3f);
             float radius = 95.0f * dim + 25.0f;
-            juce::ColourGradient grad(blindCol.withAlpha(juce::jmin(1.0f, dim * 0.95f)), vf.pos.x, vf.pos.y,
-                blindCol.withAlpha(0.0f), vf.pos.x + radius, vf.pos.y, true);
-            g.setGradientFill(grad);
-            g.fillEllipse(vf.pos.x - radius, vf.pos.y - radius, radius * 2.0f, radius * 2.0f);
+            if (isColorless)
+            {
+                g.setColour(juce::Colours::white.withAlpha(dim * 0.75f));
+                g.drawEllipse(vf.pos.x - radius * 0.6f, vf.pos.y - radius * 0.6f, radius * 1.2f, radius * 1.2f, 1.5f);
+                g.setColour(juce::Colours::white.withAlpha(dim * 0.35f));
+                g.drawEllipse(vf.pos.x - radius * 0.9f, vf.pos.y - radius * 0.9f, radius * 1.8f, radius * 1.8f, 1.0f);
+            }
+            else
+            {
+                juce::Colour blindCol = juce::Colour(0xfffffbeb).interpolatedWith(col, 0.3f);
+                juce::ColourGradient grad(blindCol.withAlpha(juce::jmin(1.0f, dim * 0.95f)), vf.pos.x, vf.pos.y,
+                    blindCol.withAlpha(0.0f), vf.pos.x + radius, vf.pos.y, true);
+                g.setGradientFill(grad);
+                g.fillEllipse(vf.pos.x - radius, vf.pos.y - radius, radius * 2.0f, radius * 2.0f);
+            }
 
             g.setColour(juce::Colours::white.withAlpha(dim * 0.85f));
-            g.drawLine(vf.pos.x - radius * 0.7f, vf.pos.y, vf.pos.x + radius * 0.7f, vf.pos.y, 2.5f);
-            g.drawLine(vf.pos.x, vf.pos.y - radius * 0.7f, vf.pos.x, vf.pos.y + radius * 0.7f, 2.5f);
+            g.drawLine(vf.pos.x - radius * 0.7f, vf.pos.y, vf.pos.x + radius * 0.7f, vf.pos.y, isColorless ? 1.4f : 2.5f);
+            g.drawLine(vf.pos.x, vf.pos.y - radius * 0.7f, vf.pos.x, vf.pos.y + radius * 0.7f, isColorless ? 1.4f : 2.5f);
             break;
         }
 
         case Cat::ImpactStrobe:
         {
             float radius = 130.0f * dim;
-            juce::ColourGradient grad(juce::Colours::white.withAlpha(dim * 0.90f), vf.pos.x, vf.pos.y,
-                col.withAlpha(0.0f), vf.pos.x + radius, vf.pos.y, true);
-            g.setGradientFill(grad);
-            g.fillEllipse(vf.pos.x - radius, vf.pos.y - radius, radius * 2.0f, radius * 2.0f);
+            if (isColorless)
+            {
+                g.setColour(juce::Colours::white.withAlpha(dim * 0.80f));
+                g.drawEllipse(vf.pos.x - radius * 0.55f, vf.pos.y - radius * 0.55f, radius * 1.1f, radius * 1.1f, 1.6f);
+                g.setColour(juce::Colours::white.withAlpha(dim * 0.30f));
+                g.drawEllipse(vf.pos.x - radius * 0.9f, vf.pos.y - radius * 0.9f, radius * 1.8f, radius * 1.8f, 1.0f);
+            }
+            else
+            {
+                juce::ColourGradient grad(juce::Colours::white.withAlpha(dim * 0.90f), vf.pos.x, vf.pos.y,
+                    col.withAlpha(0.0f), vf.pos.x + radius, vf.pos.y, true);
+                g.setGradientFill(grad);
+                g.fillEllipse(vf.pos.x - radius, vf.pos.y - radius, radius * 2.0f, radius * 2.0f);
+            }
 
             if (dim > 0.6f)
             {
-                g.setColour(juce::Colours::white.withAlpha((dim - 0.5f) * 0.22f));
+                g.setColour(juce::Colours::white.withAlpha((dim - 0.5f) * (isColorless ? 0.14f : 0.22f)));
                 g.fillRoundedRectangle(stageRect, 6.0f);
             }
             break;
@@ -1388,9 +1533,17 @@ private:
                 float puffRadius = 10.0f + ratio * 34.0f * dim;
                 float puffAlpha = (1.0f - ratio * 0.75f) * dim * 0.75f;
 
-                juce::Colour puffCol = col.interpolatedWith(juce::Colour(0xffe2e8f0), ratio * 0.65f);
-                g.setColour(puffCol.withAlpha(puffAlpha));
-                g.fillEllipse(vf.pos.x - puffRadius, py - puffRadius * 0.7f, puffRadius * 2.0f, puffRadius * 1.4f);
+                if (isColorless)
+                {
+                    g.setColour(juce::Colours::white.withAlpha(puffAlpha * 0.85f));
+                    g.drawEllipse(vf.pos.x - puffRadius, py - puffRadius * 0.7f, puffRadius * 2.0f, puffRadius * 1.4f, 1.2f);
+                }
+                else
+                {
+                    juce::Colour puffCol = col.interpolatedWith(juce::Colour(0xffe2e8f0), ratio * 0.65f);
+                    g.setColour(puffCol.withAlpha(puffAlpha));
+                    g.fillEllipse(vf.pos.x - puffRadius, py - puffRadius * 0.7f, puffRadius * 2.0f, puffRadius * 1.4f);
+                }
             }
             break;
         }
@@ -1413,7 +1566,8 @@ private:
         float startWidth,
         float endWidth,
         juce::Colour colour,
-        float alpha)
+        float alpha,
+        bool colorlessWireframe = false)
     {
         float dx = target.x - origin.x;
         float dy = target.y - origin.y;
@@ -1429,6 +1583,50 @@ private:
         cone.lineTo(target.x - nx * (endWidth * 0.5f), target.y - ny * (endWidth * 0.5f));
         cone.lineTo(target.x + nx * (endWidth * 0.5f), target.y + ny * (endWidth * 0.5f));
         cone.closeSubPath();
+
+        if (colorlessWireframe)
+        {
+            // Interno quasi trasparente (lascia comunque leggere l'intensita' del Dimmer)
+            juce::ColourGradient faintFill(
+                juce::Colours::white.withAlpha(alpha * 0.07f), origin.x, origin.y,
+                juce::Colours::white.withAlpha(0.0f), target.x, target.y, false);
+            g.setGradientFill(faintFill);
+            g.fillPath(cone);
+
+            // Bordi laterali del fascio a gradiente bianco -> argento sfumato
+            juce::Path sideEdges;
+            sideEdges.startNewSubPath(origin.x + nx * (startWidth * 0.5f), origin.y + ny * (startWidth * 0.5f));
+            sideEdges.lineTo(target.x + nx * (endWidth * 0.5f), target.y + ny * (endWidth * 0.5f));
+            sideEdges.startNewSubPath(origin.x - nx * (startWidth * 0.5f), origin.y - ny * (startWidth * 0.5f));
+            sideEdges.lineTo(target.x - nx * (endWidth * 0.5f), target.y - ny * (endWidth * 0.5f));
+
+            const float edgeAlpha = juce::jlimit(0.18f, 0.95f, alpha * 1.4f);
+
+            // Alone morbido lungo il perimetro
+            juce::ColourGradient glowGrad(
+                juce::Colours::white.withAlpha(edgeAlpha * 0.26f), origin.x, origin.y,
+                juce::Colours::white.withAlpha(0.02f), target.x, target.y, false);
+            g.setGradientFill(glowGrad);
+            g.strokePath(sideEdges, juce::PathStrokeType(3.8f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
+
+            // Linea perimetrale nitida a gradiente
+            juce::ColourGradient edgeGrad(
+                juce::Colours::white.withAlpha(edgeAlpha), origin.x, origin.y,
+                juce::Colour(0xffcbd5e1).withAlpha(edgeAlpha * 0.14f), target.x, target.y, false);
+            g.setGradientFill(edgeGrad);
+            g.strokePath(sideEdges, juce::PathStrokeType(1.35f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
+
+            // Base tratteggiata sul lato largo per chiudere il profilo del cono
+            juce::Path cap;
+            cap.startNewSubPath(target.x - nx * (endWidth * 0.5f), target.y - ny * (endWidth * 0.5f));
+            cap.lineTo(target.x + nx * (endWidth * 0.5f), target.y + ny * (endWidth * 0.5f));
+            const float dashes[2] = { 4.0f, 4.0f };
+            juce::Path dashedCap;
+            juce::PathStrokeType(1.0f).createDashedStroke(dashedCap, cap, dashes, 2);
+            g.setColour(juce::Colours::white.withAlpha(edgeAlpha * 0.25f));
+            g.fillPath(dashedCap);
+            return;
+        }
 
         juce::ColourGradient grad(colour.withAlpha(alpha), origin.x, origin.y,
             colour.withAlpha(0.02f), target.x, target.y, false);
@@ -1502,10 +1700,20 @@ private:
         }
         else
         {
-            juce::Colour lensCol = vf.state.getEffectiveColour();
-            float dim = vf.state.dimmer;
-            g.setColour(dim > 0.02f ? lensCol.withAlpha(0.35f + 0.65f * dim) : juce::Colour(0xff0f172a));
-            g.fillEllipse(vf.pos.x - 4.5f, vf.pos.y - 4.5f, 9.0f, 9.0f);
+            const float dim = vf.state.dimmer;
+            if (dim > 0.02f && !vf.state.hasExplicitColor())
+            {
+                g.setColour(juce::Colour(0xff0f172a));
+                g.fillEllipse(vf.pos.x - 4.5f, vf.pos.y - 4.5f, 9.0f, 9.0f);
+                g.setColour(juce::Colours::white.withAlpha(0.40f + 0.60f * dim));
+                g.drawEllipse(vf.pos.x - 4.2f, vf.pos.y - 4.2f, 8.4f, 8.4f, 1.3f);
+            }
+            else
+            {
+                const juce::Colour lensCol = vf.state.getEffectiveColour();
+                g.setColour(dim > 0.02f ? lensCol.withAlpha(0.35f + 0.65f * dim) : juce::Colour(0xff0f172a));
+                g.fillEllipse(vf.pos.x - 4.5f, vf.pos.y - 4.5f, 9.0f, 9.0f);
+            }
         }
 
         juce::Colour labelCol = juce::Colour(0xff94a3b8);

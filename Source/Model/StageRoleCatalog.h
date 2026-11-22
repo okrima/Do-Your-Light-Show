@@ -201,10 +201,23 @@ public:
             return minHz + ratio * (maxHz - minHz);
         }
 
-        // Scala un dimmer normale (0..255) nel range consentito (evita di sconfinare nello strobo se mode == 2)
-        int scaleNormalDimmer(int rawDimmer0to255) const
+        // Tetto DMX sicuro per il dimmer fisso in mode == 2 (sempre strettamente sotto il range strobo)
+        int getSafeDimmerMax() const noexcept
         {
-            int maxOut = (mode == 2) ? juce::jlimit(1, 255, dimmerMaxVal) : 255;
+            if (mode != 2)
+                return 255;
+
+            const int strobeLow = juce::jmin(minVal, maxVal);
+            int ceiling = juce::jlimit(1, 255, dimmerMaxVal);
+            if (strobeLow > 1)
+                ceiling = juce::jmin(ceiling, strobeLow - 1);
+            return ceiling;
+        }
+
+        // Scala un dimmer logico (0..255) nel range sicuro del faro (impossibile sconfinare nello strobo)
+        int scaleNormalDimmer(int rawDimmer0to255) const noexcept
+        {
+            const int maxOut = getSafeDimmerMax();
             return juce::roundToInt((static_cast<float>(juce::jlimit(0, 255, rawDimmer0to255)) / 255.0f) * static_cast<float>(maxOut));
         }
     };
@@ -241,6 +254,49 @@ public:
             float u = juce::jlimit(0.0f, 1.0f, norm0to1);
             return juce::jlimit(0, 255,
                 juce::roundToInt(static_cast<float>(tiltLow) + u * static_cast<float>(tiltHigh - tiltLow)));
+        }
+
+        // Calcola il puntamento statico per singola macchina (Parallelo, Ventaglio <>, Incrocio ><, Arco/Alternato)
+        static void applyPositionFan(float basePan0to1, float baseTilt0to1,
+            float panFanMinus1to1, float tiltFanMinus1to1,
+            int spatialIndex, int spatialTotal,
+            const juce::String& phaseMode,
+            float& outPan0to1, float& outTilt0to1) noexcept
+        {
+            const float spatialS = (spatialTotal > 1)
+                ? ((2.0f * static_cast<float>(spatialIndex) / static_cast<float>(spatialTotal - 1)) - 1.0f)
+                : 0.0f;
+
+            // Pan Fan: +1 = Ventaglio Aperto (<>), 0 = Parallelo, -1 = Convergenza / Incrocio X (><)
+            outPan0to1 = juce::jlimit(0.0f, 1.0f, basePan0to1 + spatialS * panFanMinus1to1 * 0.5f);
+
+            float tiltOffset = 0.0f;
+            if (spatialTotal > 1 && std::abs(tiltFanMinus1to1) > 0.001f)
+            {
+                if (phaseMode.equalsIgnoreCase("OddEven"))
+                {
+                    const float alt = (spatialIndex % 2 == 0) ? 1.0f : -1.0f;
+                    tiltOffset = alt * tiltFanMinus1to1 * 0.45f;
+                }
+                else if (phaseMode.equalsIgnoreCase("LeftToRight"))
+                {
+                    tiltOffset = spatialS * tiltFanMinus1to1 * 0.45f;
+                }
+                else if (spatialTotal >= 3)
+                {
+                    // Arco / Ali simmetriche (esterni vs centro)
+                    const float arch = 2.0f * std::abs(spatialS) - 1.0f;
+                    tiltOffset = arch * tiltFanMinus1to1 * 0.45f;
+                }
+                else
+                {
+                    // Con 2 fari: disassamento verticale immediato cosi' lo slider e' sempre utile
+                    const float alt = (spatialIndex % 2 == 0) ? 1.0f : -1.0f;
+                    tiltOffset = alt * tiltFanMinus1to1 * 0.45f;
+                }
+            }
+
+            outTilt0to1 = juce::jlimit(0.0f, 1.0f, baseTilt0to1 + tiltOffset);
         }
 
         // Trasla SX e DX insieme mantenendo identica l'ampiezza (es. +-42 step per base ruotata di 90 gradi)

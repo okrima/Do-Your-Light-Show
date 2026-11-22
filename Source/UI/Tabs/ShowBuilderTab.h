@@ -91,12 +91,25 @@ public:
     void paint(juce::Graphics& g) override;
     void resized() override;
 
+    void visibilityChanged() override;
+
+    void setDmxLiveEngine(DmxLiveEngine* engine) noexcept
+    {
+        stageSimulator.setDmxLiveEngine(engine);
+    }
+
 private:
     void addNewSceneToState();
     void saveSceneAsPreset(); // NUOVO: Salva la scena selezionata nei preferiti
     void insertPresetIntoShow(); // NUOVO: Prende un preset e lo mette sulla timeline
     void saveShow();
     void loadShow();
+
+    void restoreLivePresetLibraryAfterLoad(juce::ValueTree originalLibNode, const juce::ValueTree& liveLibSnapshot);
+    int reconcileShowScenesWithPresetLibrary();
+
+    void openAiWizardDialog();
+
     void deleteSelectedScene();
     void deletePresetFromLibrary();
     void savePresetLibraryToDisk();   // Salva i preset su file locale
@@ -133,6 +146,8 @@ private:
     StemAudioEngine audioEngine;
     MiniDawTimeline miniDawTimeline;
     AIWizardPanel aiWizardPanel;
+    juce::TextButton openAiWizardBtn;
+    std::unique_ptr<juce::DialogWindow> aiWizardWindow;
     StageSimulatorView stageSimulator;
 
     std::unique_ptr<juce::FileChooser> fileChooser;

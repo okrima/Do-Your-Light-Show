@@ -156,15 +156,30 @@ FixtureEditorPanel::FixtureEditorPanel(juce::ValueTree& state) : appState(state)
     configureFieldLabel(dimmerOrOpenLabel, "DMX Luce Fissa:");
     addAndMakeVisible(dimmerOrOpenLabel);
     configureCompactSlider(dimmerOrOpenSlider, 0, 255, 1, 40);
+
     dimmerOrOpenSlider.onValueChange = [this]() {
         if (isUpdatingUI || !currentFixtureNode.isValid()) return;
-        int mode = static_cast<int>(currentFixtureNode.getProperty(StateKeys::StrobeMode, 1));
+        const int mode = static_cast<int>(currentFixtureNode.getProperty(StateKeys::StrobeMode, 1));
         int val = static_cast<int>(dimmerOrOpenSlider.getValue());
+
         if (mode == 2)
+        {
+            const int strobeLow = juce::jmin(
+                static_cast<int>(currentFixtureNode.getProperty(StateKeys::StrobeMinVal, 135)),
+                static_cast<int>(currentFixtureNode.getProperty(StateKeys::StrobeMaxVal, 239)));
+            if (strobeLow > 1 && val >= strobeLow)
+                val = strobeLow - 1;
+
             currentFixtureNode.setProperty(StateKeys::DimmerMaxVal, val, nullptr);
+            if (val != static_cast<int>(dimmerOrOpenSlider.getValue()))
+                updateUIFromNode();
+        }
         else
+        {
             currentFixtureNode.setProperty(StateKeys::StrobeOpenVal, val, nullptr);
+        }
         };
+
     addAndMakeVisible(dimmerOrOpenSlider);
 
     configureFieldLabel(strobeStartDmxLabel, "Start DMX:");
@@ -188,9 +203,22 @@ FixtureEditorPanel::FixtureEditorPanel(juce::ValueTree& state) : appState(state)
     strobeEndHzSlider.setTextValueSuffix(" Hz");
 
     strobeStartDmxSlider.onValueChange = [this]() {
-        if (currentFixtureNode.isValid() && !isUpdatingUI)
-            currentFixtureNode.setProperty(StateKeys::StrobeMinVal, static_cast<int>(strobeStartDmxSlider.getValue()), nullptr);
+        if (!currentFixtureNode.isValid() || isUpdatingUI) return;
+        const int startVal = static_cast<int>(strobeStartDmxSlider.getValue());
+        currentFixtureNode.setProperty(StateKeys::StrobeMinVal, startVal, nullptr);
+
+        const int mode = static_cast<int>(currentFixtureNode.getProperty(StateKeys::StrobeMode, 1));
+        if (mode == 2 && startVal > 1)
+        {
+            const int curMaxDim = static_cast<int>(currentFixtureNode.getProperty(StateKeys::DimmerMaxVal, 134));
+            if (curMaxDim >= startVal)
+            {
+                currentFixtureNode.setProperty(StateKeys::DimmerMaxVal, startVal - 1, nullptr);
+                updateUIFromNode();
+            }
+        }
         };
+
     strobeStartHzSlider.onValueChange = [this]() {
         if (currentFixtureNode.isValid() && !isUpdatingUI)
             currentFixtureNode.setProperty(StateKeys::StrobeMinHz, strobeStartHzSlider.getValue(), nullptr);
@@ -1460,6 +1488,20 @@ VenuePatchTab::VenuePatchTab(juce::ValueTree& state)
     removeFixtureBtn.onClick = [this] { removeSelectedFixture(); };
     addAndMakeVisible(removeFixtureBtn);
 
+    duplicateFixtureBtn.setButtonText("Duplica Faro");
+    duplicateFixtureBtn.setColour(juce::TextButton::buttonColourId, juce::Colour(0xff334155));
+    duplicateFixtureBtn.setTooltip("Clona il faro selezionato con mappatura, calibrazione e primo indirizzo DMX libero");
+    duplicateFixtureBtn.onClick = [this] { duplicateSelectedFixture(); };
+    addAndMakeVisible(duplicateFixtureBtn);
+
+    testFixtureBtn.setButtonText("Test Faro");
+    testFixtureBtn.setClickingTogglesState(true);
+    testFixtureBtn.setColour(juce::TextButton::buttonColourId, juce::Colour(0xff1e3a5f));
+    testFixtureBtn.setColour(juce::TextButton::buttonOnColourId, juce::Colour(0xfff59e0b));
+    testFixtureBtn.setTooltip("Accende al 100% bianco e centra Pan/Tilt SOLO sul faro selezionato (richiede DMX attivo in Tab 6)");
+    testFixtureBtn.onClick = [this] { updateFixtureTestOutput(); };
+    addAndMakeVisible(testFixtureBtn);
+
     loadBtn.setButtonText("Carica Venue...");
     loadBtn.setColour(juce::TextButton::buttonColourId, juce::Colour(0xff3d3d29));
     loadBtn.onClick = [this] { loadVenue(); };
@@ -1479,6 +1521,9 @@ VenuePatchTab::VenuePatchTab(juce::ValueTree& state)
 
 VenuePatchTab::~VenuePatchTab()
 {
+    if (dmxLiveEngine != nullptr)
+        dmxLiveEngine->stopFixtureTest();
+
     venueNode.removeListener(this);
 }
 
@@ -1521,6 +1566,9 @@ void VenuePatchTab::selectedRowsChanged(int lastRowSelected)
         editorPanel.setFixtureNode(venueNode.getChild(lastRowSelected));
     else
         editorPanel.setFixtureNode(juce::ValueTree());
+
+    if (testFixtureBtn.getToggleState())
+        updateFixtureTestOutput();
 }
 
 void VenuePatchTab::paint(juce::Graphics& g)
@@ -1533,7 +1581,7 @@ void VenuePatchTab::resized()
     auto bounds = getLocalBounds();
 
     auto leftPanel = bounds.removeFromLeft(juce::roundToInt(bounds.getWidth() * 0.23f));
-    auto bottomArea = leftPanel.removeFromBottom(142).reduced(8, 4);
+    auto bottomArea = leftPanel.removeFromBottom(174).reduced(8, 4);
 
     saveBtn.setBounds(bottomArea.removeFromBottom(28));
     bottomArea.removeFromBottom(4);
@@ -1541,6 +1589,13 @@ void VenuePatchTab::resized()
     bottomArea.removeFromBottom(4);
     removeFixtureBtn.setBounds(bottomArea.removeFromBottom(28));
     bottomArea.removeFromBottom(4);
+
+    auto dupTestRow = bottomArea.removeFromBottom(28);
+    const int halfW = dupTestRow.getWidth() / 2;
+    duplicateFixtureBtn.setBounds(dupTestRow.removeFromLeft(halfW).withTrimmedRight(2));
+    testFixtureBtn.setBounds(dupTestRow.withTrimmedLeft(2));
+    bottomArea.removeFromBottom(4);
+
     addFixtureBtn.setBounds(bottomArea.removeFromBottom(28));
 
     fixtureList.setBounds(leftPanel.reduced(8));
@@ -1596,6 +1651,8 @@ void VenuePatchTab::removeSelectedFixture()
         if (venueNode.getNumChildren() > 0)
             fixtureList.selectRow(juce::jmin(sel, venueNode.getNumChildren() - 1));
     }
+    if (testFixtureBtn.getToggleState())
+        updateFixtureTestOutput();
 }
 
 void VenuePatchTab::saveVenue()
@@ -1687,4 +1744,175 @@ void VenuePatchTab::valueTreeChildRemoved(juce::ValueTree& parentTree, juce::Val
 }
 
 void VenuePatchTab::valueTreeChildOrderChanged(juce::ValueTree&, int, int) { fixtureList.updateContent(); }
-void VenuePatchTab::valueTreePropertyChanged(juce::ValueTree&, const juce::Identifier&) { fixtureList.repaint(); }
+
+void VenuePatchTab::valueTreePropertyChanged(juce::ValueTree& tree, const juce::Identifier&)
+{
+    fixtureList.repaint();
+
+    if (isShowing() && testFixtureBtn.getToggleState() && tree.hasType(StateKeys::Fixture))
+    {
+        const int sel = fixtureList.getSelectedRow();
+        if (sel >= 0 && sel < venueNode.getNumChildren() && venueNode.getChild(sel) == tree)
+            updateFixtureTestOutput();
+    }
+}
+
+void VenuePatchTab::forceStopFixtureTest()
+{
+    testFixtureBtn.setToggleState(false, juce::dontSendNotification);
+    testFixtureBtn.setButtonText("Test Faro");
+
+    if (dmxLiveEngine != nullptr && dmxLiveEngine->isFixtureTestActive())
+        dmxLiveEngine->stopFixtureTest();
+}
+
+void VenuePatchTab::visibilityChanged()
+{
+    if (!isVisible() || dmxLiveEngine == nullptr)
+        return;
+
+    const bool stillTesting = dmxLiveEngine->isFixtureTestActive()
+        && dmxLiveEngine->isOutputActive();
+
+    if (!stillTesting && dmxLiveEngine->isFixtureTestActive())
+        dmxLiveEngine->stopFixtureTest();
+
+    testFixtureBtn.setToggleState(stillTesting, juce::dontSendNotification);
+    testFixtureBtn.setButtonText(stillTesting ? "STOP Test" : "Test Faro");
+}
+
+int VenuePatchTab::computeFixtureDmxFootprint(const juce::ValueTree& fix)
+{
+    int span = juce::jmax(1, static_cast<int>(fix.getProperty(StateKeys::ChannelCount, 1)));
+
+    static const char* params[] = {
+        "Dimmer", "Strobe", "Red", "Green", "Blue", "White", "UV", "Pan", "Tilt", "GeyserBlast"
+    };
+    for (const char* p : params)
+        span = juce::jmax(span, static_cast<int>(fix.getProperty(StateKeys::getMappingKey(p), 0)));
+
+    return span;
+}
+
+int VenuePatchTab::findNextFreeDmxAddress(int preferredStart, int neededChannels) const
+{
+    if (!venueNode.isValid())
+        return juce::jlimit(1, 512, preferredStart);
+
+    std::array<bool, 513> occupied{};
+    for (int i = 0; i < venueNode.getNumChildren(); ++i)
+    {
+        auto fix = venueNode.getChild(i);
+        if (!fix.hasType(StateKeys::Fixture))
+            continue;
+
+        const int start = static_cast<int>(fix.getProperty(StateKeys::StartAddress, 0));
+        if (start < 1 || start > 512)
+            continue;
+
+        const int span = computeFixtureDmxFootprint(fix);
+        for (int ch = start; ch < start + span && ch <= 512; ++ch)
+            occupied[static_cast<size_t>(ch)] = true;
+    }
+
+    auto rangeIsFree = [&](int start) -> bool
+        {
+            if (start < 1 || start + neededChannels - 1 > 512)
+                return false;
+            for (int ch = start; ch < start + neededChannels; ++ch)
+                if (occupied[static_cast<size_t>(ch)])
+                    return false;
+            return true;
+        };
+
+    for (int cand = juce::jlimit(1, 512, preferredStart); cand <= 512; ++cand)
+        if (rangeIsFree(cand))
+            return cand;
+
+    for (int cand = 1; cand < preferredStart; ++cand)
+        if (rangeIsFree(cand))
+            return cand;
+
+    return juce::jlimit(1, 512, preferredStart);
+}
+
+void VenuePatchTab::duplicateSelectedFixture()
+{
+    const int sel = fixtureList.getSelectedRow();
+    if (!venueNode.isValid() || sel < 0 || sel >= venueNode.getNumChildren())
+    {
+        juce::NativeMessageBox::showMessageBoxAsync(
+            juce::MessageBoxIconType::WarningIcon,
+            "Nessun Faro Selezionato",
+            "Seleziona prima un faro dalla lista da duplicare.");
+        return;
+    }
+
+    auto srcFix = venueNode.getChild(sel);
+    if (!srcFix.isValid())
+        return;
+
+    auto copy = srcFix.createCopy();
+
+    const int srcStart = static_cast<int>(srcFix.getProperty(StateKeys::StartAddress, 1));
+    const int footprint = computeFixtureDmxFootprint(srcFix);
+    const int nextAddr = findNextFreeDmxAddress(srcStart + footprint, footprint);
+
+    const juce::String baseName = srcFix.getProperty(StateKeys::FixtureName, "Faro").toString();
+    copy.setProperty(StateKeys::FixtureName, baseName + " (Copia)", nullptr);
+    copy.setProperty(StateKeys::StartAddress, nextAddr, nullptr);
+
+    // Sposta leggermente eventuali unita' piazzate sul palco 2D per non sovrapporle all'originale
+    for (int u = 0; u < copy.getNumChildren(); ++u)
+    {
+        auto unit = copy.getChild(u);
+        if (unit.hasType(StateKeys::FixtureUnit) &&
+            static_cast<bool>(unit.getProperty(StateKeys::IsPlaced, false)))
+        {
+            double nx = static_cast<double>(unit.getProperty(StateKeys::PosX, 0.5));
+            nx = (nx + 0.07 <= 0.95) ? (nx + 0.07) : juce::jmax(0.05, nx - 0.07);
+            unit.setProperty(StateKeys::PosX, nx, nullptr);
+        }
+    }
+
+    venueNode.addChild(copy, -1, nullptr);
+    fixtureList.updateContent();
+    fixtureList.selectRow(venueNode.getNumChildren() - 1);
+    fixtureList.repaint();
+}
+
+void VenuePatchTab::updateFixtureTestOutput()
+{
+    if (dmxLiveEngine == nullptr)
+        return;
+
+    if (!testFixtureBtn.getToggleState())
+    {
+        testFixtureBtn.setButtonText("Test Faro");
+        dmxLiveEngine->stopFixtureTest();
+        return;
+    }
+
+    const int sel = fixtureList.getSelectedRow();
+    if (!venueNode.isValid() || sel < 0 || sel >= venueNode.getNumChildren())
+    {
+        testFixtureBtn.setToggleState(false, juce::dontSendNotification);
+        testFixtureBtn.setButtonText("Test Faro");
+        dmxLiveEngine->stopFixtureTest();
+        return;
+    }
+
+    if (!dmxLiveEngine->isOutputActive())
+    {
+        testFixtureBtn.setToggleState(false, juce::dontSendNotification);
+        testFixtureBtn.setButtonText("Test Faro");
+        juce::NativeMessageBox::showMessageBoxAsync(
+            juce::MessageBoxIconType::WarningIcon,
+            "DMX Non Attivo",
+            "Vai in Tab 6 (DMX Live), seleziona la porta COM dell'Eurolite e premi 'Avvia Uscita DMX' prima di testare il faro.");
+        return;
+    }
+
+    testFixtureBtn.setButtonText("STOP Test");
+    dmxLiveEngine->startFixtureTest(venueNode.getChild(sel));
+}
