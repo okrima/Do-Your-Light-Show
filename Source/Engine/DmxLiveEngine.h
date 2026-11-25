@@ -44,7 +44,9 @@ public:
 
     void stopOutput(bool sendFinalBlackout = true)
     {
+        clearAllOutput();
         outputManager.stopOutput(sendFinalBlackout);
+        clearAllOutput();
     }
 
     bool isOutputActive() const noexcept { return outputManager.isOutputActive(); }
@@ -93,94 +95,15 @@ public:
         if (fixtureTestActive.load() || manualTestActive.load())
             return;
 
-        if (isStandalonePreview && !tab2LivePreviewEnabled.load())
+        if (isStandalonePreview && (!tab2LivePreviewEnabled.load() || showPlaybackActive.load()))
             return;
 
         auto venueNode = appState.getChildWithName(StateKeys::VenueNode);
         if (!venueNode.isValid())
             return;
 
-        struct LiveFixture
-        {
-            juce::String roleName;
-            StageRoleCatalog::Category category = StageRoleCatalog::Category::AirWashBack;
-            int startAddress = 1;
-            float normX = 0.5f;
-            int roleSpatialIndex = 0;
-            int roleSpatialTotal = 1;
-            StageRoleCatalog::StrobeHardwareSpec strobeSpec;
-            StageRoleCatalog::PanTiltHardwareSpec panTiltSpec;
-
-            int dimOffset = 0, strOffset = 0;
-            int redOffset = 0, greenOffset = 0, blueOffset = 0, whiteOffset = 0, uvOffset = 0;
-            int panOffset = 0, tiltOffset = 0, geyserOffset = 0;
-        };
-
-        std::vector<LiveFixture> fixtures;
-        for (int f = 0; f < venueNode.getNumChildren(); ++f)
-        {
-            auto fix = venueNode.getChild(f);
-            if (!fix.hasType(StateKeys::Fixture)) continue;
-
-            const int startAddr = static_cast<int>(fix.getProperty(StateKeys::StartAddress, -1));
-            if (startAddr <= 0) continue;
-
-            LiveFixture rf;
-            rf.startAddress = startAddr;
-            const juce::String fName = fix.getProperty(StateKeys::FixtureName, "Faro").toString();
-            rf.roleName = fix.getProperty(StateKeys::RoleName, "").toString().trim();
-            if (rf.roleName.isEmpty()) rf.roleName = fName;
-            rf.category = StageRoleCatalog::classifyRole(rf.roleName, fName);
-            rf.strobeSpec = StageRoleCatalog::StrobeHardwareSpec::fromFixtureNode(fix);
-            rf.panTiltSpec = StageRoleCatalog::PanTiltHardwareSpec::fromFixtureNode(fix);
-
-            rf.dimOffset = static_cast<int>(fix.getProperty(StateKeys::getMappingKey("Dimmer"), 0));
-            rf.strOffset = static_cast<int>(fix.getProperty(StateKeys::getMappingKey("Strobe"), 0));
-            rf.redOffset = static_cast<int>(fix.getProperty(StateKeys::getMappingKey("Red"), 0));
-            rf.greenOffset = static_cast<int>(fix.getProperty(StateKeys::getMappingKey("Green"), 0));
-            rf.blueOffset = static_cast<int>(fix.getProperty(StateKeys::getMappingKey("Blue"), 0));
-            rf.whiteOffset = static_cast<int>(fix.getProperty(StateKeys::getMappingKey("White"), 0));
-            rf.uvOffset = static_cast<int>(fix.getProperty(StateKeys::getMappingKey("UV"), 0));
-            rf.geyserOffset = static_cast<int>(fix.getProperty(StateKeys::getMappingKey("GeyserBlast"), 0));
-
-            const int rawPanOff = static_cast<int>(fix.getProperty(StateKeys::getMappingKey("Pan"), 0));
-            const int rawTiltOff = static_cast<int>(fix.getProperty(StateKeys::getMappingKey("Tilt"), 0));
-            rf.panOffset = rf.panTiltSpec.isSwapped() ? rawTiltOff : rawPanOff;
-            rf.tiltOffset = rf.panTiltSpec.isSwapped() ? rawPanOff : rawTiltOff;
-
-            double sumX = 0.0;
-            int placedCount = 0;
-            for (int u = 0; u < fix.getNumChildren(); ++u)
-            {
-                auto unit = fix.getChild(u);
-                if (unit.hasType(StateKeys::FixtureUnit) &&
-                    static_cast<bool>(unit.getProperty(StateKeys::IsPlaced, false)))
-                {
-                    sumX += static_cast<double>(unit.getProperty(StateKeys::PosX, 0.5));
-                    ++placedCount;
-                }
-            }
-            rf.normX = (placedCount > 0) ? static_cast<float>(sumX / static_cast<double>(placedCount)) : 0.5f;
-            fixtures.push_back(rf);
-        }
-
-        std::sort(fixtures.begin(), fixtures.end(),
-            [](const LiveFixture& a, const LiveFixture& b) { return a.normX < b.normX; });
-
-        std::map<juce::String, std::vector<int>> roleUniqueAddresses;
-        for (const auto& rf : fixtures)
-        {
-            auto& addrList = roleUniqueAddresses[rf.roleName];
-            if (std::find(addrList.begin(), addrList.end(), rf.startAddress) == addrList.end())
-                addrList.push_back(rf.startAddress);
-        }
-        for (auto& rf : fixtures)
-        {
-            const auto& addrList = roleUniqueAddresses[rf.roleName];
-            auto it = std::find(addrList.begin(), addrList.end(), rf.startAddress);
-            rf.roleSpatialIndex = static_cast<int>(std::distance(addrList.begin(), it));
-            rf.roleSpatialTotal = juce::jmax(1, static_cast<int>(addrList.size()));
-        }
+        ensureFixtureCacheFresh(venueNode);
+        const auto& fixtures = cachedFixtures;
 
         const double barLenQ = juce::jmax(0.25, pos.barLengthQ);
         const bool allowCourtesy = isStandalonePreview && standaloneCourtesyDimmer.load();
@@ -681,6 +604,9 @@ public:
         return tab2LivePreviewEnabled.load();
     }
 
+    void setShowPlaybackActive(bool active) noexcept { showPlaybackActive.store(active); }
+    bool isShowPlaybackActive() const noexcept { return showPlaybackActive.load(); }
+
     // Azzera in sicurezza tutti i 512 canali e disattiva eventuali test attivi
     void clearAllOutput()
     {
@@ -691,10 +617,36 @@ public:
         rawFrame.fill(0);
         channelRole.fill(ChannelRole::Other);
         channelParam.fill(0);
+        monitorPeakSinceRead.fill(0);
         pushProcessedFrameLocked();
     }
 
+    void consumeMonitorSnapshot(std::array<uint8_t, 512>& outCurrent,
+        std::array<uint8_t, 512>& outPeakSinceLastRead)
+    {
+        const juce::ScopedLock sl(stateLock);
+        outCurrent = lastSentFrame;
+        outPeakSinceLastRead = monitorPeakSinceRead;
+        monitorPeakSinceRead = lastSentFrame;
+    }
+
 private:
+    struct LiveFixture
+    {
+        juce::String roleName;
+        StageRoleCatalog::Category category = StageRoleCatalog::Category::AirWashBack;
+        int startAddress = 1;
+        float normX = 0.5f;
+        int roleSpatialIndex = 0;
+        int roleSpatialTotal = 1;
+        StageRoleCatalog::StrobeHardwareSpec strobeSpec;
+        StageRoleCatalog::PanTiltHardwareSpec panTiltSpec;
+
+        int dimOffset = 0, strOffset = 0;
+        int redOffset = 0, greenOffset = 0, blueOffset = 0, whiteOffset = 0, uvOffset = 0;
+        int panOffset = 0, tiltOffset = 0, geyserOffset = 0;
+    };
+
     enum class ChannelRole : uint8_t
     {
         Other = 0,          // RGB, Pan, Tilt (non toccati da Master Dimmer / Blackout)
@@ -758,6 +710,13 @@ private:
         }
 
         outputManager.getUniverseBuffer().writeUniverse(out);
+
+        lastSentFrame = out;
+        for (size_t i = 0; i < 512; ++i)
+        {
+            if (out[i] > monitorPeakSinceRead[i])
+                monitorPeakSinceRead[i] = out[i];
+        }
     }
 
     static bool isCommandAllowedBySceneMask(const juce::ValueTree& sceneNode,
@@ -792,6 +751,106 @@ private:
         return true;
     }
 
+    void ensureFixtureCacheFresh(const juce::ValueTree& venueNode)
+    {
+        const double nowMs = juce::Time::getMillisecondCounterHiRes();
+        const int childCount = venueNode.getNumChildren();
+
+        if (!cachedFixtures.empty()
+            && childCount == cachedVenueChildCount
+            && (nowMs - lastFixtureCacheMs) < 250.0)
+        {
+            return;
+        }
+
+        // Identificatori pre-calcolati una sola volta (zero allocazioni stringa)
+        static const juce::Identifier kDimKey = StateKeys::getMappingKey("Dimmer");
+        static const juce::Identifier kStrKey = StateKeys::getMappingKey("Strobe");
+        static const juce::Identifier kRedKey = StateKeys::getMappingKey("Red");
+        static const juce::Identifier kGreenKey = StateKeys::getMappingKey("Green");
+        static const juce::Identifier kBlueKey = StateKeys::getMappingKey("Blue");
+        static const juce::Identifier kWhiteKey = StateKeys::getMappingKey("White");
+        static const juce::Identifier kUvKey = StateKeys::getMappingKey("UV");
+        static const juce::Identifier kGeyserKey = StateKeys::getMappingKey("GeyserBlast");
+        static const juce::Identifier kPanKey = StateKeys::getMappingKey("Pan");
+        static const juce::Identifier kTiltKey = StateKeys::getMappingKey("Tilt");
+
+        cachedFixtures.clear();
+        cachedFixtures.reserve(static_cast<size_t>(juce::jmax(1, childCount)));
+
+        for (int f = 0; f < childCount; ++f)
+        {
+            auto fix = venueNode.getChild(f);
+            if (!fix.hasType(StateKeys::Fixture)) continue;
+
+            const int startAddr = static_cast<int>(fix.getProperty(StateKeys::StartAddress, -1));
+            if (startAddr <= 0) continue;
+
+            LiveFixture rf;
+            rf.startAddress = startAddr;
+            const juce::String fName = fix.getProperty(StateKeys::FixtureName, "Faro").toString();
+            rf.roleName = fix.getProperty(StateKeys::RoleName, "").toString().trim();
+            if (rf.roleName.isEmpty()) rf.roleName = fName;
+            rf.category = StageRoleCatalog::classifyRole(rf.roleName, fName);
+            rf.strobeSpec = StageRoleCatalog::StrobeHardwareSpec::fromFixtureNode(fix);
+            rf.panTiltSpec = StageRoleCatalog::PanTiltHardwareSpec::fromFixtureNode(fix);
+
+            rf.dimOffset = static_cast<int>(fix.getProperty(kDimKey, 0));
+            rf.strOffset = static_cast<int>(fix.getProperty(kStrKey, 0));
+            rf.redOffset = static_cast<int>(fix.getProperty(kRedKey, 0));
+            rf.greenOffset = static_cast<int>(fix.getProperty(kGreenKey, 0));
+            rf.blueOffset = static_cast<int>(fix.getProperty(kBlueKey, 0));
+            rf.whiteOffset = static_cast<int>(fix.getProperty(kWhiteKey, 0));
+            rf.uvOffset = static_cast<int>(fix.getProperty(kUvKey, 0));
+            rf.geyserOffset = static_cast<int>(fix.getProperty(kGeyserKey, 0));
+
+            const int rawPanOff = static_cast<int>(fix.getProperty(kPanKey, 0));
+            const int rawTiltOff = static_cast<int>(fix.getProperty(kTiltKey, 0));
+            rf.panOffset = rf.panTiltSpec.isSwapped() ? rawTiltOff : rawPanOff;
+            rf.tiltOffset = rf.panTiltSpec.isSwapped() ? rawPanOff : rawTiltOff;
+
+            double sumX = 0.0;
+            int placedCount = 0;
+            for (int u = 0; u < fix.getNumChildren(); ++u)
+            {
+                auto unit = fix.getChild(u);
+                if (unit.hasType(StateKeys::FixtureUnit) &&
+                    static_cast<bool>(unit.getProperty(StateKeys::IsPlaced, false)))
+                {
+                    sumX += static_cast<double>(unit.getProperty(StateKeys::PosX, 0.5));
+                    ++placedCount;
+                }
+            }
+            rf.normX = (placedCount > 0) ? static_cast<float>(sumX / static_cast<double>(placedCount)) : 0.5f;
+            cachedFixtures.push_back(rf);
+        }
+
+        std::sort(cachedFixtures.begin(), cachedFixtures.end(),
+            [](const LiveFixture& a, const LiveFixture& b) { return a.normX < b.normX; });
+
+        std::map<juce::String, std::vector<int>> roleUniqueAddresses;
+        for (const auto& rf : cachedFixtures)
+        {
+            auto& addrList = roleUniqueAddresses[rf.roleName];
+            if (std::find(addrList.begin(), addrList.end(), rf.startAddress) == addrList.end())
+                addrList.push_back(rf.startAddress);
+        }
+        for (auto& rf : cachedFixtures)
+        {
+            const auto& addrList = roleUniqueAddresses[rf.roleName];
+            auto it = std::find(addrList.begin(), addrList.end(), rf.startAddress);
+            rf.roleSpatialIndex = static_cast<int>(std::distance(addrList.begin(), it));
+            rf.roleSpatialTotal = juce::jmax(1, static_cast<int>(addrList.size()));
+        }
+
+        cachedVenueChildCount = childCount;
+        lastFixtureCacheMs = nowMs;
+    }
+
+    std::vector<LiveFixture> cachedFixtures;
+    int cachedVenueChildCount = -1;
+    double lastFixtureCacheMs = 0.0;
+
     DmxOutputManager outputManager;
     std::atomic<float> masterDimmer{ 1.0f };
     std::atomic<bool> blackoutActive{ false };
@@ -801,9 +860,12 @@ private:
     std::array<uint8_t, 512> rawFrame{};
     std::array<ChannelRole, 512> channelRole{};
     std::array<uint8_t, 512> channelParam{};
+    std::array<uint8_t, 512> lastSentFrame{};
+    std::array<uint8_t, 512> monitorPeakSinceRead{};
     std::map<int, uint8_t> lastPanTiltByChannel;
 
     std::atomic<bool> fixtureTestActive{ false };
     std::atomic<bool> manualTestActive{ false };
     std::atomic<bool> tab2LivePreviewEnabled{ false };
+    std::atomic<bool> showPlaybackActive{ false };
 };

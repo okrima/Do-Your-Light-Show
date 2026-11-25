@@ -27,6 +27,8 @@ public:
             dmxLiveEngine->stopFixtureTest();
     }
 
+    void setAllowBackgroundDmx(bool allow) noexcept { allowBackgroundDmx = allow; }
+
     // 1. Costruttore Timeline (usato in ShowBuilderTab)
     StageSimulatorView(juce::ValueTree& state,
         StemAudioEngine& engine,
@@ -157,12 +159,11 @@ public:
         drawHeaderHud(g, bounds.withHeight(26.0f));
 
         auto stageRect = getStageRect();
-        drawStageBackdrop(g, stageRect);
-
         const float trussY = stageRect.getY() + stageRect.getHeight() * 0.14f;
         const float floorY = stageRect.getY() + stageRect.getHeight() * 0.84f;
 
         drawTrussAndFloorStructure(g, stageRect, trussY, floorY);
+
         drawDragZoneGuide(g, stageRect);
 
         std::vector<VisualFixture> fixtures = buildVisualFixtures(stageRect, trussY, floorY);
@@ -348,6 +349,9 @@ private:
     BeatTimeMap::MusicalPosition currentMusicalPos;
     DmxLiveEngine* dmxLiveEngine = nullptr;
     bool wasTab3PlayingDmx = false;
+    double lastRawAudioSec = -1.0;
+    double smoothAudioTimeSec = 0.0;
+    bool wasAudioPlaying = false;
 
     juce::Rectangle<float> getStageRect() const
     {
@@ -491,6 +495,8 @@ private:
         float uv = -1.0f;
         float strobe = 0.0f;
         float strobeTargetHz = 0.0f; // > 0 quando lo strobo hardware e' sincronizzato al BPM
+        double strobeHitsPerQuarter = 0.0;
+        double strobePhaseOffset = 0.0;
         bool hasPanCmd = false;
         bool hasTiltCmd = false;
         float panCmd = 0.5f;
@@ -583,7 +589,43 @@ private:
         }
         else if (audioEngine != nullptr && beatTimeMap != nullptr)
         {
-            currentTimeSec = audioEngine->getCurrentPositionSeconds();
+            const double rawSec = audioEngine->getCurrentPositionSeconds();
+            const bool isPlayingNow = audioEngine->isPlaying();
+
+            if (!isPlayingNow)
+            {
+                smoothAudioTimeSec = rawSec;
+                lastRawAudioSec = rawSec;
+                wasAudioPlaying = false;
+            }
+            else if (!wasAudioPlaying || lastRawAudioSec < 0.0)
+            {
+                smoothAudioTimeSec = rawSec;
+                lastRawAudioSec = rawSec;
+                wasAudioPlaying = true;
+            }
+            else
+            {
+                const double prevSmooth = smoothAudioTimeSec;
+                smoothAudioTimeSec += dtSec;
+
+                if (std::abs(rawSec - lastRawAudioSec) > 1e-6)
+                {
+                    lastRawAudioSec = rawSec;
+                    const double drift = rawSec - smoothAudioTimeSec;
+
+                    if (std::abs(drift) > 0.15)
+                        smoothAudioTimeSec = rawSec; // Seek manuale / tasto W / Home
+                    else
+                        smoothAudioTimeSec = juce::jmax(prevSmooth, smoothAudioTimeSec + drift * 0.20);
+                }
+                else if (smoothAudioTimeSec - rawSec > 0.12)
+                {
+                    smoothAudioTimeSec = rawSec + 0.12;
+                }
+            }
+
+            currentTimeSec = juce::jmax(0.0, smoothAudioTimeSec);
             currentMusicalPos = beatTimeMap->secondsToMusicalPosition(currentTimeSec);
             currentBeat = currentMusicalPos.totalQuarters;
             selectActiveTimelineScenes(currentBeat);
@@ -592,27 +634,33 @@ private:
         updateFogFromActiveScenes(dtSec);
         if (dmxLiveEngine != nullptr && dmxLiveEngine->isOutputActive())
         {
-            if (!isShowing())
+            if (standalonePreviewMode)
             {
-                wasTab3PlayingDmx = false;
-            }
-            else
-            {
-                const bool shouldSendDmx = standalonePreviewMode || audioEngine->isPlaying();
-
-                if (shouldSendDmx)
+                if ((isShowing() || allowBackgroundDmx) && !dmxLiveEngine->isShowPlaybackActive())
                 {
-                    if (!standalonePreviewMode)
-                        wasTab3PlayingDmx = true;
-
                     std::vector<DmxLiveEngine::LiveSceneInput> liveInputs;
-                    if (!standalonePreviewMode || !oneShotFinished)
+                    if (!oneShotFinished)
                     {
                         liveInputs.reserve(activeScenes.size());
                         for (const auto& entry : activeScenes)
                             liveInputs.push_back({ entry.node, entry.startBeat, entry.durationBeats, entry.progress });
                     }
-                    dmxLiveEngine->renderLiveFrame(appState, liveInputs, currentBeat, currentMusicalPos, standalonePreviewMode);
+                    dmxLiveEngine->renderLiveFrame(appState, liveInputs, currentBeat, currentMusicalPos, true);
+                }
+            }
+            else
+            {
+                const bool isPlayingShow = (audioEngine != nullptr && audioEngine->isPlaying());
+                dmxLiveEngine->setShowPlaybackActive(isPlayingShow);
+
+                if (isPlayingShow)
+                {
+                    wasTab3PlayingDmx = true;
+                    std::vector<DmxLiveEngine::LiveSceneInput> liveInputs;
+                    liveInputs.reserve(activeScenes.size());
+                    for (const auto& entry : activeScenes)
+                        liveInputs.push_back({ entry.node, entry.startBeat, entry.durationBeats, entry.progress });
+                    dmxLiveEngine->renderLiveFrame(appState, liveInputs, currentBeat, currentMusicalPos, false);
                 }
                 else if (wasTab3PlayingDmx)
                 {
@@ -621,7 +669,13 @@ private:
                 }
             }
         }
-        repaint();
+        else if (!standalonePreviewMode && dmxLiveEngine != nullptr)
+        {
+            dmxLiveEngine->setShowPlaybackActive(false);
+        }
+
+        if (isShowing())
+            repaint();
     }
 
     void updateStandalonePreviewClock(double dtSec)
@@ -997,6 +1051,8 @@ private:
                     vf.state.dimmer = 1.0f;
                     vf.state.strobe = 1.0f;
                     vf.state.strobeTargetHz = static_cast<float>((activeBpm / 60.0) * localStrobeHitsPerQ);
+                    vf.state.strobeHitsPerQuarter = localStrobeHitsPerQ;
+                    vf.state.strobePhaseOffset = phaseOffsetCycles;
                     vf.state.blockedByStrobePolicy = false;
                 }
                 else if (vf.strobeSpec.mode == 3)
@@ -1039,10 +1095,12 @@ private:
         }
 
         // Shutter hardware calibrato in Hz reali del singolo faro
-        applyHardwareStrobeToFixture(vf, currentTimeSec);
+        applyHardwareStrobeToFixture(vf, currentTimeSec, currentMusicalPos);
     }
 
-    static void applyHardwareStrobeToFixture(VisualFixture& vf, double simTimeSec)
+    static void applyHardwareStrobeToFixture(VisualFixture& vf,
+        double simTimeSec,
+        const BeatTimeMap::MusicalPosition& musicalPos)
     {
         if (vf.strobeSpec.mode != 1 && vf.strobeSpec.mode != 2)
             return;
@@ -1053,24 +1111,38 @@ private:
         if (vf.strobeSpec.mode == 1 && vf.state.dimmer <= 0.01f)
             return;
 
-        float rawHz = 0.0f;
-        if (vf.state.strobeTargetHz > 0.01f)
+        bool isFlashOn = false;
+
+        if (vf.state.strobeHitsPerQuarter > 0.01
+            && vf.state.strobeTargetHz <= vf.strobeSpec.maxHz + 0.15f)
         {
-            // Converte Hz -> DMX del faro -> Hz reali (rispetta il tetto hardware minHz..maxHz del faro!)
-            int dmxVal = vf.strobeSpec.hzToDmx(vf.state.strobeTargetHz);
-            rawHz = vf.strobeSpec.dmxToHz(dmxVal);
+            // Sincronia perfetta sul battere musicale identica ai fari Dimmer Flash (mode 0)
+            double subBeat = std::fmod(juce::jmax(0.0, musicalPos.beatInBarQ) * vf.state.strobeHitsPerQuarter
+                + vf.state.strobePhaseOffset, 1.0);
+            if (subBeat < 0.0) subBeat += 1.0;
+            isFlashOn = (subBeat < 0.45);
         }
         else
         {
-            rawHz = vf.strobeSpec.minHz + vf.state.strobe * (vf.strobeSpec.maxHz - vf.strobeSpec.minHz);
+            float rawHz = 0.0f;
+            if (vf.state.strobeTargetHz > 0.01f)
+            {
+                const int dmxVal = vf.strobeSpec.hzToDmx(vf.state.strobeTargetHz);
+                rawHz = vf.strobeSpec.dmxToHz(dmxVal);
+            }
+            else
+            {
+                rawHz = vf.strobeSpec.minHz + vf.state.strobe * (vf.strobeSpec.maxHz - vf.strobeSpec.minHz);
+            }
+
+            if (rawHz <= 0.05f)
+                return;
+
+            const float simHz = juce::jlimit(0.5f, 25.0f, rawHz);
+            double phase = std::fmod(simTimeSec * static_cast<double>(simHz) + vf.state.strobePhaseOffset, 1.0);
+            if (phase < 0.0) phase += 1.0;
+            isFlashOn = (phase < 0.45);
         }
-
-        if (rawHz <= 0.05f)
-            return;
-
-        float simHz = juce::jlimit(0.5f, 25.0f, rawHz);
-        double phase = std::fmod(simTimeSec * static_cast<double>(simHz), 1.0);
-        const bool isFlashOn = (phase < 0.25);
 
         if (vf.strobeSpec.mode == 1)
         {
@@ -1232,6 +1304,27 @@ private:
     void drawStageBackdrop(juce::Graphics& g, const juce::Rectangle<float>& stageRect)
     {
         StageArtworkHelper::drawStageBackdrop(g, stageRect);
+    }
+
+    void drawCachedStageBackground(juce::Graphics& g,
+        const juce::Rectangle<float>& stageRect,
+        float trussY,
+        float floorY)
+    {
+        const int targetW = juce::jmax(1, getWidth());
+        const int targetH = juce::jmax(1, getHeight());
+
+        if (!cachedBackdrop.isValid()
+            || cachedBackdrop.getWidth() != targetW
+            || cachedBackdrop.getHeight() != targetH)
+        {
+            cachedBackdrop = juce::Image(juce::Image::ARGB, targetW, targetH, true);
+            juce::Graphics bg(cachedBackdrop);
+            drawStageBackdrop(bg, stageRect);
+            drawTrussAndFloorStructure(bg, stageRect, trussY, floorY);
+        }
+
+        g.drawImageAt(cachedBackdrop, 0, 0);
     }
 
     void drawTrussAndFloorStructure(juce::Graphics& g,
@@ -1757,4 +1850,7 @@ private:
     juce::ValueTree draggedUnitNode;
     StageRoleCatalog::Category draggedCategory = StageRoleCatalog::Category::AirWashBack;
     juce::String draggedUnitLabel;
+
+    bool allowBackgroundDmx = false;
+    juce::Image cachedBackdrop;
 };

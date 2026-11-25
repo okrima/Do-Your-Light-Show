@@ -34,9 +34,9 @@
         {
           "nodeType": "FIXTURE_UNIT",
           "unitIndex": 1,
-          "isPlaced": false,
-          "posX": 0.5,
-          "posY": 0.12
+          "isPlaced": true,
+          "posX": 0.761421322822571,
+          "posY": 0.831670820713043
         }
       ]
     },
@@ -73,9 +73,157 @@
         {
           "nodeType": "FIXTURE_UNIT",
           "unitIndex": 1,
-          "isPlaced": false,
-          "posX": 0.5,
-          "posY": 0.12
+          "isPlaced": true,
+          "posX": 0.620558381080627,
+          "posY": 0.8329176902771
+        }
+      ]
+    },
+    {
+      "nodeType": "FIXTURE",
+      "name": "Wash Andrea",
+      "quantity": 1,
+      "startAddress": 19,
+      "channelCount": 9,
+      "role": "Terra: Controluce / Sotto-Batteria",
+      "map_Dimmer": 3,
+      "map_Red": 4,
+      "map_Green": 5,
+      "map_Blue": 6,
+      "strobeMode": 2,
+      "dimmerMaxVal": 134,
+      "strobeOpenVal": 0,
+      "strobeMinVal": 135,
+      "strobeMinHz": 0.5,
+      "strobeMaxVal": 239,
+      "strobeMaxHz": 40.0,
+      "panMin": 85,
+      "panMax": 170,
+      "tiltMin": 128,
+      "tiltMax": 195,
+      "swapPanTilt": false,
+      "invertPan": false,
+      "invertTilt": false,
+      "map_Pan": 1,
+      "map_Tilt": 2,
+      "map_White": 7,
+      "map_Strobe": 3,
+      "children": [
+        {
+          "nodeType": "FIXTURE_UNIT",
+          "unitIndex": 1,
+          "isPlaced": true,
+          "posX": 0.376903563737869,
+          "posY": 0.831670820713043
+        }
+      ]
+    },
+    {
+      "nodeType": "FIXTURE",
+      "name": "Wash Mirko",
+      "quantity": 1,
+      "startAddress": 28,
+      "channelCount": 9,
+      "role": "Terra: Controluce / Sotto-Batteria",
+      "map_Dimmer": 3,
+      "map_Red": 4,
+      "map_Green": 5,
+      "map_Blue": 6,
+      "strobeMode": 2,
+      "dimmerMaxVal": 134,
+      "strobeOpenVal": 0,
+      "strobeMinVal": 135,
+      "strobeMinHz": 0.5,
+      "strobeMaxVal": 239,
+      "strobeMaxHz": 40.0,
+      "panMin": 85,
+      "panMax": 170,
+      "tiltMin": 128,
+      "tiltMax": 195,
+      "swapPanTilt": false,
+      "invertPan": false,
+      "invertTilt": false,
+      "map_Pan": 1,
+      "map_Tilt": 2,
+      "map_White": 7,
+      "map_Strobe": 3,
+      "children": [
+        {
+          "nodeType": "FIXTURE_UNIT",
+          "unitIndex": 1,
+          "isPlaced": true,
+          "posX": 0.244923859834671,
+          "posY": 0.831670820713043
+        }
+      ]
+    },
+    {
+      "nodeType": "FIXTURE",
+      "name": "Barra dietro Batteria",
+      "quantity": 1,
+      "startAddress": 41,
+      "channelCount": 4,
+      "role": "Terra: Controluce / Sotto-Batteria",
+      "map_Dimmer": 4,
+      "map_Red": 1,
+      "map_Green": 2,
+      "map_Blue": 3,
+      "strobeMode": 0,
+      "dimmerMaxVal": 255,
+      "strobeOpenVal": 0,
+      "strobeMinVal": 20,
+      "strobeMinHz": 1.0,
+      "strobeMaxVal": 245,
+      "strobeMaxHz": 20.0,
+      "panMin": 85,
+      "panMax": 170,
+      "tiltMin": 128,
+      "tiltMax": 195,
+      "swapPanTilt": false,
+      "invertPan": false,
+      "invertTilt": false,
+      "children": [
+        {
+          "nodeType": "FIXTURE_UNIT",
+          "unitIndex": 1,
+          "isPlaced": true,
+          "posX": 0.497461915016174,
+          "posY": 0.789276778697968
+        }
+      ]
+    },
+    {
+      "nodeType": "FIXTURE",
+      "name": "Barra davanti Batteria",
+      "quantity": 1,
+      "startAddress": 45,
+      "channelCount": 4,
+      "role": "Terra: Controluce / Sotto-Batteria",
+      "map_Dimmer": 4,
+      "map_Red": 1,
+      "map_Green": 2,
+      "map_Blue": 3,
+      "strobeMode": 0,
+      "dimmerMaxVal": 255,
+      "strobeOpenVal": 0,
+      "strobeMinVal": 20,
+      "strobeMinHz": 1.0,
+      "strobeMaxVal": 245,
+      "strobeMaxHz": 20.0,
+      "panMin": 85,
+      "panMax": 170,
+      "tiltMin": 128,
+      "tiltMax": 195,
+      "swapPanTilt": false,
+      "invertPan": false,
+      "invertTilt": false,
+      "children": [
+        {
+          "nodeType": "FIXTURE_UNIT",
+          "unitIndex": 1,
+          "isPlaced": true,
+          "posX": 0.498730957508087,
+          "posY": 0.849127173423767
         }
       ]
     }

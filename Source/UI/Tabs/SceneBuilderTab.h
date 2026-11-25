@@ -73,7 +73,6 @@ public:
     {
         cancelPendingUpdate();
         presetLibNode.removeListener(this);
-        savePresetLibraryToDefaultDisk();
     }
 
     void visibilityChanged() override
@@ -85,6 +84,11 @@ public:
     void setDmxLiveEngine(DmxLiveEngine* engine) noexcept
     {
         previewSimulator.setDmxLiveEngine(engine);
+    }
+
+    void setAllowBackgroundDmx(bool allow) noexcept
+    {
+        previewSimulator.setAllowBackgroundDmx(allow);
     }
 
     // --- ListBoxModel ---
@@ -228,6 +232,41 @@ public:
 
         right.removeFromTop(4);
         previewSimulator.setBounds(right);
+    }
+
+    std::function<void()> onPresetLibraryClean;
+
+    bool savePresetLibraryForExit()
+    {
+        savePresetLibraryToDefaultDisk();
+        if (onPresetLibraryClean)
+            onPresetLibraryClean();
+        return true;
+    }
+
+    void refreshAfterUndoRedo()
+    {
+        cancelPendingUpdate();
+        pendingSyncPreset = juce::ValueTree();
+        pendingSyncDuration = false;
+
+        juce::ScopedValueSetter<bool> suppressGuard(isSuppressingShowSync, true);
+
+        const int prevRow = presetList.getSelectedRow();
+        rebuildFilteredList();
+
+        if (!filteredPresets.empty())
+        {
+            const int targetRow = juce::jlimit(0, static_cast<int>(filteredPresets.size()) - 1,
+                prevRow < 0 ? 0 : prevRow);
+            presetList.selectRow(targetRow);
+            selectPresetNode(filteredPresets[static_cast<size_t>(targetRow)]);
+        }
+        else
+        {
+            presetList.deselectAllRows();
+            selectPresetNode(juce::ValueTree());
+        }
     }
 
 private:
@@ -543,7 +582,7 @@ private:
         }
     }
 
-    void handleAsyncUpdate() override
+void handleAsyncUpdate() override
     {
         if (!pendingSyncPreset.isValid())
             return;
@@ -565,7 +604,6 @@ private:
         }
 
         syncLinkedScenesInShow(presetToSync, syncDur, fallbackName);
-        savePresetLibraryToDefaultDisk();
 
         if (presetToSync == currentPreset)
             selectedPresetLastSyncedName = currentName;
@@ -1880,6 +1918,9 @@ private:
         dir.createDirectory();
         if (auto xml = presetLibNode.createXml())
             xml->writeTo(dir.getChildFile("preset_library.xml"));
+
+        if (onPresetLibraryClean)
+            onPresetLibraryClean();
     }
 
     int populateStarterPresets(bool onlyAddMissing = false)
@@ -2279,13 +2320,21 @@ private:
             FileProgressRunner::runBackground(
                 "Salvataggio Libreria Preset",
                 "Preparazione libreria (" + juce::String(count) + " preset)...",
-                [snapshot, file](std::function<void(double, const juce::String&)> report) -> bool {
+                [safeThis, snapshot, file](std::function<void(double, const juce::String&)> report) -> bool {
                     report(0.25, "Serializzazione XML...");
                     auto xml = snapshot.createXml();
                     if (xml == nullptr) return false;
 
                     report(0.70, "Scrittura su disco: " + file.getFileName() + "...");
-                    return xml->writeTo(file);
+                    const bool ok = xml->writeTo(file);
+                    if (ok)
+                    {
+                        juce::MessageManager::callAsync([safeThis]() {
+                            if (safeThis != nullptr)
+                                safeThis->savePresetLibraryToDefaultDisk();
+                            });
+                    }
+                    return ok;
                 },
                 "Salvataggio Completato",
                 "Libreria '" + file.getFileName() + "' salvata correttamente (" + juce::String(count) + " preset).",

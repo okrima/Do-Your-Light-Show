@@ -98,6 +98,11 @@ public:
         stageSimulator.setDmxLiveEngine(engine);
     }
 
+    std::function<void()> onShowClean;
+    void saveShowForExitAsync(std::function<void(bool saved)> onComplete);
+
+    void refreshAfterUndoRedo(bool beatOrAudioChanged);
+
 private:
     void addNewSceneToState();
     void saveSceneAsPreset(); // NUOVO: Salva la scena selezionata nei preferiti
@@ -152,6 +157,8 @@ private:
 
     std::unique_ptr<juce::FileChooser> fileChooser;
     std::unique_ptr<AudioAnalysisEngine::AnalysisJob> analysisJob;
+
+    juce::File currentShowFile;
 
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(ShowBuilderTab)

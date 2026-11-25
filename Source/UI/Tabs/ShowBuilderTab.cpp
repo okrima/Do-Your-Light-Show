@@ -303,9 +303,16 @@ SceneEditorPanel::SceneEditorPanel(juce::ValueTree& state) : appState(state)
     setVisible(false);
 }
 
-SceneEditorPanel::~SceneEditorPanel() {
+SceneEditorPanel::~SceneEditorPanel()
+{
     if (currentSceneNode.isValid()) currentSceneNode.removeListener(this);
-    appState.getChildWithName(StateKeys::VenueNode).removeListener(this);
+    auto venueNode = appState.getChildWithName(StateKeys::VenueNode);
+    if (venueNode.isValid())
+    {
+        for (auto fix : venueNode)
+            fix.removeListener(this);
+        venueNode.removeListener(this);
+    }
 }
 
 void SceneEditorPanel::refreshRoleList()
@@ -696,6 +703,8 @@ ShowBuilderTab::ShowBuilderTab(juce::ValueTree& state) : appState(state), miniDa
     addAndMakeVisible(editorPanel);
     if (showNode.getNumChildren() > 0) sceneList.selectRow(0);
 }
+
+
 
 ShowBuilderTab::~ShowBuilderTab()
 {
@@ -1167,24 +1176,76 @@ void ShowBuilderTab::saveShow()
             auto file = fc.getResult();
             if (file == juce::File{}) return;
 
+            if (!file.hasFileExtension(".show"))
+                file = file.withFileExtension(".show");
+
             auto snapshot = safeThis->appState.createCopy();
             const int sceneCount = safeThis->showNode.isValid() ? safeThis->showNode.getNumChildren() : 0;
 
             FileProgressRunner::runBackground(
                 "Salvataggio Show",
                 "Preparazione archivio show...",
-                [snapshot, file](std::function<void(double, const juce::String&)> report) mutable -> bool {
+                [safeThis, snapshot, file](std::function<void(double, const juce::String&)> report) mutable -> bool {
                     report(0.25, "Raccolta scene, patch e tracce audio...");
                     report(0.55, "Scrittura file " + file.getFileName() + "...");
                     PresetManager::saveShow(snapshot, file);
                     report(0.95, "Verifica integrita' file...");
-                    return file.existsAsFile() && file.getSize() > 0;
+
+                    const bool ok = file.existsAsFile() && file.getSize() > 0;
+                    if (ok)
+                    {
+                        juce::MessageManager::callAsync([safeThis, file]() {
+                            if (safeThis == nullptr) return;
+                            safeThis->currentShowFile = file;
+                            if (safeThis->onShowClean)
+                                safeThis->onShowClean();
+                            });
+                    }
+                    return ok;
                 },
                 "Salvataggio Completato",
                 "Lo show '" + file.getFileName() + "' e' stato salvato correttamente.\nScene salvate: "
                 + juce::String(sceneCount),
                 "Errore Salvataggio",
                 "Impossibile completare il salvataggio del file:\n" + file.getFullPathName());
+        });
+}
+
+void ShowBuilderTab::saveShowForExitAsync(std::function<void(bool saved)> onComplete)
+{
+    // Se lo show ha gia' un file associato, sovrascrive al volo senza aprire dialog
+    if (currentShowFile != juce::File{})
+    {
+        PresetManager::saveShow(appState, currentShowFile);
+        if (onShowClean) onShowClean();
+        if (onComplete) onComplete(true);
+        return;
+    }
+
+    fileChooser = std::make_unique<juce::FileChooser>(
+        "Salva Show (Tab 3)",
+        juce::File::getSpecialLocation(juce::File::userDocumentsDirectory).getChildFile("NuovoShow.show"),
+        "*.show");
+
+    auto chooserFlags = juce::FileBrowserComponent::saveMode | juce::FileBrowserComponent::canSelectFiles;
+    juce::Component::SafePointer<ShowBuilderTab> safeThis(this);
+    fileChooser->launchAsync(chooserFlags, [safeThis, onComplete](const juce::FileChooser& fc) {
+        if (safeThis == nullptr) return;
+        auto file = fc.getResult();
+        if (file != juce::File{})
+        {
+            if (!file.hasFileExtension(".show"))
+                file = file.withFileExtension(".show");
+
+            PresetManager::saveShow(safeThis->appState, file);
+            safeThis->currentShowFile = file;
+            if (safeThis->onShowClean) safeThis->onShowClean();
+            if (onComplete) onComplete(true);
+        }
+        else if (onComplete)
+        {
+            onComplete(false);
+        }
         });
 }
 
@@ -1381,7 +1442,7 @@ void ShowBuilderTab::loadShow()
             safeThis->aiWizardPanel.syncUIFromState();
             return true;
         } });
-        steps.push_back({ "Ordinamento scene e aggiornamento simulatore...", 1.0, [safeThis, loadedSceneCount]() {
+        steps.push_back({ "Ordinamento scene e aggiornamento simulatore...", 1.0, [safeThis, file, loadedSceneCount]() {
             if (safeThis == nullptr) return false;
             safeThis->sortScenesByStartBeat();
             safeThis->sceneList.updateContent();
@@ -1395,6 +1456,9 @@ void ShowBuilderTab::loadShow()
             safeThis->sceneList.repaint();
             safeThis->miniDawTimeline.repaint();
             safeThis->stageSimulator.repaint();
+            safeThis->currentShowFile = file;
+            if (safeThis->onShowClean)
+                safeThis->onShowClean();
             return true;
         } });
 
@@ -1493,4 +1557,41 @@ void ShowBuilderTab::loadPresetLibraryFromDisk()
             }
         }
     }
+}
+
+void ShowBuilderTab::refreshAfterUndoRedo(bool beatOrAudioChanged)
+{
+    showNode = appState.getChildWithName(StateKeys::ShowNode);
+
+    if (beatOrAudioChanged)
+    {
+        beatTimeMap.bindToAppState(appState);
+        miniDawTimeline.syncWithAppState();
+        aiWizardPanel.syncUIFromState();
+    }
+
+    const int prevRow = sceneList.getSelectedRow();
+    sceneList.updateContent();
+
+    const int numScenes = showNode.isValid() ? showNode.getNumChildren() : 0;
+    if (numScenes > 0)
+    {
+        const int targetRow = juce::jlimit(0, numScenes - 1, prevRow < 0 ? 0 : prevRow);
+        sceneList.selectRow(targetRow);
+        miniDawTimeline.setSelectedSceneIndex(targetRow);
+        editorPanel.setSceneNode(showNode.getChild(targetRow));
+    }
+    else
+    {
+        sceneList.deselectAllRows();
+        miniDawTimeline.setSelectedSceneIndex(-1);
+        editorPanel.setSceneNode(juce::ValueTree());
+    }
+
+    if (stageSimulator.getIsExpanded())
+        editorPanel.setVisible(false);
+
+    sceneList.repaint();
+    miniDawTimeline.repaint();
+    stageSimulator.repaint();
 }

@@ -30,7 +30,7 @@ target_sources(DoYourLightShow
         Source/UI/Tabs/VenuePatchTab.cpp
         Source/UI/Tabs/ShowBuilderTab.cpp
         Source/UI/Tabs/ExportEngineTab.cpp
-        
+
         # Model
         Source/Model/LogicalParam.h
         Source/Model/FixtureProfile.h
@@ -38,26 +38,39 @@ target_sources(DoYourLightShow
         Source/Model/HardwareMidiMapper.h
         Source/Model/VenuePatch.h
         Source/Model/Scene.h
-        
+        Source/Model/CurveEvaluator.h
+
         # Engine
         Source/Engine/MusicalContext.h
         Source/Engine/LfoGenerator.h
         Source/Engine/ColorGenerator.h
         Source/Engine/TriggerGenerator.h
         Source/Engine/MidiRenderEngine.h
-        
+        Source/Engine/DmxOutputDriver.h
+        Source/Engine/ArtNetDmxDriver.h
+        Source/Engine/SacnDmxDriver.h
+        Source/Engine/EnttecProDmxDriver.h
+        Source/Engine/DmxOutputManager.h
+        Source/Engine/DmxLiveEngine.h
+
         # UI Tabs & Components
         Source/UI/Tabs/VenuePatchTab.h
+        Source/UI/Tabs/SceneBuilderTab.h
         Source/UI/Tabs/ShowBuilderTab.h
         Source/UI/Tabs/ExportEngineTab.h
         Source/UI/Components/PanTiltRangeSlider.h
         Source/UI/Components/TwoValueSliderAttachment.h
         Source/UI/Components/LfoWaveformPreview.h
         Source/UI/Components/MiniDawTimeline.h
-        
+        Source/UI/Components/PanTiltCalibrationWizard.h
+        Source/UI/Components/TimeMetricManager.h
+        Source/UI/Components/StageArtworkHelper.h
+        Source/UI/Components/FileProgressOverlay.h
+        Source/UI/Components/DmxOutputControlPanel.h
+
         # Utils
         Source/Utils/PresetManager.h
- "Source/UI/Tabs/SceneBuilderTab.h" "Source/Model/CurveEvaluator.h" "Source/UI/Components/PanTiltCalibrationWizard.h" "Source/UI/Components/TimeMetricManager.h" "Source/UI/Components/StageArtworkHelper.h" "Source/UI/Components/FileProgressOverlay.h" "Source/Engine/DmxOutputDriver.h" "Source/Engine/ArtNetDmxDriver.h" "Source/Engine/EnttecProDmxDriver.h" "Source/Engine/DmxOutputManager.h" "Source/Engine/SacnDmxDriver.h" "Source/Engine/DmxLiveEngine.h" "Source/UI/Components/DmxOutputControlPanel.h")
+ "Source/Utils/StateUndoManager.h")
 
 # 4. Include directory
 target_include_directories(DoYourLightShow

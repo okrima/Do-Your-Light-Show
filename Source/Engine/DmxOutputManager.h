@@ -1,8 +1,8 @@
 #pragma once
 #include "DmxOutputDriver.h"
 #include "ArtNetDmxDriver.h"
-#include "EnttecProDmxDriver.h"
 #include "SacnDmxDriver.h"
+#include "EnttecProDmxDriver.h"
 #include <memory>
 
 class DmxOutputManager : private juce::Thread
@@ -21,21 +21,31 @@ public:
     DmxUniverseBuffer& getUniverseBuffer() noexcept { return universeBuffer; }
     const DmxUniverseBuffer& getUniverseBuffer() const noexcept { return universeBuffer; }
 
-    // Avvia l'uscita con il driver scelto (Art-Net o ENTTEC Pro)
     bool startOutput(std::unique_ptr<DmxOutputDriver> driver)
     {
         stopOutput(false);
 
         if (driver == nullptr || !driver->open())
         {
-            lastStatusText = (driver != nullptr) ? driver->getStatusText() : "Driver DMX non valido";
+            const juce::String errText = (driver != nullptr) ? driver->getStatusText() : "Driver DMX non valido";
+            const auto errSnap = (driver != nullptr) ? driver->getDebugSnapshot() : DmxOutputDriver::DebugSnapshot{};
+            const juce::ScopedLock sl(statusLock);
+            lastStatusText = errText;
+            cachedDebugSnapshot = errSnap;
             return false;
         }
+
+        const juce::String openedStatus = driver->getStatusText();
+        const auto initialSnap = driver->getDebugSnapshot();
 
         {
             const juce::ScopedLock sl(driverLock);
             activeDriver = std::move(driver);
-            lastStatusText = activeDriver->getStatusText();
+        }
+        {
+            const juce::ScopedLock sl(statusLock);
+            lastStatusText = openedStatus;
+            cachedDebugSnapshot = initialSnap;
         }
 
         txFrameCount.store(0);
@@ -43,28 +53,36 @@ public:
         consecutiveErrors.store(0);
         outputRunning.store(true);
 
-        startThread(juce::Thread::Priority::high);
+        // Priority::normal evita che il thread TX sottragga cicli a UI e audio
+        startThread(juce::Thread::Priority::normal);
         return true;
     }
 
-    // Ferma la trasmissione e chiude l'interfaccia (opzionalmente invia 1 frame a zero)
     void stopOutput(bool sendFinalBlackout = true)
     {
         outputRunning.store(false);
         signalThreadShouldExit();
         stopThread(1000);
 
-        const juce::ScopedLock sl(driverLock);
-        if (activeDriver != nullptr)
+        juce::String closedStatus = "DMX disattivo";
         {
-            if (sendFinalBlackout && activeDriver->isOpen())
+            const juce::ScopedLock sl(driverLock);
+            if (activeDriver != nullptr)
             {
-                std::array<uint8_t, DmxUniverseBuffer::kNumChannels> zeroFrame{};
-                activeDriver->sendFrame(zeroFrame.data());
+                if (sendFinalBlackout && activeDriver->isOpen())
+                {
+                    std::array<uint8_t, DmxUniverseBuffer::kNumChannels> zeroFrame{};
+                    activeDriver->sendFrame(zeroFrame.data());
+                }
+                activeDriver->close();
+                closedStatus = activeDriver->getStatusText();
+                activeDriver.reset();
             }
-            activeDriver->close();
-            lastStatusText = activeDriver->getStatusText();
-            activeDriver.reset();
+        }
+        {
+            const juce::ScopedLock sl(statusLock);
+            lastStatusText = closedStatus;
+            cachedDebugSnapshot = {};
         }
     }
 
@@ -72,10 +90,39 @@ public:
     uint64_t getTxFrameCount() const noexcept { return txFrameCount.load(); }
     uint64_t getTxErrorCount() const noexcept { return txErrorCount.load(); }
 
+    // Legge SOLO statusLock: mai bloccato durante WriteFile / socket.write
     juce::String getStatusText() const
     {
-        const juce::ScopedLock sl(driverLock);
-        return activeDriver != nullptr ? activeDriver->getStatusText() : lastStatusText;
+        const juce::ScopedLock sl(statusLock);
+        return lastStatusText;
+    }
+
+    DmxOutputDriver::DebugSnapshot getDriverDebugSnapshot() const
+    {
+        const juce::ScopedLock sl(statusLock);
+        return cachedDebugSnapshot;
+    }
+
+    juce::String runDriverDiagnosticProbe()
+    {
+        juce::String res = "Nessun driver DMX attivo.";
+        DmxOutputDriver::DebugSnapshot snap;
+        bool hasSnap = false;
+        {
+            const juce::ScopedLock sl(driverLock);
+            if (activeDriver != nullptr)
+            {
+                res = activeDriver->runDiagnosticProbe();
+                snap = activeDriver->getDebugSnapshot();
+                hasSnap = true;
+            }
+        }
+        if (hasSnap)
+        {
+            const juce::ScopedLock sl(statusLock);
+            cachedDebugSnapshot = std::move(snap);
+        }
+        return res;
     }
 
     void setRefreshRateHz(int hz) noexcept
@@ -83,27 +130,12 @@ public:
         refreshRateHz.store(juce::jlimit(10, 44, hz));
     }
 
-    DmxOutputDriver::DebugSnapshot getDriverDebugSnapshot() const
-    {
-        const juce::ScopedLock sl(driverLock);
-        if (activeDriver != nullptr)
-            return activeDriver->getDebugSnapshot();
-        return {};
-    }
-
-    juce::String runDriverDiagnosticProbe()
-    {
-        const juce::ScopedLock sl(driverLock);
-        if (activeDriver != nullptr)
-            return activeDriver->runDiagnosticProbe();
-        return "Nessun driver DMX attivo.";
-    }
-
 private:
     void run() override
     {
         std::array<uint8_t, DmxUniverseBuffer::kNumChannels> localFrame{};
         double nextTickMs = juce::Time::getMillisecondCounterHiRes();
+        double lastSnapMs = 0.0;
 
         while (!threadShouldExit())
         {
@@ -113,10 +145,28 @@ private:
             universeBuffer.copyUniverseTo(localFrame);
 
             bool sentOk = false;
+            bool needSnapUpdate = false;
+            DmxOutputDriver::DebugSnapshot snap;
+            const double nowBeforeSnap = juce::Time::getMillisecondCounterHiRes();
+
             {
                 const juce::ScopedLock sl(driverLock);
                 if (activeDriver != nullptr && activeDriver->isOpen())
+                {
                     sentOk = activeDriver->sendFrame(localFrame.data());
+                    if ((nowBeforeSnap - lastSnapMs) >= 150.0)
+                    {
+                        snap = activeDriver->getDebugSnapshot();
+                        needSnapUpdate = true;
+                        lastSnapMs = nowBeforeSnap;
+                    }
+                }
+            }
+
+            if (needSnapUpdate)
+            {
+                const juce::ScopedLock sl(statusLock);
+                cachedDebugSnapshot = std::move(snap);
             }
 
             if (sentOk)
@@ -128,9 +178,9 @@ private:
             {
                 txErrorCount.fetch_add(1);
                 const int errs = consecutiveErrors.fetch_add(1) + 1;
-                if (errs >= 40) // ~1 secondo di errori continui (es. USB scollegata)
+                if (errs == 40)
                 {
-                    const juce::ScopedLock sl(driverLock);
+                    const juce::ScopedLock sl(statusLock);
                     lastStatusText = "Connessione DMX persa (controlla cavo / interfaccia)";
                 }
             }
@@ -141,14 +191,17 @@ private:
             if (remainingMs > 1.0)
                 wait(static_cast<int>(remainingMs));
             else if (remainingMs < -100.0)
-                nextTickMs = nowMs; // Evita raffiche di recupero dopo uno stallo del sistema
+                nextTickMs = nowMs;
         }
     }
 
     DmxUniverseBuffer universeBuffer;
     mutable juce::CriticalSection driverLock;
+    mutable juce::CriticalSection statusLock;
+
     std::unique_ptr<DmxOutputDriver> activeDriver;
     juce::String lastStatusText{ "DMX disattivo" };
+    DmxOutputDriver::DebugSnapshot cachedDebugSnapshot;
 
     std::atomic<bool> outputRunning{ false };
     std::atomic<int> refreshRateHz{ 40 };

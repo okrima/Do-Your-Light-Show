@@ -1657,17 +1657,48 @@ void VenuePatchTab::removeSelectedFixture()
 
 void VenuePatchTab::saveVenue()
 {
+    saveVenueForExitAsync(nullptr);
+}
+
+void VenuePatchTab::saveVenueForExitAsync(std::function<void(bool saved)> onComplete)
+{
+    // Se chiamato in chiusura e il file .venue e' gia' noto, salva direttamente
+    if (onComplete && currentVenueFile != juce::File{})
+    {
+        PresetManager::saveVenue(appState, currentVenueFile);
+        if (onVenueClean) onVenueClean();
+        onComplete(true);
+        return;
+    }
+
+    const juce::File defaultTarget = (currentVenueFile != juce::File{})
+        ? currentVenueFile
+        : juce::File::getSpecialLocation(juce::File::userDocumentsDirectory).getChildFile("NuovoLocale.venue");
+
     fileChooser = std::make_unique<juce::FileChooser>(
-        "Salva Configurazione Venue",
-        juce::File::getSpecialLocation(juce::File::userDocumentsDirectory).getChildFile("NuovoLocale.venue"),
-        "*.venue"
-    );
+        "Salva Configurazione Venue (Tab 1)",
+        defaultTarget,
+        "*.venue");
 
     auto chooserFlags = juce::FileBrowserComponent::saveMode | juce::FileBrowserComponent::canSelectFiles;
-    fileChooser->launchAsync(chooserFlags, [this](const juce::FileChooser& fc) {
+    juce::Component::SafePointer<VenuePatchTab> safeThis(this);
+    fileChooser->launchAsync(chooserFlags, [safeThis, onComplete](const juce::FileChooser& fc) {
+        if (safeThis == nullptr) return;
         auto file = fc.getResult();
         if (file != juce::File{})
-            PresetManager::saveVenue(appState, file);
+        {
+            if (!file.hasFileExtension(".venue"))
+                file = file.withFileExtension(".venue");
+
+            PresetManager::saveVenue(safeThis->appState, file);
+            safeThis->currentVenueFile = file;
+            if (safeThis->onVenueClean) safeThis->onVenueClean();
+            if (onComplete) onComplete(true);
+        }
+        else if (onComplete)
+        {
+            onComplete(false);
+        }
         });
 }
 
@@ -1715,6 +1746,10 @@ void VenuePatchTab::loadVenue()
 
                 // Ridisegna Light Case e fari piazzati nelle esatte posizioni salvate
                 stageDesignerPanel.refreshFromState();
+
+                currentVenueFile = file;
+                if (onVenueClean)
+                    onVenueClean();
             }
         }
         });
@@ -1915,4 +1950,37 @@ void VenuePatchTab::updateFixtureTestOutput()
 
     testFixtureBtn.setButtonText("STOP Test");
     dmxLiveEngine->startFixtureTest(venueNode.getChild(sel));
+}
+
+void VenuePatchTab::refreshAfterUndoRedo()
+{
+    venueNode = appState.getChildWithName(StateKeys::VenueNode);
+    if (!venueNode.isValid())
+        return;
+
+    VenueUnitHelper::ensureVenueUnitsInitialized(venueNode);
+
+    const int prevRow = fixtureList.getSelectedRow();
+    fixtureList.updateContent();
+
+    const int numRows = venueNode.getNumChildren();
+    if (numRows > 0)
+    {
+        const int targetRow = juce::jlimit(0, numRows - 1, prevRow < 0 ? 0 : prevRow);
+        fixtureList.selectRow(targetRow);
+        editorPanel.setFixtureNode(venueNode.getChild(targetRow));
+        stageDesignerPanel.setSelectedFixtureIndex(targetRow);
+    }
+    else
+    {
+        fixtureList.deselectAllRows();
+        editorPanel.setFixtureNode(juce::ValueTree());
+        stageDesignerPanel.setSelectedFixtureIndex(-1);
+    }
+
+    fixtureList.repaint();
+    stageDesignerPanel.refreshFromState();
+
+    if (testFixtureBtn.getToggleState())
+        updateFixtureTestOutput();
 }

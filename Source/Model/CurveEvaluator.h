@@ -94,7 +94,7 @@ public:
         {
             double subBeat = std::fmod(juce::jmax(0.0, pos.beatInBarQ) * strobeHitsPerQ + phaseOffsetCycles, 1.0);
             if (subBeat < 0.0) subBeat += 1.0;
-            return (subBeat < 0.35) ? endVal : startVal;
+            return (subBeat < 0.45) ? endVal : startVal;
         }
 
         // Default: Linear

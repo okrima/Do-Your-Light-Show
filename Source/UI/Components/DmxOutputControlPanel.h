@@ -11,6 +11,8 @@ public:
     explicit DmxOutputControlPanel(DmxLiveEngine& engine)
         : dmxEngine(engine)
     {
+        setOpaque(true);
+
         auto setupLbl = [this](juce::Label& l, const juce::String& txt, bool header = false, juce::Colour col = juce::Colours::lightgrey)
             {
                 l.setText(txt, juce::dontSendNotification);
@@ -18,6 +20,12 @@ public:
                 l.setColour(juce::Label::textColourId, col);
                 addAndMakeVisible(l);
             };
+
+        saveConfigBtn.setButtonText("Salva Config");
+        saveConfigBtn.setColour(juce::TextButton::buttonColourId, juce::Colour(0xff293d3d));
+        saveConfigBtn.setTooltip("Salva protocollo, IP/Universo, porta COM e opzioni Tab 6 su disco");
+        saveConfigBtn.onClick = [this]() { saveSettingsToDisk(); };
+        addAndMakeVisible(saveConfigBtn);
 
         auto setupEdit = [this](juce::TextEditor& e, const juce::String& defTxt)
             {
@@ -34,7 +42,7 @@ public:
         driverCombo.addItem("sACN E1.31 (UDP 5568)", 2);
         driverCombo.addItem("USB DMX Pro / Eurolite MK2 (COM)", 3);
         driverCombo.setSelectedId(1, juce::dontSendNotification);
-        driverCombo.onChange = [this]() { updateDriverConfigVisibility(); };
+        driverCombo.onChange = [this]() { updateDriverConfigVisibility(); markDirty(); };
         addAndMakeVisible(driverCombo);
 
         // --- Parametri Art-Net ---
@@ -42,12 +50,13 @@ public:
         setupEdit(artNetIpEdit, "255.255.255.255");
         artNetLocalBtn.setButtonText("Localhost");
         artNetLocalBtn.setTooltip("Imposta 127.0.0.1 per testare in locale senza hardware");
-        artNetLocalBtn.onClick = [this]() { artNetIpEdit.setText("127.0.0.1", juce::dontSendNotification); };
+        artNetLocalBtn.onClick = [this]() { artNetIpEdit.setText("127.0.0.1", juce::dontSendNotification); markDirty(); };
+        artNetIpEdit.onTextChange = [this]() { markDirty(); };
         addAndMakeVisible(artNetLocalBtn);
 
         artNetBcastBtn.setButtonText("Broadcast");
         artNetBcastBtn.setTooltip("Imposta 255.255.255.255 per tutti i nodi Art-Net in rete");
-        artNetBcastBtn.onClick = [this]() { artNetIpEdit.setText("255.255.255.255", juce::dontSendNotification); };
+        artNetBcastBtn.onClick = [this]() { artNetIpEdit.setText("255.255.255.255", juce::dontSendNotification); markDirty(); };
         addAndMakeVisible(artNetBcastBtn);
 
         setupLbl(artNetUniLbl, "Universo (0-15):");
@@ -55,6 +64,7 @@ public:
         artNetUniSlider.setTextBoxStyle(juce::Slider::TextBoxLeft, false, 44, 22);
         artNetUniSlider.setRange(0, 15, 1);
         artNetUniSlider.setValue(0, juce::dontSendNotification);
+        artNetUniSlider.onValueChange = [this]() { markDirty(); };
         addAndMakeVisible(artNetUniSlider);
 
         setupLbl(artNetSubLbl, "Subnet (0-15):");
@@ -62,6 +72,7 @@ public:
         artNetSubSlider.setTextBoxStyle(juce::Slider::TextBoxLeft, false, 44, 22);
         artNetSubSlider.setRange(0, 15, 1);
         artNetSubSlider.setValue(0, juce::dontSendNotification);
+        artNetSubSlider.onValueChange = [this]() { markDirty(); };
         addAndMakeVisible(artNetSubSlider);
 
         setupLbl(artNetNetLbl, "Net (0-127):");
@@ -69,23 +80,26 @@ public:
         artNetNetSlider.setTextBoxStyle(juce::Slider::TextBoxLeft, false, 44, 22);
         artNetNetSlider.setRange(0, 127, 1);
         artNetNetSlider.setValue(0, juce::dontSendNotification);
+        artNetNetSlider.onValueChange = [this]() { markDirty(); };
         addAndMakeVisible(artNetNetSlider);
 
         // --- Parametri sACN E1.31 ---
         sacnMulticastToggle.setButtonText("Multicast E1.31 (239.255.x.x)");
         sacnMulticastToggle.setToggleState(true, juce::dontSendNotification);
-        sacnMulticastToggle.onClick = [this]() { updateSacnTargetPreview(); };
+        sacnMulticastToggle.onClick = [this]() { updateSacnTargetPreview(); markDirty(); };
         addAndMakeVisible(sacnMulticastToggle);
 
         setupLbl(sacnIpLbl, "IP Destinazione:");
         setupEdit(sacnIpEdit, "239.255.0.1");
+
+        sacnIpEdit.onTextChange = [this]() { markDirty(); };
 
         setupLbl(sacnUniLbl, "Universo (1-63999):");
         sacnUniSlider.setSliderStyle(juce::Slider::IncDecButtons);
         sacnUniSlider.setTextBoxStyle(juce::Slider::TextBoxLeft, false, 58, 22);
         sacnUniSlider.setRange(1, 63999, 1);
         sacnUniSlider.setValue(1, juce::dontSendNotification);
-        sacnUniSlider.onValueChange = [this]() { updateSacnTargetPreview(); };
+        sacnUniSlider.onValueChange = [this]() { updateSacnTargetPreview(); markDirty(); };
         addAndMakeVisible(sacnUniSlider);
 
         setupLbl(sacnPrioLbl, "Priorita' (0-200):");
@@ -93,10 +107,12 @@ public:
         sacnPrioSlider.setTextBoxStyle(juce::Slider::TextBoxLeft, false, 50, 22);
         sacnPrioSlider.setRange(0, 200, 1);
         sacnPrioSlider.setValue(100, juce::dontSendNotification);
+        sacnPrioSlider.onValueChange = [this]() { markDirty(); };
         addAndMakeVisible(sacnPrioSlider);
 
         // --- Parametri ENTTEC Pro ---
         setupLbl(comPortLbl, "Porta COM:");
+        comPortCombo.onChange = [this]() { markDirty(); };
         addAndMakeVisible(comPortCombo);
         refreshComBtn.setButtonText("Aggiorna COM");
         refreshComBtn.onClick = [this]() { refreshComPorts(); };
@@ -137,6 +153,7 @@ public:
         masterSlider.setTooltip("Scala l'intensita' di tutti i fari senza muovere Pan/Tilt");
         masterSlider.onValueChange = [this]() {
             dmxEngine.setMasterDimmer(static_cast<float>(masterSlider.getValue()) / 100.0f);
+            markDirty();
             };
         addAndMakeVisible(masterSlider);
 
@@ -160,6 +177,7 @@ public:
             courtesyToggle.setEnabled(on);
             if (!on && !dmxEngine.isFixtureTestActive())
                 dmxEngine.clearAllOutput();
+            markDirty();
             };
         addAndMakeVisible(tab2LiveToggle);
 
@@ -168,6 +186,7 @@ public:
         courtesyToggle.setEnabled(dmxEngine.isTab2LivePreviewEnabled());
         courtesyToggle.onClick = [this]() {
             dmxEngine.setStandaloneCourtesyDimmer(courtesyToggle.getToggleState());
+            markDirty();
             };
         addAndMakeVisible(courtesyToggle);
 
@@ -191,7 +210,9 @@ public:
         updateDriverConfigVisibility();
         updateMonitorPageButtons();
 
-        startTimerHz(20);
+        loadSettingsFromDisk();
+
+        startTimerHz(60);
     }
 
     ~DmxOutputControlPanel() override
@@ -199,6 +220,18 @@ public:
         stopTimer();
         miniConsoleWindow.reset();
         serialDebugWindow.reset();
+    }
+
+    void visibilityChanged() override
+    {
+        if (isShowing())
+        {
+            std::array<uint8_t, 512> fresh{}, peaks{};
+            dmxEngine.consumeMonitorSnapshot(fresh, peaks);
+            monitorSnapshot = fresh;
+            refreshStatusUI();
+            repaint();
+        }
     }
 
     void paint(juce::Graphics& g) override
@@ -221,10 +254,6 @@ public:
         g.setColour(ledCol);
         g.fillEllipse(ledRect);
 
-        // Legge sempre il buffer live prima di disegnare (elimina il flash di 50 ms al cambio tab)
-        dmxEngine.getOutputManager().getUniverseBuffer().copyUniverseTo(monitorSnapshot);
-        drawChannelMonitorGrid(g, monitorGridRect);
-
         // Griglia Monitor 16x8 (128 canali della pagina attiva)
         drawChannelMonitorGrid(g, monitorGridRect);
     }
@@ -244,6 +273,8 @@ public:
         auto lTitle = leftHalf.removeFromTop(22);
         ledRect = juce::Rectangle<float>(static_cast<float>(lTitle.getX() + 2), static_cast<float>(lTitle.getCentreY() - 5), 10.0f, 10.0f);
         lTitle.removeFromLeft(18);
+        saveConfigBtn.setBounds(lTitle.removeFromRight(105));
+        lTitle.removeFromRight(8);
         titleLbl.setBounds(lTitle);
         leftHalf.removeFromTop(6);
 
@@ -337,13 +368,110 @@ public:
         monitorGridRect = b;
     }
 
+    std::function<void(bool)> onDirtyStateChanged;
+
+    bool hasUnsavedChanges() const noexcept { return dirty; }
+
+    static juce::File getSettingsFile()
+    {
+        return juce::File::getSpecialLocation(juce::File::userApplicationDataDirectory)
+            .getChildFile("DoYourLightShow")
+            .getChildFile("dmx_settings.xml");
+    }
+
+    bool saveSettingsToDisk()
+    {
+        auto file = getSettingsFile();
+        file.getParentDirectory().createDirectory();
+
+        juce::XmlElement root("DMX_LIVE_SETTINGS");
+        root.setAttribute("driverId", driverCombo.getSelectedId());
+
+        root.setAttribute("artNetIp", artNetIpEdit.getText().trim());
+        root.setAttribute("artNetUni", static_cast<int>(artNetUniSlider.getValue()));
+        root.setAttribute("artNetSub", static_cast<int>(artNetSubSlider.getValue()));
+        root.setAttribute("artNetNet", static_cast<int>(artNetNetSlider.getValue()));
+
+        root.setAttribute("sacnMulticast", sacnMulticastToggle.getToggleState());
+        root.setAttribute("sacnIp", sacnIpEdit.getText().trim());
+        root.setAttribute("sacnUni", static_cast<int>(sacnUniSlider.getValue()));
+        root.setAttribute("sacnPrio", static_cast<int>(sacnPrioSlider.getValue()));
+
+        root.setAttribute("comPort", getSelectedComPortName());
+        root.setAttribute("masterPct", static_cast<int>(masterSlider.getValue()));
+        root.setAttribute("tab2Live", tab2LiveToggle.getToggleState());
+        root.setAttribute("courtesyDim", courtesyToggle.getToggleState());
+
+        if (root.writeTo(file))
+        {
+            setDirty(false);
+            return true;
+        }
+        return false;
+    }
+
+    void loadSettingsFromDisk()
+    {
+        auto file = getSettingsFile();
+        if (!file.existsAsFile())
+            return;
+
+        auto xml = juce::XmlDocument::parse(file);
+        if (xml == nullptr || !xml->hasTagName("DMX_LIVE_SETTINGS"))
+            return;
+
+        juce::ScopedValueSetter<bool> guard(isLoadingSettings, true);
+
+        driverCombo.setSelectedId(juce::jlimit(1, 3, xml->getIntAttribute("driverId", 1)), juce::dontSendNotification);
+
+        artNetIpEdit.setText(xml->getStringAttribute("artNetIp", "255.255.255.255"), juce::dontSendNotification);
+        artNetUniSlider.setValue(xml->getIntAttribute("artNetUni", 0), juce::dontSendNotification);
+        artNetSubSlider.setValue(xml->getIntAttribute("artNetSub", 0), juce::dontSendNotification);
+        artNetNetSlider.setValue(xml->getIntAttribute("artNetNet", 0), juce::dontSendNotification);
+
+        sacnMulticastToggle.setToggleState(xml->getBoolAttribute("sacnMulticast", true), juce::dontSendNotification);
+        sacnUniSlider.setValue(xml->getIntAttribute("sacnUni", 1), juce::dontSendNotification);
+        sacnPrioSlider.setValue(xml->getIntAttribute("sacnPrio", 100), juce::dontSendNotification);
+        sacnIpEdit.setText(xml->getStringAttribute("sacnIp", "239.255.0.1"), juce::dontSendNotification);
+        updateSacnTargetPreview();
+
+        const juce::String savedCom = xml->getStringAttribute("comPort", "").trim();
+        if (savedCom.isNotEmpty())
+        {
+            for (size_t i = 0; i < detectedComPorts.size(); ++i)
+            {
+                if (detectedComPorts[i].portName.equalsIgnoreCase(savedCom))
+                {
+                    comPortCombo.setSelectedId(static_cast<int>(i) + 1, juce::dontSendNotification);
+                    break;
+                }
+            }
+        }
+
+        const int masterPct = juce::jlimit(0, 100, xml->getIntAttribute("masterPct", 100));
+        masterSlider.setValue(masterPct, juce::dontSendNotification);
+        dmxEngine.setMasterDimmer(static_cast<float>(masterPct) / 100.0f);
+
+        const bool tab2On = xml->getBoolAttribute("tab2Live", false);
+        tab2LiveToggle.setToggleState(tab2On, juce::dontSendNotification);
+        dmxEngine.setTab2LivePreviewEnabled(tab2On);
+
+        const bool courtesyOn = xml->getBoolAttribute("courtesyDim", true);
+        courtesyToggle.setToggleState(courtesyOn, juce::dontSendNotification);
+        courtesyToggle.setEnabled(tab2On);
+        dmxEngine.setStandaloneCourtesyDimmer(courtesyOn);
+
+        updateDriverConfigVisibility();
+        setDirty(false);
+    }
+
 private:
     class MiniConsoleContent : public juce::Component,
         private juce::Timer
     {
     public:
-        explicit MiniConsoleContent(DmxLiveEngine& engine)
-            : dmxEngine(engine)
+        explicit MiniConsoleContent(DmxLiveEngine& engine, std::function<void()> onMasterEdited = nullptr)
+            : dmxEngine(engine), masterEditedCallback(std::move(onMasterEdited))
         {
             statusLbl.setFont(juce::FontOptions(11.5f, juce::Font::bold));
             statusLbl.setColour(juce::Label::textColourId, juce::Colour(0xffcbd5e1));
@@ -359,7 +487,11 @@ private:
             masterSlider.setTextValueSuffix("%");
             masterSlider.onValueChange = [this]() {
                 if (!syncing)
+                {
                     dmxEngine.setMasterDimmer(static_cast<float>(masterSlider.getValue()) / 100.0f);
+                    if (masterEditedCallback)
+                        masterEditedCallback();
+                }
                 };
             addAndMakeVisible(masterSlider);
 
@@ -375,7 +507,7 @@ private:
 
             setSize(320, 118);
             syncFromEngine();
-            startTimerHz(15);
+            startTimerHz(8);
         }
 
         ~MiniConsoleContent() override { stopTimer(); }
@@ -408,18 +540,37 @@ private:
     private:
         void timerCallback() override
         {
-            syncFromEngine();
-            repaint();
+            if (!isShowing())
+                return;
+            if (syncFromEngine())
+                repaint();
         }
 
-        void syncFromEngine()
+        bool syncFromEngine()
         {
             juce::ScopedValueSetter<bool> g(syncing, true);
-            statusLbl.setText(dmxEngine.getStatusText(), juce::dontSendNotification);
-            masterSlider.setValue(juce::roundToInt(dmxEngine.getMasterDimmer() * 100.0f), juce::dontSendNotification);
+            const bool active = dmxEngine.isOutputActive();
             const bool bo = dmxEngine.isBlackout();
-            blackoutBtn.setToggleState(bo, juce::dontSendNotification);
-            blackoutBtn.setButtonText(bo ? "BLACKOUT ATTIVO" : "BLACKOUT");
+            const juce::String st = dmxEngine.getStatusText();
+            const int pct = juce::roundToInt(dmxEngine.getMasterDimmer() * 100.0f);
+
+            if (st != lastStatus)
+            {
+                lastStatus = st;
+                statusLbl.setText(st, juce::dontSendNotification);
+            }
+            if (juce::roundToInt(masterSlider.getValue()) != pct)
+                masterSlider.setValue(pct, juce::dontSendNotification);
+            if (blackoutBtn.getToggleState() != bo)
+            {
+                blackoutBtn.setToggleState(bo, juce::dontSendNotification);
+                blackoutBtn.setButtonText(bo ? "BLACKOUT ATTIVO" : "BLACKOUT");
+            }
+
+            const bool ledChanged = (active != lastActive || bo != lastBlackout);
+            lastActive = active;
+            lastBlackout = bo;
+            return ledChanged;
         }
 
         DmxLiveEngine& dmxEngine;
@@ -427,18 +578,23 @@ private:
         juce::Label statusLbl, masterLbl;
         juce::Slider masterSlider;
         juce::TextButton blackoutBtn;
+
+        bool lastActive = false, lastBlackout = false; 
+        juce::String lastStatus;
+
+        std::function<void()> masterEditedCallback;
     };
 
     class MiniConsoleWindow : public juce::DialogWindow
     {
     public:
-        explicit MiniConsoleWindow(DmxLiveEngine& engine)
+        explicit MiniConsoleWindow(DmxLiveEngine& engine, std::function<void()> onMasterEdited = nullptr)
             : juce::DialogWindow("DMX Live Mini-Console", juce::Colour(0xff14151c), true, true)
         {
             setUsingNativeTitleBar(true);
             setResizable(false, false);
             setAlwaysOnTop(true);
-            setContentOwned(new MiniConsoleContent(engine), true);
+            setContentOwned(new MiniConsoleContent(engine, std::move(onMasterEdited)), true);
             centreWithSize(getWidth(), getHeight());
         }
 
@@ -506,7 +662,7 @@ private:
             addAndMakeVisible(logBox);
 
             setSize(760, 420);
-            startTimerHz(10);
+            startTimerHz(6);
         }
 
         ~SerialDebugContent() override
@@ -546,9 +702,14 @@ private:
             logBox.setBounds(b);
         }
 
+
+
     private:
         void timerCallback() override
         {
+            if (!isShowing())
+                return;
+
             const auto snap = dmxEngine.getOutputManager().getDriverDebugSnapshot();
 
             if (!snap.isSerialDriver)
@@ -614,7 +775,7 @@ private:
     void openMiniConsole()
     {
         if (miniConsoleWindow == nullptr)
-            miniConsoleWindow = std::make_unique<MiniConsoleWindow>(dmxEngine);
+            miniConsoleWindow = std::make_unique<MiniConsoleWindow>(dmxEngine, [this]() { markDirty(); });
 
         miniConsoleWindow->setVisible(true);
         miniConsoleWindow->toFront(true);
@@ -623,7 +784,7 @@ private:
     void refreshComPorts()
     {
         const juce::String prevPort = getSelectedComPortName();
-        comPortCombo.clear();
+        comPortCombo.clear(juce::dontSendNotification);
         detectedComPorts = EnttecProDmxDriver::listDetailedComPorts();
 
         int indexToSelect = -1;
@@ -666,7 +827,7 @@ private:
     void updateSacnTargetPreview()
     {
         const bool isMc = sacnMulticastToggle.getToggleState();
-        sacnIpEdit.setEnabled(!isMc);
+        sacnIpEdit.setEnabled(!isMc && !dmxEngine.isOutputActive());
         if (isMc)
         {
             const int uni = static_cast<int>(sacnUniSlider.getValue());
@@ -715,7 +876,9 @@ private:
         if (dmxEngine.isOutputActive())
         {
             dmxEngine.stopOutput(true);
+            monitorSnapshot.fill(0);
             refreshStatusUI();
+            repaint();
             return;
         }
 
@@ -770,39 +933,145 @@ private:
         refreshStatusUI();
     }
 
-    void refreshStatusUI()
+    void setConfigControlsLocked(bool locked)
+    {
+        const bool canEdit = !locked;
+
+        driverCombo.setEnabled(canEdit);
+
+        // Art-Net
+        artNetIpEdit.setEnabled(canEdit);
+        artNetLocalBtn.setEnabled(canEdit);
+        artNetBcastBtn.setEnabled(canEdit);
+        artNetUniSlider.setEnabled(canEdit);
+        artNetSubSlider.setEnabled(canEdit);
+        artNetNetSlider.setEnabled(canEdit);
+
+        // sACN E1.31 (rispetta anche il toggle Multicast allo sblocco)
+        sacnMulticastToggle.setEnabled(canEdit);
+        sacnIpEdit.setEnabled(canEdit && !sacnMulticastToggle.getToggleState());
+        sacnUniSlider.setEnabled(canEdit);
+        sacnPrioSlider.setEnabled(canEdit);
+
+        // USB DMX Pro / Eurolite MK2 (COM)
+        comPortCombo.setEnabled(canEdit);
+        refreshComBtn.setEnabled(canEdit);
+    }
+
+    bool refreshStatusUI()
     {
         const bool active = dmxEngine.isOutputActive();
-        connectBtn.setButtonText(active ? "Ferma Uscita DMX" : "Avvia Uscita DMX (40 Hz)");
-        connectBtn.setColour(juce::TextButton::buttonColourId,
-            active ? juce::Colour(0xffb91c1c) : juce::Colour(0xff0f766e));
+        const bool bo = dmxEngine.isBlackout();
+        const bool ledChanged = (!uiStateInitialized || active != lastUiActive || bo != lastUiBlackout);
 
-        statusLbl.setText("Stato: " + dmxEngine.getStatusText(), juce::dontSendNotification);
-        statusLbl.setColour(juce::Label::textColourId,
-            active ? juce::Colour(0xff34d399) : juce::Colour(0xff94a3b8));
+        if (!uiStateInitialized || active != lastUiActive)
+        {
+            connectBtn.setButtonText(active ? "Ferma Uscita DMX" : "Avvia Uscita DMX (40 Hz)");
+            connectBtn.setColour(juce::TextButton::buttonColourId,
+                active ? juce::Colour(0xffb91c1c) : juce::Colour(0xff0f766e));
+            statusLbl.setColour(juce::Label::textColourId,
+                active ? juce::Colour(0xff34d399) : juce::Colour(0xff94a3b8));
+            setConfigControlsLocked(active);
+            lastUiActive = active;
+        }
 
-        statsLbl.setText("TX: " + juce::String(dmxEngine.getTxFrameCount())
-            + " frame | Errori: " + juce::String(dmxEngine.getTxErrorCount()),
-            juce::dontSendNotification);
+        const juce::String newStatus = "Stato: " + dmxEngine.getStatusText();
+        if (newStatus != lastUiStatusText)
+        {
+            lastUiStatusText = newStatus;
+            statusLbl.setText(newStatus, juce::dontSendNotification);
+        }
 
-        // Sincronizza slider/blackout nel caso siano stati mossi dalla Mini-Console Mobile
+        const uint64_t txFrames = dmxEngine.getTxFrameCount();
+        const uint64_t txErrors = dmxEngine.getTxErrorCount();
+        if (!uiStateInitialized || txFrames != lastUiTxFrames || txErrors != lastUiTxErrors)
+        {
+            lastUiTxFrames = txFrames;
+            lastUiTxErrors = txErrors;
+            statsLbl.setText("TX: " + juce::String(txFrames)
+                + " frame | Errori: " + juce::String(txErrors),
+                juce::dontSendNotification);
+        }
+
         const int engineMasterPct = juce::roundToInt(dmxEngine.getMasterDimmer() * 100.0f);
         if (juce::roundToInt(masterSlider.getValue()) != engineMasterPct)
             masterSlider.setValue(engineMasterPct, juce::dontSendNotification);
 
-        const bool bo = dmxEngine.isBlackout();
-        if (blackoutBtn.getToggleState() != bo)
+        if (!uiStateInitialized || blackoutBtn.getToggleState() != bo)
         {
             blackoutBtn.setToggleState(bo, juce::dontSendNotification);
             blackoutBtn.setButtonText(bo ? "BLACKOUT ATTIVO" : "BLACKOUT");
+            lastUiBlackout = bo;
         }
+
+        uiStateInitialized = true;
+        return ledChanged;
     }
 
     void timerCallback() override
     {
-        dmxEngine.getOutputManager().getUniverseBuffer().copyUniverseTo(monitorSnapshot);
-        refreshStatusUI();
-        repaint();
+        if (!isShowing())
+            return;
+
+        std::array<uint8_t, 512> fresh{}, peaks{};
+        dmxEngine.consumeMonitorSnapshot(fresh, peaks);
+
+        const size_t pageOffset = static_cast<size_t>(activeMonitorPage * 128);
+
+        for (size_t ch = 0; ch < 512; ++ch)
+        {
+            const uint8_t prevVal = monitorSnapshot[ch];
+            const uint8_t nextVal = (fresh[ch] == 0 && prevVal == 0 && peaks[ch] > 0)
+                ? peaks[ch]
+                : fresh[ch];
+
+            if (nextVal != prevVal)
+            {
+                monitorSnapshot[ch] = nextVal;
+                if (ch >= pageOffset && ch < pageOffset + 128)
+                {
+                    const int cellIdx = static_cast<int>(ch - pageOffset);
+                    repaint(getMonitorCellRect(cellIdx).expanded(2.0f).getSmallestIntegerContainer());
+                }
+            }
+        }
+
+        if (++statusTickDivider >= 6)
+        {
+            statusTickDivider = 0;
+            if (refreshStatusUI())
+                repaint(ledRect.expanded(5.0f).toNearestInt());
+        }
+    }
+
+    static const std::array<juce::String, 513>& getCachedNumberStrings()
+    {
+        static const auto table = []() {
+            std::array<juce::String, 513> arr;
+            for (int i = 0; i <= 512; ++i)
+                arr[static_cast<size_t>(i)] = juce::String(i);
+            return arr;
+            }();
+        return table;
+    }
+
+    juce::Rectangle<float> getMonitorCellRect(int cellIndex0to127) const
+    {
+        auto inner = monitorGridRect.reduced(6);
+        constexpr int cols = 16;
+        constexpr int rows = 8;
+        const float cellW = static_cast<float>(inner.getWidth()) / static_cast<float>(cols);
+        const float cellH = static_cast<float>(inner.getHeight()) / static_cast<float>(rows);
+
+        const int col = cellIndex0to127 % cols;
+        const int row = cellIndex0to127 / cols;
+
+        return {
+            inner.getX() + col * cellW + 1.5f,
+            inner.getY() + row * cellH + 1.5f,
+            cellW - 3.0f,
+            cellH - 3.0f
+        };
     }
 
     void drawChannelMonitorGrid(juce::Graphics& g, const juce::Rectangle<int>& area)
@@ -815,25 +1084,21 @@ private:
         g.setColour(juce::Colour(0xff2a2d3d));
         g.drawRoundedRectangle(area.toFloat(), 6.0f, 1.0f);
 
-        auto inner = area.reduced(6);
-        constexpr int cols = 16;
-        constexpr int rows = 8;
-        const float cellW = static_cast<float>(inner.getWidth()) / static_cast<float>(cols);
-        const float cellH = static_cast<float>(inner.getHeight()) / static_cast<float>(rows);
+        const auto& numStrings = getCachedNumberStrings();
+        const juce::Font chFont(juce::FontOptions(9.0f));
+        const juce::Font valFontPlain(juce::FontOptions(11.5f, juce::Font::plain));
+        const juce::Font valFontBold(juce::FontOptions(11.5f, juce::Font::bold));
+        const auto clipBounds = g.getClipBounds().toFloat();
         const int baseCh = activeMonitorPage * 128;
 
         for (int i = 0; i < 128; ++i)
         {
-            const int col = i % cols;
-            const int row = i / cols;
+            const auto cell = getMonitorCellRect(i);
+            if (!clipBounds.intersects(cell.expanded(2.0f)))
+                continue;
+
             const int chIdx = baseCh + i;
             const uint8_t val = monitorSnapshot[static_cast<size_t>(chIdx)];
-
-            juce::Rectangle<float> cell(
-                inner.getX() + col * cellW + 1.5f,
-                inner.getY() + row * cellH + 1.5f,
-                cellW - 3.0f,
-                cellH - 3.0f);
 
             g.setColour(val > 0 ? juce::Colour(0xff172233) : juce::Colour(0xff141620));
             g.fillRoundedRectangle(cell, 3.0f);
@@ -851,17 +1116,42 @@ private:
             g.setColour(val > 0 ? juce::Colour(0xff38bdf8).withAlpha(0.65f) : juce::Colour(0xff252938));
             g.drawRoundedRectangle(cell, 3.0f, 1.0f);
 
+            const auto textBox = cell.reduced(2.0f, 1.0f).toNearestInt();
+
             g.setColour(juce::Colour(0xff64748b));
-            g.setFont(juce::FontOptions(9.0f));
-            g.drawText(juce::String(chIdx + 1), cell.reduced(2.0f, 1.0f).toNearestInt(),
+            g.setFont(chFont);
+            g.drawText(numStrings[static_cast<size_t>(chIdx + 1)], textBox,
                 juce::Justification::topLeft, false);
 
             g.setColour(val > 0 ? juce::Colours::white : juce::Colour(0xff475569));
-            g.setFont(juce::FontOptions(11.5f, val > 0 ? juce::Font::bold : juce::Font::plain));
-            g.drawText(juce::String(static_cast<int>(val)), cell.reduced(2.0f, 1.0f).toNearestInt(),
+            g.setFont(val > 0 ? valFontBold : valFontPlain);
+            g.drawText(numStrings[static_cast<size_t>(val)], textBox,
                 juce::Justification::centredBottom, false);
         }
     }
+
+    void markDirty()
+    {
+        if (!isLoadingSettings)
+            setDirty(true);
+    }
+
+    void setDirty(bool shouldBeDirty)
+    {
+        if (dirty != shouldBeDirty)
+        {
+            dirty = shouldBeDirty;
+            saveConfigBtn.setButtonText(dirty ? "Salva Config *" : "Salva Config");
+            saveConfigBtn.setColour(juce::TextButton::buttonColourId,
+                dirty ? juce::Colour(0xff0f766e) : juce::Colour(0xff293d3d));
+            if (onDirtyStateChanged)
+                onDirtyStateChanged(dirty);
+        }
+    }
+
+    juce::TextButton saveConfigBtn;
+    bool isLoadingSettings = false;
+    bool dirty = false;
 
     DmxLiveEngine& dmxEngine;
     std::array<uint8_t, 512> monitorSnapshot{};
@@ -907,6 +1197,14 @@ private:
     std::vector<EnttecProDmxDriver::ComPortInfo> detectedComPorts;
     juce::TextButton debugSerialBtn;
     std::unique_ptr<SerialDebugWindow> serialDebugWindow;
+
+    bool uiStateInitialized = false;
+    int statusTickDivider = 0;
+    bool lastUiActive = false;
+    bool lastUiBlackout = false;
+    juce::String lastUiStatusText;
+    uint64_t lastUiTxFrames = 0;
+    uint64_t lastUiTxErrors = 0;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(DmxOutputControlPanel)
 };

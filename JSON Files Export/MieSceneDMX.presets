@@ -1,30 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
 <PRESET_LIBRARY>
-  <SCENE_PRESET sceneName="Blast Beat White - BACK UP" startBeat="33.0" durationBeats="32.0"
-                presetName="Blast Beat White - BACK UP" targetRolesCsv="Aria: Wash Controluce (Fondale)|Aria: Teste Mobili / Beam"
-                presetPool="Strobe" layerType="OverlayFX" presetColor1="ffffffff"
-                presetColor2="ffffffff" presetDimmerMin="0" presetDimmerMax="255"
-                presetCurve="Static" presetStrobeUseHw="1" presetStrobeSubdiv="1/16"
-                presetUseColor="1" presetUseDimmer="0" presetUseMove="0" presetUseStrobe="1"
-                presetId="9178cd4dcdd145938efe6122eab2b6c7">
-    <ROLE_COMMAND roleName="Aria: Wash Controluce (Fondale)" parameter="Red" startValue="255"
-                  endValue="255" curve="Static" commandColor="ffffffff"/>
-    <ROLE_COMMAND roleName="Aria: Wash Controluce (Fondale)" parameter="Green"
-                  startValue="255" endValue="255" curve="Static" commandColor="ffffffff"/>
-    <ROLE_COMMAND roleName="Aria: Wash Controluce (Fondale)" parameter="Blue" startValue="255"
-                  endValue="255" curve="Static" commandColor="ffffffff"/>
-    <ROLE_COMMAND roleName="Aria: Wash Controluce (Fondale)" parameter="Dimmer"
-                  startValue="0" endValue="255" curve="Square_1_16" commandColor="ffffffff"/>
-    <ROLE_COMMAND roleName="Aria: Teste Mobili / Beam" parameter="Red" startValue="255"
-                  endValue="255" curve="Static" commandColor="ffffffff"/>
-    <ROLE_COMMAND roleName="Aria: Teste Mobili / Beam" parameter="Green" startValue="255"
-                  endValue="255" curve="Static" commandColor="ffffffff"/>
-    <ROLE_COMMAND roleName="Aria: Teste Mobili / Beam" parameter="Blue" startValue="255"
-                  endValue="255" curve="Static" commandColor="ffffffff"/>
-    <ROLE_COMMAND roleName="Aria: Teste Mobili / Beam" parameter="Dimmer" startValue="0"
-                  endValue="255" curve="Square_1_16" commandColor="ffffffff"/>
-  </SCENE_PRESET>
   <SCENE_PRESET sceneName="Blast Beat Red - FLOOR" startBeat="65.0" durationBeats="4.0"
                 presetName="Orange Floor" targetRolesCsv="Terra: Controluce / Sotto-Batteria|Terra: Par / Barre Laterali (Taglio)|Terra: Teste Mobili a Terra"
                 presetPool="Color" layerType="Base" presetColor1="ffdc2626" presetColor2="fff59e0b"
@@ -273,7 +249,7 @@
                   startValue="0" endValue="255" curve="Linear" commandColor="ffffffff"/>
   </SCENE_PRESET>
   <SCENE_PRESET presetName="Decrescendo Dimmer" presetPool="Dimmer" layerType="Base"
-                durationBeats="4.0" isOneShot="1" phaseMode="Sync" targetRolesCsv="Aria: Wash Controluce (Fondale)|Aria: Teste Mobili / Beam|Terra: Controluce / Sotto-Batteria"
+                durationBeats="4.0" isOneShot="1" phaseMode="Sync" targetRolesCsv="Aria: Wash Controluce (Fondale)|Terra: Controluce / Sotto-Batteria"
                 presetColor1="ffffffff" presetColor2="ffffffff" presetDimmerMin="0"
                 presetDimmerMax="255" presetCurve="Decay" presetStrobeUseHw="0"
                 presetStrobeSubdiv="1/8" presetMoveShape="PanSweep" presetMoveSpeed="Sine_4Bars"
@@ -281,8 +257,6 @@
                 presetUseDimmer="1" presetUseMove="0" presetUseStrobe="0" presetId="237bc465f24a436e99bf336a92d7752b">
     <ROLE_COMMAND roleName="Aria: Wash Controluce (Fondale)" parameter="Dimmer"
                   startValue="255" endValue="0" curve="Decay" commandColor="ffffffff"/>
-    <ROLE_COMMAND roleName="Aria: Teste Mobili / Beam" parameter="Dimmer" startValue="255"
-                  endValue="0" curve="Decay" commandColor="ffffffff"/>
     <ROLE_COMMAND roleName="Terra: Controluce / Sotto-Batteria" parameter="Dimmer"
                   startValue="255" endValue="0" curve="Decay" commandColor="ffffffff"/>
   </SCENE_PRESET>

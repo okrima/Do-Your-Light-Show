@@ -296,6 +296,11 @@ public:
     void forceStopFixtureTest();
     void visibilityChanged() override;
 
+    std::function<void()> onVenueClean;
+    void saveVenueForExitAsync(std::function<void(bool saved)> onComplete);
+
+    void refreshAfterUndoRedo();
+
 private:
     void addNewFixtureToState();
     void removeSelectedFixture();
@@ -329,6 +334,8 @@ private:
     FixtureEditorPanel editorPanel;
     StagePatchAndCasePanel stageDesignerPanel;
     std::unique_ptr<juce::FileChooser> fileChooser;
+
+    juce::File currentVenueFile;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(VenuePatchTab)
 };
