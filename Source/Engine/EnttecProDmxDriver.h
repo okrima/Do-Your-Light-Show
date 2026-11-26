@@ -1,5 +1,8 @@
 #pragma once
 #include "DmxOutputDriver.h"
+#include <algorithm>
+#include <cmath>
+#include <cstring>
 #include <deque>
 #include <vector>
 
@@ -20,8 +23,8 @@ class EnttecProDmxDriver : public DmxOutputDriver
 public:
     struct ComPortInfo
     {
-        juce::String portName;     // es. "COM4"
-        juce::String friendlyName; // es. "USB Serial Port (COM4)"
+        juce::String portName;     // es. "COM3"
+        juce::String friendlyName; // es. "USB Serial Port (COM3)"
         juce::String hardwareId;   // es. "FTDIBUS\\COMPORT&VID_0403&PID_6001"
         bool isFtdi = false;
 
@@ -53,7 +56,6 @@ public:
         std::vector<ComPortInfo> result;
 
 #if JUCE_WINDOWS
-        // GUID standard classe "Ports (COM & LPT)": {4d36e978-e325-11ce-bfc1-08002be10318}
         static constexpr GUID kPortsClassGuid = {
             0x4d36e978, 0xe325, 0x11ce,{ 0xbf, 0xc1, 0x08, 0x00, 0x2b, 0xe1, 0x03, 0x18 }
         };
@@ -66,7 +68,6 @@ public:
 
             for (DWORD idx = 0; ::SetupDiEnumDeviceInfo(devInfo, idx, &devData); ++idx)
             {
-                // 1. Legge il nome esatto della porta dal registro (es. "COM4")
                 juce::String portName;
                 HKEY hKey = ::SetupDiOpenDevRegKey(devInfo, &devData, DICS_FLAG_GLOBAL, 0, DIREG_DEV, KEY_READ);
                 if (hKey != INVALID_HANDLE_VALUE)
@@ -110,7 +111,6 @@ public:
             ::SetupDiDestroyDeviceInfoList(devInfo);
         }
 
-        // Fallback se SetupAPI non restituisce nulla
         if (result.empty())
         {
             wchar_t targetPath[256]{};
@@ -126,7 +126,6 @@ public:
             }
         }
 
-        // Ordina mettendo prima i dispositivi FTDI, poi per numero COM crescente
         std::sort(result.begin(), result.end(), [](const ComPortInfo& a, const ComPortInfo& b)
             {
                 if (a.isFtdi != b.isFtdi)
@@ -153,74 +152,10 @@ public:
 #if JUCE_WINDOWS
         if (comPortName.isEmpty())
         {
-            statusText = "Nessuna porta COM selezionata";
+            setStatusText("Nessuna porta COM selezionata");
             appendLog("ERRORE: Nessuna porta COM selezionata.");
             return false;
         }
-
-        const juce::String devicePath = "\\\\.\\" + comPortName;
-        HANDLE h = ::CreateFileW(
-            devicePath.toWideCharPointer(),
-            GENERIC_READ | GENERIC_WRITE,
-            0,
-            nullptr,
-            OPEN_EXISTING,
-            FILE_ATTRIBUTE_NORMAL,
-            nullptr);
-
-        if (h == INVALID_HANDLE_VALUE)
-        {
-            const DWORD err = ::GetLastError();
-            statusText = "Impossibile aprire " + comPortName + " (err " + juce::String(static_cast<int>(err)) + ")";
-            appendLog("ERRORE CreateFile(" + comPortName + "): codice Win32 " + juce::String(static_cast<int>(err)));
-            return false;
-        }
-
-        DCB dcb{};
-        dcb.DCBlength = sizeof(DCB);
-        if (!::GetCommState(h, &dcb))
-        {
-            ::CloseHandle(h);
-            statusText = "Errore lettura configurazione " + comPortName;
-            appendLog("ERRORE GetCommState su " + comPortName);
-            return false;
-        }
-
-        dcb.BaudRate = kBaudRate;
-        dcb.ByteSize = 8;
-        dcb.Parity = NOPARITY;
-        dcb.StopBits = TWOSTOPBITS;
-        dcb.fBinary = TRUE;
-        dcb.fDtrControl = DTR_CONTROL_ENABLE;
-        dcb.fRtsControl = RTS_CONTROL_ENABLE;
-        dcb.fOutxCtsFlow = FALSE;
-        dcb.fOutxDsrFlow = FALSE;
-        dcb.fOutX = FALSE;
-        dcb.fInX = FALSE;
-
-        if (!::SetCommState(h, &dcb))
-        {
-            ::CloseHandle(h);
-            statusText = "Errore impostazione 250000 8N2 su " + comPortName;
-            appendLog("ERRORE SetCommState(250000 8N2) su " + comPortName);
-            return false;
-        }
-
-        COMMTIMEOUTS timeouts{};
-        timeouts.ReadIntervalTimeout = 20;
-        timeouts.ReadTotalTimeoutMultiplier = 0;
-        timeouts.ReadTotalTimeoutConstant = 80;
-        timeouts.WriteTotalTimeoutMultiplier = 0;
-        timeouts.WriteTotalTimeoutConstant = 50; // 518 byte @ 250k baud 8N2 = ~22.8 ms
-        ::SetCommTimeouts(h, &timeouts);
-
-        ::PurgeComm(h, PURGE_TXCLEAR | PURGE_RXCLEAR);
-
-        serialHandle = h;
-        hasSentInitialFrame = false;
-        lastTxTimeMs = 0.0;
-        opened = true;
-        statusText = "USB DMX Pro / Eurolite connesso su " + comPortName;
 
         {
             const juce::ScopedLock sl(debugLock);
@@ -229,44 +164,74 @@ public:
             txBytesTotal = 0;
             txErrors = 0;
             lastTxDurationMs = 0.0;
-            lastTxHexPreview.clear();
+            hasTxPreview = false;
             lastRxHex.clear();
         }
-        appendLog("APERTO " + comPortName + " @ 250000 baud (8N2, DTR/RTS ON, Timeout TX 50 ms)");
+
+        if (!openSerialHandle(false))
+            return false;
+
+        sessionActive = true;
+        consecutiveWriteErrors = 0;
+        lastReconnectAttemptMs = 0.0;
         return true;
 #else
-        statusText = "Driver COM Win32 disponibile solo su Windows";
+        setStatusText("Driver COM Win32 disponibile solo su Windows");
         return false;
 #endif
     }
 
     void close() override
     {
+        sessionActive = false;
+        consecutiveWriteErrors = 0;
+
 #if JUCE_WINDOWS
         if (serialHandle != INVALID_HANDLE_VALUE)
         {
+            ::PurgeComm(serialHandle, PURGE_TXABORT | PURGE_RXABORT | PURGE_TXCLEAR | PURGE_RXCLEAR);
             ::CloseHandle(serialHandle);
             serialHandle = INVALID_HANDLE_VALUE;
             appendLog("CHIUSO " + comPortName);
         }
 #endif
-        opened = false;
-        statusText = "USB DMX Pro / Eurolite disconnesso";
+        setStatusText("USB DMX Pro / Eurolite disconnesso");
     }
 
-    bool isOpen() const override { return opened; }
+    bool isOpen() const override
+    {
+#if JUCE_WINDOWS
+        return sessionActive && serialHandle != INVALID_HANDLE_VALUE;
+#else
+        return false;
+#endif
+    }
 
     bool sendFrame(const uint8_t* dmx512) override
     {
 #if JUCE_WINDOWS
-        if (!opened || serialHandle == INVALID_HANDLE_VALUE || dmx512 == nullptr)
+        if (!sessionActive || dmx512 == nullptr)
             return false;
 
         const double nowMs = juce::Time::getMillisecondCounterHiRes();
+
+        // Auto-riconnessione trasparente se la porta e' caduta durante il live
+        if (serialHandle == INVALID_HANDLE_VALUE)
+        {
+            if ((nowMs - lastReconnectAttemptMs) < kReconnectIntervalMs)
+                return false;
+
+            lastReconnectAttemptMs = nowMs;
+            if (!openSerialHandle(true))
+                return false;
+
+            consecutiveWriteErrors = 0;
+        }
+
         const bool dataChanged = !hasSentInitialFrame
             || (std::memcmp(lastSentDmx.data(), dmx512, 512) != 0);
 
-        if (!dataChanged && (nowMs - lastTxTimeMs) < 150.0)
+        if (!dataChanged && (nowMs - lastTxTimeMs) < kKeepaliveIntervalMs)
         {
             const juce::ScopedLock sl(debugLock);
             ++txPacketsSkipped;
@@ -284,30 +249,54 @@ public:
             static_cast<DWORD>(packet.size()),
             &bytesWritten,
             nullptr);
-        const double elapsedMs = juce::Time::getMillisecondCounterHiRes() - t0;
+        const double t1 = juce::Time::getMillisecondCounterHiRes();
+        const double elapsedMs = t1 - t0;
 
         if (ok != FALSE && bytesWritten == static_cast<DWORD>(packet.size()))
         {
             std::memcpy(lastSentDmx.data(), dmx512, 512);
             hasSentInitialFrame = true;
-            lastTxTimeMs = nowMs;
+            lastTxTimeMs = t1;
+            consecutiveWriteErrors = 0;
 
             const juce::ScopedLock sl(debugLock);
             ++txPacketsSent;
             txBytesTotal += bytesWritten;
             lastTxDurationMs = elapsedMs;
-            lastTxHexPreview = formatPacketPreview(packet.data(), 24);
+            std::memcpy(lastTxPreviewBytes.data(), packet.data(), lastTxPreviewBytes.size());
+            hasTxPreview = true;
             return true;
         }
 
         const DWORD err = ::GetLastError();
+        DWORD commErrs = 0;
+        COMSTAT commStat{};
+        ::ClearCommError(serialHandle, &commErrs, &commStat);
+        ::PurgeComm(serialHandle, PURGE_TXABORT | PURGE_TXCLEAR);
+
+        ++consecutiveWriteErrors;
         {
             const juce::ScopedLock sl(debugLock);
             ++txErrors;
             lastTxDurationMs = elapsedMs;
         }
-        appendLog("ERRORE TX WriteFile: scritti " + juce::String(static_cast<int>(bytesWritten))
-            + "/518 byte (Win32 err " + juce::String(static_cast<int>(err)) + ")");
+
+        if (consecutiveWriteErrors <= 3 || (consecutiveWriteErrors % 20) == 0)
+        {
+            appendLog("ERRORE TX WriteFile: scritti " + juce::String(static_cast<int>(bytesWritten))
+                + "/518 byte (Win32 err " + juce::String(static_cast<int>(err)) + ")");
+        }
+
+        if (consecutiveWriteErrors >= kErrorsBeforeReconnect)
+        {
+            ::CloseHandle(serialHandle);
+            serialHandle = INVALID_HANDLE_VALUE;
+            hasSentInitialFrame = false;
+            lastReconnectAttemptMs = t1;
+            setStatusText("Connessione persa su " + comPortName + " - riconnessione...");
+            appendLog("PORTA PERSA su " + comPortName + ": avvio auto-riconnessione ogni 750 ms...");
+        }
+
         return false;
 #else
         juce::ignoreUnused(dmx512);
@@ -320,7 +309,11 @@ public:
         const juce::ScopedLock sl(debugLock);
         DebugSnapshot s;
         s.isSerialDriver = true;
-        s.isOpen = opened;
+#if JUCE_WINDOWS
+        s.isOpen = sessionActive && (serialHandle != INVALID_HANDLE_VALUE);
+#else
+        s.isOpen = false;
+#endif
         s.portOrTarget = comPortName;
         s.baudRate = kBaudRate;
         s.txPacketsSent = txPacketsSent;
@@ -328,7 +321,7 @@ public:
         s.txBytesTotal = txBytesTotal;
         s.txErrors = txErrors;
         s.lastTxDurationMs = lastTxDurationMs;
-        s.lastTxHexPreview = lastTxHexPreview;
+        s.lastTxHexPreview = hasTxPreview ? formatPacketPreview(lastTxPreviewBytes.data(), 24) : juce::String();
         s.lastRxHex = lastRxHex;
         for (const auto& line : logHistory)
             s.logLines.add(line);
@@ -338,7 +331,7 @@ public:
     juce::String runDiagnosticProbe() override
     {
 #if JUCE_WINDOWS
-        if (!opened || serialHandle == INVALID_HANDLE_VALUE)
+        if (!sessionActive || serialHandle == INVALID_HANDLE_VALUE)
         {
             appendLog("PROBE: porta non aperta.");
             return "Apri prima la porta COM per interrogare l'interfaccia.";
@@ -367,7 +360,6 @@ public:
             appendLog("PROBE RX (" + juce::String(static_cast<int>(bytesRead)) + " byte): " + hexStr);
             summary = "Risposta ricevuta (" + juce::String(static_cast<int>(bytesRead)) + " byte): " + hexStr;
 
-            // Parsing base risposta Label 0x03 se conforme Enttec Pro
             if (bytesRead >= 10 && rxBuf[0] == 0x7E && rxBuf[1] == 0x03)
             {
                 const int fwLsb = rxBuf[4];
@@ -382,8 +374,8 @@ public:
         }
         else
         {
-            appendLog("PROBE RX [0x03]: nessuna risposta (normale su alcuni firmware solo-TX; verifica LED sull'Eurolite).");
-            summary = "Nessuna risposta RX al comando 0x03 (molti cloni MK2 sono solo TX su DMX).";
+            appendLog("PROBE RX [0x03]: nessuna risposta (normale sui firmware Eurolite solo-TX).");
+            summary = "Nessuna risposta RX al comando 0x03 (normale sui firmware Eurolite solo-TX).";
         }
 
         // 2. Label 0x0A: Get Widget Serial Number Request
@@ -412,14 +404,111 @@ public:
     }
 
     juce::String getDriverName() const override { return "USB DMX Pro / Eurolite MK2 (" + comPortName + ")"; }
-    juce::String getStatusText() const override { return statusText; }
+    juce::String getStatusText() const override
+    {
+        const juce::ScopedLock sl(debugLock);
+        return statusText;
+    }
 
 private:
     static constexpr int kBaudRate = 250000;
+    static constexpr double kKeepaliveIntervalMs = 150.0;
+    static constexpr double kReconnectIntervalMs = 750.0;
+    static constexpr int kErrorsBeforeReconnect = 3;
+
+#if JUCE_WINDOWS
+    bool openSerialHandle(bool isReconnect)
+    {
+        const juce::String devicePath = "\\\\.\\" + comPortName;
+        HANDLE h = ::CreateFileW(
+            devicePath.toWideCharPointer(),
+            GENERIC_READ | GENERIC_WRITE,
+            0,
+            nullptr,
+            OPEN_EXISTING,
+            FILE_ATTRIBUTE_NORMAL,
+            nullptr);
+
+        if (h == INVALID_HANDLE_VALUE)
+        {
+            const DWORD err = ::GetLastError();
+            if (!isReconnect)
+            {
+                setStatusText("Impossibile aprire " + comPortName + " (err " + juce::String(static_cast<int>(err)) + ")");
+                appendLog("ERRORE CreateFile(" + comPortName + "): codice Win32 " + juce::String(static_cast<int>(err)));
+            }
+            return false;
+        }
+
+        ::SetupComm(h, 4096, 4096);
+
+        DCB dcb{};
+        dcb.DCBlength = sizeof(DCB);
+        if (!::GetCommState(h, &dcb))
+        {
+            ::CloseHandle(h);
+            if (!isReconnect)
+            {
+                setStatusText("Errore lettura configurazione " + comPortName);
+                appendLog("ERRORE GetCommState su " + comPortName);
+            }
+            return false;
+        }
+
+        dcb.BaudRate = kBaudRate;
+        dcb.ByteSize = 8;
+        dcb.Parity = NOPARITY;
+        dcb.StopBits = TWOSTOPBITS;
+        dcb.fBinary = TRUE;
+        dcb.fDtrControl = DTR_CONTROL_ENABLE;
+        dcb.fRtsControl = RTS_CONTROL_ENABLE;
+        dcb.fOutxCtsFlow = FALSE;
+        dcb.fOutxDsrFlow = FALSE;
+        dcb.fOutX = FALSE;
+        dcb.fInX = FALSE;
+        dcb.fAbortOnError = FALSE;
+
+        if (!::SetCommState(h, &dcb))
+        {
+            ::CloseHandle(h);
+            if (!isReconnect)
+            {
+                setStatusText("Errore impostazione 250000 8N2 su " + comPortName);
+                appendLog("ERRORE SetCommState(250000 8N2) su " + comPortName);
+            }
+            return false;
+        }
+
+        COMMTIMEOUTS timeouts{};
+        timeouts.ReadIntervalTimeout = 20;
+        timeouts.ReadTotalTimeoutMultiplier = 0;
+        timeouts.ReadTotalTimeoutConstant = 80;
+        timeouts.WriteTotalTimeoutMultiplier = 0;
+        timeouts.WriteTotalTimeoutConstant = 45; // 518 byte @ 250k baud 8N2 = ~22.8 ms
+        ::SetCommTimeouts(h, &timeouts);
+
+        ::PurgeComm(h, PURGE_TXABORT | PURGE_RXABORT | PURGE_TXCLEAR | PURGE_RXCLEAR);
+
+        serialHandle = h;
+        hasSentInitialFrame = false;
+        lastTxTimeMs = 0.0;
+        setStatusText("USB DMX Pro / Eurolite connesso su " + comPortName);
+        appendLog((isReconnect ? "RICONNESSO " : "APERTO ") + comPortName
+            + " @ 250000 baud (8N2, Buf 4KB, DTR/RTS ON, Timeout TX 45 ms)");
+        return true;
+    }
+#endif
+
+    void setStatusText(const juce::String& text)
+    {
+        const juce::ScopedLock sl(debugLock);
+        statusText = text;
+    }
 
     static juce::String bytesToHex(const uint8_t* data, size_t len)
     {
         juce::String s;
+        s.preallocateBytes(len * 3);
         for (size_t i = 0; i < len; ++i)
         {
             if (i > 0) s += ' ';
@@ -428,11 +517,10 @@ private:
         return s;
     }
 
-    static juce::String formatPacketPreview(const uint8_t* pkt518, int numDmxChannels)
+    static juce::String formatPacketPreview(const uint8_t* pkt29, int numDmxChannels)
     {
-        // Header (5 byte: 7E 06 01 02 00) + primi N canali DMX + chiusura (E7)
-        juce::String out = "HDR[" + bytesToHex(pkt518, 5) + "]  CH1.." + juce::String(numDmxChannels) + "[";
-        out += bytesToHex(pkt518 + 5, static_cast<size_t>(numDmxChannels));
+        juce::String out = "HDR[" + bytesToHex(pkt29, 5) + "]  CH1.." + juce::String(numDmxChannels) + "[";
+        out += bytesToHex(pkt29 + 5, static_cast<size_t>(numDmxChannels));
         out += "] ... END[E7]";
         return out;
     }
@@ -462,16 +550,19 @@ private:
     std::array<uint8_t, 512> lastSentDmx{};
     bool hasSentInitialFrame = false;
     double lastTxTimeMs = 0.0;
-    bool opened = false;
-    juce::String statusText{ "USB DMX Pro / Eurolite pronto" };
+    double lastReconnectAttemptMs = 0.0;
+    int consecutiveWriteErrors = 0;
+    bool sessionActive = false;
 
     mutable juce::CriticalSection debugLock;
+    juce::String statusText{ "USB DMX Pro / Eurolite pronto" };
     uint64_t txPacketsSent = 0;
     uint64_t txPacketsSkipped = 0;
     uint64_t txBytesTotal = 0;
     uint64_t txErrors = 0;
     double lastTxDurationMs = 0.0;
-    juce::String lastTxHexPreview;
+    std::array<uint8_t, 29> lastTxPreviewBytes{};
+    bool hasTxPreview = false;
     juce::String lastRxHex;
     std::deque<juce::String> logHistory;
 

@@ -709,6 +709,9 @@ private:
             }
         }
 
+        const bool frameChanged = !hasPushedInitialFrame || (out != lastSentFrame);
+        hasPushedInitialFrame = true;
+
         outputManager.getUniverseBuffer().writeUniverse(out);
 
         lastSentFrame = out;
@@ -717,6 +720,9 @@ private:
             if (out[i] > monitorPeakSinceRead[i])
                 monitorPeakSinceRead[i] = out[i];
         }
+
+        if (frameChanged)
+            outputManager.notifyFrameUpdated();
     }
 
     static bool isCommandAllowedBySceneMask(const juce::ValueTree& sceneNode,
@@ -863,6 +869,8 @@ private:
     std::array<uint8_t, 512> lastSentFrame{};
     std::array<uint8_t, 512> monitorPeakSinceRead{};
     std::map<int, uint8_t> lastPanTiltByChannel;
+
+    bool hasPushedInitialFrame = false;
 
     std::atomic<bool> fixtureTestActive{ false };
     std::atomic<bool> manualTestActive{ false };

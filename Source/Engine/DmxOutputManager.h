@@ -3,7 +3,13 @@
 #include "ArtNetDmxDriver.h"
 #include "SacnDmxDriver.h"
 #include "EnttecProDmxDriver.h"
+#include <cmath>
 #include <memory>
+
+#if JUCE_WINDOWS
+#include <mmsystem.h>
+#pragma comment(lib, "winmm.lib")
+#endif
 
 class DmxOutputManager : private juce::Thread
 {
@@ -20,6 +26,16 @@ public:
 
     DmxUniverseBuffer& getUniverseBuffer() noexcept { return universeBuffer; }
     const DmxUniverseBuffer& getUniverseBuffer() const noexcept { return universeBuffer; }
+
+    // Sveglia immediatamente il thread TX quando i dati DMX cambiano (latenza < 1 ms)
+    void notifyFrameUpdated() noexcept
+    {
+        if (outputRunning.load(std::memory_order_acquire))
+        {
+            if (!frameDirty.exchange(true, std::memory_order_acq_rel))
+                notify();
+        }
+    }
 
     bool startOutput(std::unique_ptr<DmxOutputDriver> driver)
     {
@@ -51,16 +67,17 @@ public:
         txFrameCount.store(0);
         txErrorCount.store(0);
         consecutiveErrors.store(0);
-        outputRunning.store(true);
+        frameDirty.store(true, std::memory_order_release);
+        outputRunning.store(true, std::memory_order_release);
 
-        // Priority::normal evita che il thread TX sottragga cicli a UI e audio
-        startThread(juce::Thread::Priority::normal);
+        // Priority::high riduce il jitter UI senza mai interferire con il thread Audio real-time
+        startThread(juce::Thread::Priority::high);
         return true;
     }
 
     void stopOutput(bool sendFinalBlackout = true)
     {
-        outputRunning.store(false);
+        outputRunning.store(false, std::memory_order_release);
         signalThreadShouldExit();
         stopThread(1000);
 
@@ -86,7 +103,7 @@ public:
         }
     }
 
-    bool isOutputActive() const noexcept { return outputRunning.load(); }
+    bool isOutputActive() const noexcept { return outputRunning.load(std::memory_order_acquire); }
     uint64_t getTxFrameCount() const noexcept { return txFrameCount.load(); }
     uint64_t getTxErrorCount() const noexcept { return txErrorCount.load(); }
 
@@ -133,40 +150,70 @@ public:
 private:
     void run() override
     {
+#if JUCE_WINDOWS
+        struct ScopedWinHiResTimer
+        {
+            ScopedWinHiResTimer() { ::timeBeginPeriod(1); }
+            ~ScopedWinHiResTimer() { ::timeEndPeriod(1); }
+        } hiResTimerGuard;
+#endif
+
         std::array<uint8_t, DmxUniverseBuffer::kNumChannels> localFrame{};
-        double nextTickMs = juce::Time::getMillisecondCounterHiRes();
+        double nextPeriodicTickMs = juce::Time::getMillisecondCounterHiRes();
+        double earliestDirtySendMs = nextPeriodicTickMs;
         double lastSnapMs = 0.0;
 
         while (!threadShouldExit())
         {
             const double periodMs = 1000.0 / static_cast<double>(refreshRateHz.load());
-            nextTickMs += periodMs;
+            const double nowMs = juce::Time::getMillisecondCounterHiRes();
+            const bool isDirty = frameDirty.load(std::memory_order_acquire);
 
+            const double targetMs = isDirty
+                ? juce::jmin(nextPeriodicTickMs, earliestDirtySendMs)
+                : nextPeriodicTickMs;
+
+            if (nowMs < targetMs - 0.5)
+            {
+                const int waitMs = juce::jmax(1, static_cast<int>(std::floor(targetMs - nowMs)));
+                wait(waitMs);
+                continue;
+            }
+
+            const bool wasDirty = frameDirty.exchange(false, std::memory_order_acq_rel);
             universeBuffer.copyUniverseTo(localFrame);
 
             bool sentOk = false;
             bool needSnapUpdate = false;
             DmxOutputDriver::DebugSnapshot snap;
-            const double nowBeforeSnap = juce::Time::getMillisecondCounterHiRes();
+            juce::String updatedDriverStatus;
+
+            const double tSendStart = juce::Time::getMillisecondCounterHiRes();
 
             {
                 const juce::ScopedLock sl(driverLock);
-                if (activeDriver != nullptr && activeDriver->isOpen())
+                if (activeDriver != nullptr)
                 {
                     sentOk = activeDriver->sendFrame(localFrame.data());
-                    if ((nowBeforeSnap - lastSnapMs) >= 150.0)
+                    if ((tSendStart - lastSnapMs) >= 150.0 || !sentOk)
                     {
                         snap = activeDriver->getDebugSnapshot();
+                        updatedDriverStatus = activeDriver->getStatusText();
                         needSnapUpdate = true;
-                        lastSnapMs = nowBeforeSnap;
+                        lastSnapMs = tSendStart;
                     }
                 }
             }
+
+            const double tSendEnd = juce::Time::getMillisecondCounterHiRes();
+            const double sendDurationMs = tSendEnd - tSendStart;
 
             if (needSnapUpdate)
             {
                 const juce::ScopedLock sl(statusLock);
                 cachedDebugSnapshot = std::move(snap);
+                if (updatedDriverStatus.isNotEmpty())
+                    lastStatusText = updatedDriverStatus;
             }
 
             if (sentOk)
@@ -177,21 +224,15 @@ private:
             else
             {
                 txErrorCount.fetch_add(1);
-                const int errs = consecutiveErrors.fetch_add(1) + 1;
-                if (errs == 40)
-                {
-                    const juce::ScopedLock sl(statusLock);
-                    lastStatusText = "Connessione DMX persa (controlla cavo / interfaccia)";
-                }
+                consecutiveErrors.fetch_add(1);
             }
 
-            const double nowMs = juce::Time::getMillisecondCounterHiRes();
-            const double remainingMs = nextTickMs - nowMs;
+            nextPeriodicTickMs = tSendStart + periodMs;
 
-            if (remainingMs > 1.0)
-                wait(static_cast<int>(remainingMs));
-            else if (remainingMs < -100.0)
-                nextTickMs = nowMs;
+            // Se c'e' stato un vero invio su filo (dato cambiato o keepalive seriale),
+            // rispetta il periodo minimo; se il driver ha fatto skip (< 2 ms), resta pronto a svegliarsi subito
+            if (wasDirty || sendDurationMs >= 2.0)
+                earliestDirtySendMs = tSendStart + periodMs;
         }
     }
 
@@ -204,6 +245,7 @@ private:
     DmxOutputDriver::DebugSnapshot cachedDebugSnapshot;
 
     std::atomic<bool> outputRunning{ false };
+    std::atomic<bool> frameDirty{ false };
     std::atomic<int> refreshRateHz{ 40 };
     std::atomic<uint64_t> txFrameCount{ 0 };
     std::atomic<uint64_t> txErrorCount{ 0 };

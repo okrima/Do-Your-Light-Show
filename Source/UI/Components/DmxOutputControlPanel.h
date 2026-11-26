@@ -720,7 +720,7 @@ private:
 
             statsLbl.setText(snap.portOrTarget + " @ " + juce::String(snap.baudRate) + " 8N2"
                 + " | TX: " + juce::String(snap.txPacketsSent)
-                + " (Saltati: " + juce::String(snap.txPacketsSkipped) + ")"
+                + " (Invariati: " + juce::String(snap.txPacketsSkipped) + ")"
                 + " | Err: " + juce::String(snap.txErrors)
                 + " | Write: " + juce::String(snap.lastTxDurationMs, 2) + " ms",
                 juce::dontSendNotification);
@@ -918,7 +918,7 @@ private:
             driver = std::make_unique<EnttecProDmxDriver>(port);
         }
 
-        dmxEngine.getOutputManager().setRefreshRateHz(drvId == 3 ? 30 : 40);
+        dmxEngine.getOutputManager().setRefreshRateHz(40);
 
 
 
