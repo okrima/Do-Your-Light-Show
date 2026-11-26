@@ -44,6 +44,28 @@ MainComponent::MainComponent(LightShowProcessor& processorRef)
     sceneBuilderTab.setDmxLiveEngine(&dmxEngine);
     showBuilderTab.setDmxLiveEngine(&dmxEngine);
 
+    auto wireReaperCallbacks = [this]()
+        {
+            if (processor.isReaperApiAvailable())
+            {
+                showBuilderTab.setReaperSyncCallbacks(
+                    true,
+                    [this]() { return processor.forceSyncFromReaper(); },
+                    [this]() { return processor.reaperTogglePlayPause(); },
+                    [this]() { return processor.reaperStopOrRewind(); },
+                    [this](double beat1Based) { return processor.reaperSeekToBeat(beat1Based); }
+                );
+            }
+        };
+
+    if (processor.isRunningInDaw())
+    {
+        showBuilderTab.setDawTransportBridge(&processor.getTransportBridge());
+        timeMetricTab.setEnabled(false);
+        tabbedComponent.setTabName(3, "4. Time & Metric (DAW)");
+        wireReaperCallbacks();
+    }
+
     tabbedComponent.onTabChanged = [this](int prevTab, int newTab)
         {
             processor.setActiveTabIndex(newTab);
@@ -116,7 +138,13 @@ MainComponent::MainComponent(LightShowProcessor& processorRef)
                 }
             }
         },
-        [this]() { refreshAllTabsFromProcessorState(); }
+        [this]() { refreshAllTabsFromProcessorState(); },
+        [this, wireReaperCallbacks]() {
+            processor.getBeatTimeMap().bindToAppState(processor.getMainState());
+            timeMetricTab.refreshTables();
+            wireReaperCallbacks();
+        }
+
     );
 
     processor.markTabDirty(5, dmxControlPanel.hasUnsavedChanges());
@@ -132,7 +160,7 @@ MainComponent::MainComponent(LightShowProcessor& processorRef)
 MainComponent::~MainComponent()
 {
     quitOverlay.reset();
-    processor.setEditorCallbacks(nullptr, nullptr, nullptr, nullptr);
+    processor.setEditorCallbacks(nullptr, nullptr, nullptr, nullptr, nullptr);
     tabbedComponent.clearTabs();
 }
 

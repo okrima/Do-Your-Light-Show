@@ -23,6 +23,14 @@ public:
     const LockFreeTransportBridge& getTransportBridge() const noexcept { return transportBridge; }
 
     bool isRunningInDaw() const noexcept { return hostedInDaw; }
+
+    bool isReaperApiAvailable() const noexcept;
+    bool forceSyncFromReaper();
+    bool reaperTogglePlayPause();
+    bool reaperStopOrRewind();
+    bool reaperSeekToBeat(double beat1Based);
+    juce::VST3ClientExtensions* getVST3ClientExtensions() override;
+
     bool hasInitializedSession() const noexcept { return sessionInitialized; }
 
     void setActiveTabIndex(int tabIndex) noexcept { activeTabIndex = tabIndex; }
@@ -36,7 +44,8 @@ public:
     void setEditorCallbacks(std::function<void()> onDirtyChanged,
         std::function<void()> onHistoryChanged,
         std::function<void(const StateUndoManager::RestoreResult&)> onRestored,
-        std::function<void()> onExternalStateLoaded);
+        std::function<void()> onExternalStateLoaded,
+        std::function<void()> onBeatMapSynced = nullptr);
 
     // --- Interfaccia juce::AudioProcessor ---
     const juce::String getName() const override { return "Do Your Light Show"; }
@@ -75,7 +84,11 @@ private:
     void renderDawDmxFrame(const DawTransportState& transport);
     juce::ValueTree makeShowSubtreeSnapshot() const;
 
+    void tryAutoConnectDmxFromSettings();
+
     static int getLayerPriority(const juce::ValueTree& node);
+
+    bool syncFromReaperHost(bool forceNow);
 
     const bool hostedInDaw = true;
     bool sessionInitialized = false;
@@ -102,6 +115,13 @@ private:
     std::function<void()> editorOnHistoryChanged;
     std::function<void(const StateUndoManager::RestoreResult&)> editorOnStateRestored;
     std::function<void()> editorOnExternalStateLoaded;
+
+    struct ReaperApiBridge;
+    std::unique_ptr<ReaperApiBridge> reaperBridge;
+    bool syncingFromReaper = false;
+    int reaperPollDivider = 0;
+
+    std::function<void()> editorOnBeatMapSynced;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(LightShowProcessor)
 };

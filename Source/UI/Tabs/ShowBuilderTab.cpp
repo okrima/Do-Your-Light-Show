@@ -545,7 +545,7 @@ void SceneEditorPanel::visibilityChanged()
 // =============================================================================
 // ShowBuilderTab Implementation (Main)
 // =============================================================================
-ShowBuilderTab::ShowBuilderTab(juce::ValueTree& state) : appState(state), miniDawTimeline(state, audioEngine, beatTimeMap), editorPanel(state), aiWizardPanel(state, audioEngine), stageSimulator(state, audioEngine, beatTimeMap)
+ShowBuilderTab::ShowBuilderTab(juce::ValueTree& state, bool runningInDaw) : appState(state), miniDawTimeline(state, audioEngine, beatTimeMap), editorPanel(state), audioEngine(!runningInDaw), aiWizardPanel(state, audioEngine), stageSimulator(state, audioEngine, beatTimeMap)
 {
 
     // 1. Garantisce che AUDIO_STEMS, AESTHETIC_CONFIG, BEAT_MAP, VENUE, SHOW e PRESET esistano

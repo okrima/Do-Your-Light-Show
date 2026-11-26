@@ -80,7 +80,7 @@ class ShowBuilderTab : public juce::Component,
     private juce::KeyListener
 {
 public:
-    ShowBuilderTab(juce::ValueTree& state);
+    ShowBuilderTab(juce::ValueTree& state, bool runningInDaw = false);
     ~ShowBuilderTab() override;
 
     int getNumRows() override;
@@ -96,6 +96,25 @@ public:
     void setDmxLiveEngine(DmxLiveEngine* engine) noexcept
     {
         stageSimulator.setDmxLiveEngine(engine);
+    }
+
+    void setDawTransportBridge(const LockFreeTransportBridge* bridge)
+    {
+        stageSimulator.setDawTransportBridge(bridge);
+        miniDawTimeline.setDawTransportBridge(bridge);
+    }
+
+    void setReaperSyncCallbacks(bool enabled,
+        std::function<bool()> onForceSync,
+        std::function<bool()> onTogglePlayPause,
+        std::function<bool()> onStopOrRewind,
+        std::function<bool(double)> onSeekBeat)
+    {
+        miniDawTimeline.onForceReaperSync = std::move(onForceSync);
+        miniDawTimeline.onDawTogglePlayPause = std::move(onTogglePlayPause);
+        miniDawTimeline.onDawStopOrRewind = std::move(onStopOrRewind);
+        miniDawTimeline.onDawSeekBeat = std::move(onSeekBeat);
+        miniDawTimeline.setReaperSyncEnabled(enabled);
     }
 
     std::function<void()> onShowClean;

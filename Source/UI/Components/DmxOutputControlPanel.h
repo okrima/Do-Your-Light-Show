@@ -190,6 +190,11 @@ public:
             };
         addAndMakeVisible(courtesyToggle);
 
+        autoConnectToggle.setButtonText("Auto-connetti DMX all'avvio (Standalone & VST3)");
+        autoConnectToggle.setTooltip("Avvia automaticamente l'interfaccia DMX salvata appena si apre l'app o il progetto Reaper");
+        autoConnectToggle.onClick = [this]() { markDirty(); };
+        addAndMakeVisible(autoConnectToggle);
+
         // --- Monitor 512 Canali ---
         setupLbl(monitorTitleLbl, "MONITOR UNIVERSO DMX (512 CANALI LIVE)", true, juce::Colour(0xff38bdf8));
 
@@ -211,6 +216,8 @@ public:
         updateMonitorPageButtons();
 
         loadSettingsFromDisk();
+
+        refreshStatusUI();
 
         startTimerHz(60);
     }
@@ -262,7 +269,10 @@ public:
     {
         auto b = getLocalBounds().reduced(12);
 
-        topCardRect = b.removeFromTop(178);
+        topCardRect = b.removeFromTop(194);
+
+
+
         auto card = topCardRect.reduced(12, 10);
 
         auto leftHalf = card.removeFromLeft(juce::roundToInt(card.getWidth() * 0.56f));
@@ -351,11 +361,14 @@ public:
         actRow.removeFromLeft(8);
         miniConsoleBtn.setBounds(actRow.reduced(2));
 
-        rightHalf.removeFromTop(10);
-        auto prevRow = rightHalf.removeFromTop(24);
+        rightHalf.removeFromTop(8);
+        auto prevRow = rightHalf.removeFromTop(22);
         tab2LiveToggle.setBounds(prevRow.removeFromLeft(235));
         prevRow.removeFromLeft(8);
         courtesyToggle.setBounds(prevRow);
+
+        rightHalf.removeFromTop(4);
+        autoConnectToggle.setBounds(rightHalf.removeFromTop(22));
 
         // --- Parte Inferiore: Monitor 512 Canali ---
         b.removeFromTop(12);
@@ -401,6 +414,8 @@ public:
         root.setAttribute("masterPct", static_cast<int>(masterSlider.getValue()));
         root.setAttribute("tab2Live", tab2LiveToggle.getToggleState());
         root.setAttribute("courtesyDim", courtesyToggle.getToggleState());
+
+        root.setAttribute("autoConnect", autoConnectToggle.getToggleState());
 
         if (root.writeTo(file))
         {
@@ -448,18 +463,35 @@ public:
             }
         }
 
-        const int masterPct = juce::jlimit(0, 100, xml->getIntAttribute("masterPct", 100));
-        masterSlider.setValue(masterPct, juce::dontSendNotification);
-        dmxEngine.setMasterDimmer(static_cast<float>(masterPct) / 100.0f);
+        if (dmxEngine.isOutputActive())
+        {
+            const int liveMasterPct = juce::roundToInt(dmxEngine.getMasterDimmer() * 100.0f);
+            masterSlider.setValue(liveMasterPct, juce::dontSendNotification);
 
-        const bool tab2On = xml->getBoolAttribute("tab2Live", false);
-        tab2LiveToggle.setToggleState(tab2On, juce::dontSendNotification);
-        dmxEngine.setTab2LivePreviewEnabled(tab2On);
+            const bool liveTab2 = dmxEngine.isTab2LivePreviewEnabled();
+            tab2LiveToggle.setToggleState(liveTab2, juce::dontSendNotification);
 
-        const bool courtesyOn = xml->getBoolAttribute("courtesyDim", true);
-        courtesyToggle.setToggleState(courtesyOn, juce::dontSendNotification);
-        courtesyToggle.setEnabled(tab2On);
-        dmxEngine.setStandaloneCourtesyDimmer(courtesyOn);
+            const bool liveCourtesy = dmxEngine.getStandaloneCourtesyDimmer();
+            courtesyToggle.setToggleState(liveCourtesy, juce::dontSendNotification);
+            courtesyToggle.setEnabled(liveTab2);
+        }
+        else
+        {
+            const int masterPct = juce::jlimit(0, 100, xml->getIntAttribute("masterPct", 100));
+            masterSlider.setValue(masterPct, juce::dontSendNotification);
+            dmxEngine.setMasterDimmer(static_cast<float>(masterPct) / 100.0f);
+
+            const bool tab2On = xml->getBoolAttribute("tab2Live", false);
+            tab2LiveToggle.setToggleState(tab2On, juce::dontSendNotification);
+            dmxEngine.setTab2LivePreviewEnabled(tab2On);
+
+            const bool courtesyOn = xml->getBoolAttribute("courtesyDim", true);
+            courtesyToggle.setToggleState(courtesyOn, juce::dontSendNotification);
+            courtesyToggle.setEnabled(tab2On);
+            dmxEngine.setStandaloneCourtesyDimmer(courtesyOn);
+        }
+
+        autoConnectToggle.setToggleState(xml->getBoolAttribute("autoConnect", false), juce::dontSendNotification);
 
         updateDriverConfigVisibility();
         setDirty(false);
@@ -1188,6 +1220,8 @@ private:
     juce::TextButton blackoutBtn;
     juce::ToggleButton courtesyToggle;
     juce::ToggleButton tab2LiveToggle;
+
+    juce::ToggleButton autoConnectToggle;
 
     // Monitor 512 ch
     juce::Label monitorTitleLbl;

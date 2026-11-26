@@ -4,6 +4,7 @@
 #include "../../Model/BeatTimeMap.h"
 #include "../../Model/DataStateKeys.h"
 #include "TimeMetricManager.h"
+#include "../../Engine/DawTransportSync.h"
 #include <cmath>
 #include <vector>
 #include <algorithm>
@@ -125,7 +126,7 @@ public:
         bpmSlider.setTextValueSuffix(" BPM");
         bpmSlider.setTooltip("Imposta un BPM fisso (rimuove eventuali cambi BPM della Tempo Map)");
         bpmSlider.onValueChange = [this]() {
-            if (isUpdatingControls) return;
+            if (isUpdatingControls || dawTransportBridge != nullptr) return;
             juce::ScopedValueSetter<bool> guard(isUpdatingControls, true);
             beatTimeMap.setFixedBpm(bpmSlider.getValue(), beatTimeMap.getFirstDownbeatSeconds());
             updateScrollBarRange();
@@ -145,7 +146,7 @@ public:
         meterCombo.setWantsKeyboardFocus(false);
         meterCombo.setTooltip("Metrica base del brano (trascina i marker sul righello o tasto destro per aggiungere/modificare)");
         meterCombo.onChange = [this]() {
-            if (isUpdatingControls) return;
+            if (isUpdatingControls || dawTransportBridge != nullptr) return;
             int num = 4, den = 4;
             if (meterIdToSignature(meterCombo.getSelectedId(), num, den))
             {
@@ -176,6 +177,8 @@ public:
         zoomFitBtn.setWantsKeyboardFocus(false);
         zoomFitBtn.setTooltip("Mostra l'intera durata del brano");
         zoomFitBtn.onClick = [this]() {
+            if (dawTransportBridge != nullptr)
+                dawWorkspaceEndSec = juce::jmax(60.0, getContentDurationSeconds() + 16.0);
             zoomFactor = 1.0;
             viewStartSec = 0.0;
             updateScrollBarRange();
@@ -255,8 +258,31 @@ public:
         }
     }
 
+    void setDawTransportBridge(const LockFreeTransportBridge* bridge)
+    {
+        dawTransportBridge = bridge;
+
+        if (dawTransportBridge != nullptr)
+        {
+            fallbackPlaying = false;
+            audioEngine.pause();
+            dawWorkspaceEndSec = juce::jmax(300.0, getContentDurationSeconds() + 120.0);
+        }
+
+        updateDawControlStates();
+        updateScrollBarRange();
+        repaint();
+    }
+
     void togglePlayPause()
     {
+        if (dawTransportBridge != nullptr)
+        {
+            if (onDawTogglePlayPause)
+                onDawTogglePlayPause();
+            return;
+        }
+
         if (audioEngine.hasActiveAudioDevice())
         {
             audioEngine.togglePlayPause();
@@ -272,6 +298,13 @@ public:
 
     void stopAndRewind()
     {
+        if (dawTransportBridge != nullptr)
+        {
+            if (onDawStopOrRewind)
+                onDawStopOrRewind();
+            return;
+        }
+
         fallbackPlaying = false;
         fallbackPosSec = 0.0;
         audioEngine.stopAndRewind();
@@ -321,6 +354,16 @@ public:
     {
         if (key == juce::KeyPress::spaceKey)
         {
+            if (dawTransportBridge != nullptr)
+            {
+                if (onDawTogglePlayPause)
+                {
+                    onDawTogglePlayPause();
+                    return true;
+                }
+                return false;
+            }
+
             togglePlayPause();
             return true;
         }
@@ -408,17 +451,22 @@ public:
         const double viewEndSec = clampedStart + visSec;
 
         const double currentSec = juce::jlimit(0.0, totalSec, getCurrentPlayheadSeconds());
-        const auto musicalPos = beatTimeMap.secondsToMusicalPosition(currentSec);
+        const bool hasDawPos = (dawTransportBridge != nullptr && lastDawTransport.isHostActive);
+        const auto musicalPos = hasDawPos
+            ? lastDawTransport.toMusicalPosition()
+            : beatTimeMap.secondsToMusicalPosition(currentSec);
+        const double hudTimeSec = hasDawPos ? lastDawTransport.timeSeconds : currentSec;
 
         // 1. HUD Timecode + Battuta/Metrica + BPM Locale + Quarto
         if (!topInfoBounds.isEmpty())
         {
             g.setColour(juce::Colour(0xff1e1e26));
             g.fillRoundedRectangle(topInfoBounds.toFloat(), 4.0f);
-            g.setColour(juce::Colour(0xff60a5fa));
+            g.setColour(hasDawPos ? juce::Colour(0xff34d399) : juce::Colour(0xff60a5fa));
             g.setFont(juce::FontOptions(12.0f, juce::Font::bold));
 
-            juce::String statusText = BeatTimeMap::formatTimecode(currentSec)
+            juce::String statusText = (hasDawPos ? "[DAW] " : "")
+                + BeatTimeMap::formatTimecode(hudTimeSec)
                 + " | " + musicalPos.formatBarString()
                 + " | " + juce::String(musicalPos.localBpm, 1) + " BPM"
                 + " | Q " + juce::String(musicalPos.totalQuarters, 2);
@@ -468,6 +516,9 @@ public:
             g.setFont(juce::FontOptions(9.5f, juce::Font::bold));
             g.drawText("Grid: " + activeGridLabel, gridPill, juce::Justification::centred, false);
         }
+
+        // 4b. Marker e Region della scaletta importati da Reaper
+        drawProjectMarkers(g, clampedStart, viewEndSec);
 
         // 5. Corsia Scene (SHOW_TIMELINE)
         drawSceneLane(g, clampedStart, viewEndSec);
@@ -525,11 +576,14 @@ public:
 
     void mouseMove(const juce::MouseEvent& e) override
     {
-        if (const auto* hit = hitTestRulerMarker(e.getPosition()))
+        if (dawTransportBridge == nullptr)
         {
-            setMouseCursor(hit->index > 0 ? juce::MouseCursor::LeftRightResizeCursor
-                : juce::MouseCursor::PointingHandCursor);
-            return;
+            if (const auto* hit = hitTestRulerMarker(e.getPosition()))
+            {
+                setMouseCursor(hit->index > 0 ? juce::MouseCursor::LeftRightResizeCursor
+                    : juce::MouseCursor::PointingHandCursor);
+                return;
+            }
         }
 
         if (audioEngine.hasFullMixLoaded() &&
@@ -549,6 +603,10 @@ public:
             else
                 setMouseCursor(juce::MouseCursor::NormalCursor);
         }
+        else
+        {
+            setMouseCursor(juce::MouseCursor::NormalCursor);
+        }
     }
 
     void mouseDown(const juce::MouseEvent& e) override
@@ -556,11 +614,15 @@ public:
         // Tasto destro su un marker specifico del righello
         if (e.mods.isPopupMenu())
         {
+            if (dawTransportBridge != nullptr)
+                return;
+
             if (const auto* hit = hitTestRulerMarker(e.getPosition()))
             {
                 showMarkerSpecificContextMenu(*hit);
                 return;
             }
+
             if (rulerBounds.contains(e.getPosition()) || waveformBounds.contains(e.getPosition()))
             {
                 showMeterContextMenu(e.x);
@@ -574,22 +636,26 @@ public:
         grabKeyboardFocus();
 
         // Click o Doppio-Click su un marker del righello (Metrica o BPM)
-        if (const auto* hit = hitTestRulerMarker(e.getPosition()))
+        // Click o Doppio-Click su un marker del righello (solo in Standalone)
+        if (dawTransportBridge == nullptr)
         {
-            if (e.getNumberOfClicks() >= 2)
+            if (const auto* hit = hitTestRulerMarker(e.getPosition()))
             {
-                openTimeMetricManager();
-                return;
-            }
-            if (hit->index > 0)
-            {
-                isDraggingMarker = true;
-                draggingMarkerKind = hit->kind;
-                draggingMarkerIndex = hit->index;
-                markerDragPreviewBeatQ = hit->beatQ;
-                setMouseCursor(juce::MouseCursor::LeftRightResizeCursor);
-                repaint();
-                return;
+                if (e.getNumberOfClicks() >= 2)
+                {
+                    openTimeMetricManager();
+                    return;
+                }
+                if (hit->index > 0)
+                {
+                    isDraggingMarker = true;
+                    draggingMarkerKind = hit->kind;
+                    draggingMarkerIndex = hit->index;
+                    markerDragPreviewBeatQ = hit->beatQ;
+                    setMouseCursor(juce::MouseCursor::LeftRightResizeCursor);
+                    repaint();
+                    return;
+                }
             }
         }
 
@@ -614,6 +680,7 @@ public:
 
         if (rulerBounds.contains(e.getPosition()) || waveformBounds.contains(e.getPosition()))
         {
+            lastDawSeekTimeMs = 0.0;
             isScrubbing = true;
             scrubToMouseX(e.x);
         }
@@ -645,6 +712,7 @@ public:
                 return;
             }
 
+            lastDawSeekTimeMs = 0.0;
             isScrubbing = true;
             scrubToMouseX(e.x);
         }
@@ -704,6 +772,15 @@ public:
                 const double newDur = juce::jmax(minDur, fixedEnd - newStart);
                 draggingSceneNode.setProperty(StateKeys::StartBeat, newStart, nullptr);
                 draggingSceneNode.setProperty(StateKeys::DurationBeats, newDur, nullptr);
+            }
+
+            if (dawTransportBridge != nullptr)
+            {
+                const double sB = static_cast<double>(draggingSceneNode.getProperty(StateKeys::StartBeat, 1.0));
+                const double dB = juce::jmax(0.25, static_cast<double>(draggingSceneNode.getProperty(StateKeys::DurationBeats, 4.0)));
+                const double endSec = beatTimeMap.beatToSeconds(sB + dB);
+                if (endSec + 15.0 > dawWorkspaceEndSec)
+                    dawWorkspaceEndSec = juce::jmin(14400.0, endSec + 60.0);
             }
 
             updateScrollBarRange();
@@ -801,8 +878,16 @@ public:
         if (e.mods.isShiftDown() || std::abs(wheel.deltaX) > std::abs(wheel.deltaY))
         {
             const double delta = (std::abs(wheel.deltaX) > 0.001f) ? -wheel.deltaX : -wheel.deltaY;
-            viewStartSec = juce::jlimit(0.0, juce::jmax(0.0, totalSec - visSec),
-                viewStartSec + delta * visSec * 0.25);
+            const double targetStart = viewStartSec + delta * visSec * 0.25;
+            double effTotal = totalSec;
+
+            if (dawTransportBridge != nullptr && targetStart > effTotal - visSec)
+            {
+                dawWorkspaceEndSec = juce::jmin(14400.0, targetStart + visSec * 1.5);
+                effTotal = getEffectiveTimelineDurationSeconds();
+            }
+
+            viewStartSec = juce::jlimit(0.0, juce::jmax(0.0, effTotal - visSec), targetStart);
             updateScrollBarRange();
             repaint();
             return;
@@ -813,6 +898,31 @@ public:
             const double factor = (wheel.deltaY > 0.0f) ? 1.32 : (1.0 / 1.32);
             zoomAtPixel(e.x, factor);
         }
+    }
+
+    std::function<bool()> onForceReaperSync;
+    std::function<bool()> onDawTogglePlayPause;
+    std::function<bool()> onDawStopOrRewind;
+    std::function<bool(double beat1Based)> onDawSeekBeat;
+
+    void setReaperSyncEnabled(bool enabled)
+    {
+        reaperSyncEnabled = enabled;
+        if (reaperSyncEnabled)
+        {
+            importMidiMapBtn.setButtonText("Sync Reaper");
+            importMidiMapBtn.setColour(juce::TextButton::buttonColourId, juce::Colour(0xff0f766e));
+            importMidiMapBtn.setTooltip("Forza la sincronizzazione di Tempo Map, Metriche e Marker/Region da Reaper");
+            importMidiMapBtn.onClick = [this]() {
+                if (onForceReaperSync)
+                    onForceReaperSync();
+                beatTimeMap.rebuildCacheFromState();
+                syncControlsFromBeatMap();
+                updateScrollBarRange();
+                repaint();
+                };
+        }
+        updateDawControlStates();
     }
 
 private:
@@ -1066,18 +1176,40 @@ private:
         if (dynamic_cast<juce::TextEditor*>(juce::Component::getCurrentlyFocusedComponent()) != nullptr)
             return false;
 
+        if (dawTransportBridge != nullptr)
+        {
+            if (onDawTogglePlayPause)
+            {
+                onDawTogglePlayPause();
+                return true;
+            }
+            return false;
+        }
+
         togglePlayPause();
         return true;
     }
 
     void updatePlayButtonLabel()
     {
+        if (dawTransportBridge != nullptr)
+        {
+            const bool dawPlay = lastDawTransport.isHostActive && lastDawTransport.isPlaying;
+            playPauseBtn.setButtonText(dawPlay ? "Pausa" : "Play");
+            playPauseBtn.setColour(juce::TextButton::buttonColourId,
+                dawPlay ? juce::Colour(0xff10b981) : juce::Colour(0xff0f766e));
+            return;
+        }
+
         const bool playing = audioEngine.hasActiveAudioDevice() ? audioEngine.isPlaying() : fallbackPlaying;
         playPauseBtn.setButtonText(playing ? "Pausa" : "Play");
     }
 
     double getCurrentPlayheadSeconds() const
     {
+        if (dawTransportBridge != nullptr)
+            return dawTimelinePosSec;
+
         return audioEngine.hasActiveAudioDevice() ? audioEngine.getCurrentPositionSeconds() : fallbackPosSec;
     }
 
@@ -1110,14 +1242,26 @@ private:
 
     void zoomAtPixel(int anchorX, double multiplier)
     {
-        const double totalSec = getEffectiveTimelineDurationSeconds();
+        double totalSec = getEffectiveTimelineDurationSeconds();
         const double oldVis = getVisibleDurationSeconds(totalSec);
         const double anchorNorm = (waveformBounds.getWidth() > 0)
             ? juce::jlimit(0.0, 1.0, static_cast<double>(anchorX - waveformBounds.getX()) / static_cast<double>(waveformBounds.getWidth()))
             : 0.5;
         const double anchorSec = viewStartSec + anchorNorm * oldVis;
 
-        zoomFactor = juce::jlimit(1.0, kMaxZoomFactor, zoomFactor * multiplier);
+        const double proposedZoom = zoomFactor * multiplier;
+        if (dawTransportBridge != nullptr && proposedZoom < 1.0 && multiplier < 1.0)
+        {
+            const double expandRatio = 1.0 / juce::jmax(0.1, proposedZoom);
+            dawWorkspaceEndSec = juce::jlimit(60.0, 14400.0, totalSec * expandRatio);
+            totalSec = getEffectiveTimelineDurationSeconds();
+            zoomFactor = 1.0;
+        }
+        else
+        {
+            zoomFactor = juce::jlimit(1.0, kMaxZoomFactor, proposedZoom);
+        }
+
         const double newVis = getVisibleDurationSeconds(totalSec);
         viewStartSec = juce::jlimit(0.0, juce::jmax(0.0, totalSec - newVis), anchorSec - anchorNorm * newVis);
 
@@ -1150,9 +1294,20 @@ private:
 
         if (sb == &horizontalScrollBar)
         {
-            const double totalSec = getEffectiveTimelineDurationSeconds();
+            double totalSec = getEffectiveTimelineDurationSeconds();
             const double visSec = getVisibleDurationSeconds(totalSec);
-            viewStartSec = juce::jlimit(0.0, juce::jmax(0.0, totalSec - visSec), newRangeStart);
+
+            if (dawTransportBridge != nullptr && (newRangeStart + visSec) >= totalSec - juce::jmax(1.0, visSec * 0.02))
+            {
+                dawWorkspaceEndSec = juce::jmin(14400.0, totalSec + juce::jmax(60.0, visSec * 0.35));
+                totalSec = getEffectiveTimelineDurationSeconds();
+                viewStartSec = juce::jlimit(0.0, juce::jmax(0.0, totalSec - visSec), newRangeStart);
+                updateScrollBarRange();
+            }
+            else
+            {
+                viewStartSec = juce::jlimit(0.0, juce::jmax(0.0, totalSec - visSec), newRangeStart);
+            }
             repaint();
         }
         else if (sb == &verticalLaneScrollBar)
@@ -1220,6 +1375,87 @@ private:
             repaint();
         }
 
+        if (dawTransportBridge != nullptr)
+        {
+            const auto dawTs = dawTransportBridge->read();
+            if (dawTs.isHostActive)
+            {
+                const double safeBpm = (dawTs.bpm > 1.0 && dawTs.bpm < 500.0) ? dawTs.bpm : 120.0;
+                const double rawPpq = juce::jmax(0.0, dawTs.ppqPosition);
+                const double rawSec = juce::jmax(0.0, dawTs.timeSeconds);
+
+                if (!dawTs.isPlaying)
+                {
+                    smoothDawPpq = rawPpq;
+                    smoothDawSec = rawSec;
+                    lastRawDawPpq = rawPpq;
+                    wasDawPlaying = false;
+                }
+                else if (!wasDawPlaying || lastRawDawPpq < 0.0)
+                {
+                    smoothDawPpq = rawPpq;
+                    smoothDawSec = rawSec;
+                    lastRawDawPpq = rawPpq;
+                    wasDawPlaying = true;
+                }
+                else
+                {
+                    const double prevPpq = smoothDawPpq;
+                    smoothDawPpq += dtSec * (safeBpm / 60.0);
+                    smoothDawSec += dtSec;
+
+                    if (std::abs(rawPpq - lastRawDawPpq) > 1e-6)
+                    {
+                        lastRawDawPpq = rawPpq;
+                        const double driftQ = rawPpq - smoothDawPpq;
+                        if (std::abs(driftQ) > 0.35)
+                        {
+                            smoothDawPpq = rawPpq;
+                            smoothDawSec = rawSec;
+                        }
+                        else
+                        {
+                            smoothDawPpq = juce::jmax(prevPpq, smoothDawPpq + driftQ * 0.25);
+                            smoothDawSec += (rawSec - smoothDawSec) * 0.25;
+                        }
+                    }
+                }
+
+                lastDawTransport = dawTs;
+                lastDawTransport.ppqPosition = smoothDawPpq;
+                lastDawTransport.timeSeconds = smoothDawSec;
+
+                const double dawBeatQ = 1.0 + smoothDawPpq;
+                dawTimelinePosSec = beatTimeMap.beatToSeconds(dawBeatQ);
+
+                const double totalSec = getEffectiveTimelineDurationSeconds();
+                if (dawTimelinePosSec > totalSec - 2.0)
+                    updateScrollBarRange();
+
+                updatePlayButtonLabel();
+
+                if (dawTs.isPlaying || std::abs(dawTimelinePosSec - lastReportedSec) > 0.001)
+                {
+                    lastReportedSec = dawTimelinePosSec;
+
+                    if (dawTs.isPlaying && zoomFactor > 1.01 && !isDraggingAudioClip)
+                    {
+                        const double visSec = getVisibleDurationSeconds(totalSec);
+                        if (dawTimelinePosSec < viewStartSec || dawTimelinePosSec > viewStartSec + visSec * 0.95)
+                        {
+                            viewStartSec = juce::jlimit(0.0, juce::jmax(0.0, totalSec - visSec), dawTimelinePosSec - visSec * 0.15);
+                            updateScrollBarRange();
+                        }
+                    }
+
+                    if (onBeatPositionChanged)
+                        onBeatPositionChanged(dawBeatQ);
+                    repaint();
+                }
+            }
+            return;
+        }
+
         const double totalSec = getEffectiveTimelineDurationSeconds();
         bool isPlayingNow = false;
 
@@ -1274,7 +1510,8 @@ private:
         if (isUpdatingControls) return;
         if (node.hasType(StateKeys::BeatMapNode) ||
             node.hasType(StateKeys::BeatPointNode) ||
-            node.hasType(StateKeys::MeterPointNode))
+            node.hasType(StateKeys::MeterPointNode) ||
+            node.hasType(BeatTimeMap::kProjectMarkerNode))
         {
             needsBeatMapSync = true;
         }
@@ -1596,12 +1833,8 @@ private:
             });
     }
 
-    double getEffectiveTimelineDurationSeconds() const
+    double getContentDurationSeconds() const
     {
-
-        if (isDraggingAudioClip && clipDragFrozenTotalSec > 0.0)
-            return clipDragFrozenTotalSec;
-
         double maxSec = 30.0;
 
         const double audioLen = audioEngine.getTotalLengthSeconds();
@@ -1629,11 +1862,60 @@ private:
             }
         }
         maxSec = juce::jmax(maxSec, beatTimeMap.beatToSeconds(maxBeat));
+
+        if (dawTransportBridge != nullptr && lastDawTransport.isHostActive)
+            maxSec = juce::jmax(maxSec, dawTimelinePosSec + 30.0);
+
         return maxSec;
+    }
+
+    double getEffectiveTimelineDurationSeconds() const
+    {
+        if (isDraggingAudioClip && clipDragFrozenTotalSec > 0.0)
+            return clipDragFrozenTotalSec;
+
+        const double contentSec = getContentDurationSeconds();
+        if (dawTransportBridge != nullptr)
+            return juce::jmax(contentSec + 60.0, dawWorkspaceEndSec);
+
+        return contentSec;
     }
 
     void scrubToMouseX(int mouseX)
     {
+        if (dawTransportBridge != nullptr)
+        {
+            if (onDawSeekBeat)
+            {
+                double targetSec = pixelXToTime(mouseX);
+                double targetBeat = beatTimeMap.secondsToBeat(targetSec);
+                if (snapBtn.getToggleState())
+                    targetBeat = snapBeatToActiveGrid(targetBeat, false);
+
+                targetBeat = juce::jmax(1.0, targetBeat);
+
+                const double nowMs = juce::Time::getMillisecondCounterHiRes();
+                const bool dragMovedEnough = std::abs(targetBeat - lastDawSeekBeatSent) > 0.005;
+                if (lastDawSeekTimeMs <= 0.0 || (dragMovedEnough && (nowMs - lastDawSeekTimeMs) >= 35.0))
+                {
+                    lastDawSeekBeatSent = targetBeat;
+                    lastDawSeekTimeMs = nowMs;
+                    onDawSeekBeat(targetBeat);
+                }
+
+                // Aggiornamento immediato playhead VST prima del prossimo blocco ASIO
+                smoothDawPpq = targetBeat - 1.0;
+                lastRawDawPpq = -1.0;
+                dawTimelinePosSec = beatTimeMap.beatToSeconds(targetBeat);
+                smoothDawSec = dawTimelinePosSec;
+
+                if (onBeatPositionChanged)
+                    onBeatPositionChanged(targetBeat);
+                repaint();
+            }
+            return;
+        }
+
         if (waveformBounds.getWidth() <= 0) return;
 
         double targetSec = pixelXToTime(mouseX);
@@ -1876,8 +2158,11 @@ private:
             const float pxPerQ = pxPerBar / static_cast<float>(barLenQ);
 
             int barStep = 1;
-            if (pxPerBar < 2.2f)  barStep = 16;
-            else if (pxPerBar < 5.0f)  barStep = 8;
+            if (pxPerBar < 0.35f) barStep = 128;
+            else if (pxPerBar < 0.70f) barStep = 64;
+            else if (pxPerBar < 1.30f) barStep = 32;
+            else if (pxPerBar < 2.50f) barStep = 16;
+            else if (pxPerBar < 5.00f) barStep = 8;
             else if (pxPerBar < 10.0f) barStep = 4;
             else if (pxPerBar < 18.0f) barStep = 2;
 
@@ -2199,6 +2484,87 @@ private:
         g.strokePath(linePath, juce::PathStrokeType(noAudioLoaded ? 1.8f : 1.2f));
     }
 
+    void drawProjectMarkers(juce::Graphics& g, double vStartSec, double vEndSec)
+    {
+        const auto& markers = beatTimeMap.getProjectMarkers();
+        if (markers.empty() || waveformBounds.getWidth() <= 0)
+            return;
+
+        const double visSec = vEndSec - vStartSec;
+        if (visSec <= 0.0001)
+            return;
+
+        const int leftX = waveformBounds.getX();
+        const int rightX = waveformBounds.getRight();
+
+        g.saveState();
+        g.reduceClipRegion(waveformBounds.getUnion(sceneLaneBounds));
+
+        // 1. Prima le Region (bande titolo brano in alto nella waveform)
+        for (const auto& pm : markers)
+        {
+            if (!pm.isRegion)
+                continue;
+
+            const double sSec = beatTimeMap.beatToSeconds(pm.beat);
+            const double eSec = beatTimeMap.beatToSeconds(pm.endBeat);
+            if (eSec < vStartSec || sSec > vEndSec)
+                continue;
+
+            const int x1 = juce::jlimit(leftX, rightX, timeToPixelX(sSec, vStartSec, visSec));
+            const int x2 = juce::jlimit(leftX, rightX, timeToPixelX(eSec, vStartSec, visSec));
+            const int w = juce::jmax(4, x2 - x1);
+
+            juce::Rectangle<int> barRect(x1, waveformBounds.getY() + 1, w, 16);
+            g.setColour(pm.colour.withAlpha(0.28f));
+            g.fillRect(barRect);
+            g.setColour(pm.colour.withAlpha(0.85f));
+            g.drawRect(barRect, 1);
+
+            g.setColour(pm.colour.withAlpha(0.35f));
+            g.drawVerticalLine(x1, static_cast<float>(waveformBounds.getY()), static_cast<float>(sceneLaneBounds.getBottom()));
+            g.drawVerticalLine(x2, static_cast<float>(waveformBounds.getY()), static_cast<float>(sceneLaneBounds.getBottom()));
+
+            if (w >= 26)
+            {
+                g.setColour(juce::Colours::white);
+                g.setFont(juce::FontOptions(10.0f, juce::Font::bold));
+                g.drawText(pm.name, barRect.reduced(4, 0), juce::Justification::centredLeft, true);
+            }
+        }
+
+        // 2. Poi i Marker puntuali (bandierina + linea verticale fino alle scene)
+        for (const auto& pm : markers)
+        {
+            if (pm.isRegion)
+                continue;
+
+            const double sSec = beatTimeMap.beatToSeconds(pm.beat);
+            if (sSec < vStartSec || sSec > vEndSec)
+                continue;
+
+            const int x = timeToPixelX(sSec, vStartSec, visSec);
+            if (x < leftX || x > rightX)
+                continue;
+
+            g.setColour(pm.colour.withAlpha(0.75f));
+            g.drawVerticalLine(x, static_cast<float>(waveformBounds.getY()), static_cast<float>(sceneLaneBounds.getBottom()));
+
+            const int tagW = juce::jlimit(36, 130, pm.name.length() * 6 + 14);
+            const int tagX = juce::jmin(rightX - tagW - 2, x + 2);
+            juce::Rectangle<int> tag(tagX, waveformBounds.getY() + 18, tagW, 15);
+            g.setColour(pm.colour.darker(0.45f).withAlpha(0.92f));
+            g.fillRoundedRectangle(tag.toFloat(), 3.0f);
+            g.setColour(pm.colour);
+            g.drawRoundedRectangle(tag.toFloat(), 3.0f, 1.0f);
+            g.setColour(juce::Colours::white);
+            g.setFont(juce::FontOptions(9.5f, juce::Font::bold));
+            g.drawText(pm.name, tag.reduced(4, 0), juce::Justification::centredLeft, true);
+        }
+
+        g.restoreState();
+    }
+
     void drawSceneLane(juce::Graphics& g, double vStartSec, double vEndSec)
     {
         g.setColour(juce::Colour(0xff16161d));
@@ -2268,8 +2634,20 @@ private:
                     g.setColour(juce::Colours::white);
                     g.setFont(juce::FontOptions(10.5f, isSel ? juce::Font::bold : juce::Font::plain));
                     const int textLeftPad = hasSwatch ? 8 : 4;
-                    g.drawText(name, blockRect.withTrimmedLeft(textLeftPad).withTrimmedRight(3),
+
+                    const bool showWarn = sceneNeedsDimmerWarning(showNode, i) && blockRect.getWidth() >= 18;
+                    g.drawText(name, blockRect.withTrimmedLeft(textLeftPad).withTrimmedRight(showWarn ? 19 : 3),
                         juce::Justification::centredLeft, true);
+
+                    if (showWarn)
+                    {
+                        auto warnPill = juce::Rectangle<int>(blockRect.getRight() - 16, blockRect.getY() + 2, 14, blockRect.getHeight() - 4);
+                        g.setColour(juce::Colour(0xfff59e0b));
+                        g.fillRoundedRectangle(warnPill.toFloat(), 2.5f);
+                        g.setColour(juce::Colour(0xff09090d));
+                        g.setFont(juce::FontOptions(10.5f, juce::Font::bold));
+                        g.drawText("!", warnPill, juce::Justification::centred, false);
+                    }
                 }
             }
         }
@@ -2278,6 +2656,114 @@ private:
 
         g.setColour(juce::Colour(0xff2a2a35));
         g.drawRect(sceneLaneBounds, 1);
+    }
+
+    void updateDawControlStates()
+    {
+        if (dawTransportBridge != nullptr)
+        {
+            const bool canControlDaw = reaperSyncEnabled && static_cast<bool>(onDawTogglePlayPause);
+
+            bpmSlider.setEnabled(false);
+            bpmSlider.setTooltip("BPM sincronizzati automaticamente dalla DAW (non modificabili in VST)");
+            meterCombo.setEnabled(false);
+            meterCombo.setTooltip("Metrica sincronizzata automaticamente dalla DAW (non modificabile in VST)");
+
+            clickBtn.setToggleState(false, juce::dontSendNotification);
+            clickBtn.setEnabled(false);
+            clickVolSlider.setEnabled(false);
+
+            playPauseBtn.setEnabled(canControlDaw);
+            playPauseBtn.setTooltip(canControlDaw
+                ? "Play / Pausa bidirezionale con Reaper (Spazio)"
+                : "Transport guidato dalla DAW");
+
+            stopBtn.setEnabled(canControlDaw);
+            stopBtn.setTooltip(canControlDaw
+                ? "Stop Reaper (premi ancora per tornare a 00:00)"
+                : "Transport guidato dalla DAW");
+            updatePlayButtonLabel();
+        }
+        else
+        {
+            bpmSlider.setEnabled(true);
+            meterCombo.setEnabled(true);
+            playPauseBtn.setEnabled(true);
+            playPauseBtn.setColour(juce::TextButton::buttonColourId, juce::Colour(0xff2563eb));
+            stopBtn.setEnabled(true);
+            clickBtn.setEnabled(true);
+            clickVolSlider.setEnabled(true);
+            updatePlayButtonLabel();
+        }
+    }
+
+    static void inspectSceneAttributes(const juce::ValueTree& scene,
+        bool& outDim, bool& outCol, bool& outMove, bool& outStrobe)
+    {
+        outDim = outCol = outMove = outStrobe = false;
+        const bool useCol = !scene.hasProperty(StateKeys::PresetUseColor) || static_cast<bool>(scene.getProperty(StateKeys::PresetUseColor));
+        const bool useMove = !scene.hasProperty(StateKeys::PresetUseMove) || static_cast<bool>(scene.getProperty(StateKeys::PresetUseMove));
+        const bool useStrobe = !scene.hasProperty(StateKeys::PresetUseStrobe) || static_cast<bool>(scene.getProperty(StateKeys::PresetUseStrobe));
+        const bool useDim = !scene.hasProperty(StateKeys::PresetUseDimmer) || static_cast<bool>(scene.getProperty(StateKeys::PresetUseDimmer));
+
+        for (int c = 0; c < scene.getNumChildren(); ++c)
+        {
+            auto cmd = scene.getChild(c);
+            if (!cmd.hasType(StateKeys::RoleCommand)) continue;
+
+            const juce::String param = cmd.getProperty(StateKeys::TargetParam, "").toString();
+            const juce::String curve = cmd.getProperty(StateKeys::CurveType, "").toString();
+
+            if (param.equalsIgnoreCase("Red") || param.equalsIgnoreCase("Green") ||
+                param.equalsIgnoreCase("Blue") || param.equalsIgnoreCase("White") ||
+                param.equalsIgnoreCase("UV"))
+            {
+                if (useCol) outCol = true;
+            }
+            else if (param.equalsIgnoreCase("Pan") || param.equalsIgnoreCase("Tilt"))
+            {
+                if (useMove) outMove = true;
+            }
+            else if (param.equalsIgnoreCase("Strobe") ||
+                (param.equalsIgnoreCase("Dimmer") && curve.startsWithIgnoreCase("Square")))
+            {
+                if (useStrobe) outStrobe = true;
+            }
+            else if (param.equalsIgnoreCase("Dimmer") || param.equalsIgnoreCase("GeyserBlast"))
+            {
+                if (useDim) outDim = true;
+            }
+        }
+    }
+
+    static bool sceneNeedsDimmerWarning(const juce::ValueTree& showNode, int sceneIndex)
+    {
+        auto sc = showNode.getChild(sceneIndex);
+        bool hasDim = false, hasCol = false, hasMove = false, hasStrobe = false;
+        inspectSceneAttributes(sc, hasDim, hasCol, hasMove, hasStrobe);
+
+        if (hasDim || (!hasCol && !hasMove && !hasStrobe))
+            return false;
+
+        const double sA = static_cast<double>(sc.getProperty(StateKeys::StartBeat, 1.0));
+        const double eA = sA + juce::jmax(0.25, static_cast<double>(sc.getProperty(StateKeys::DurationBeats, 4.0)));
+
+        for (int j = 0; j < showNode.getNumChildren(); ++j)
+        {
+            if (j == sceneIndex) continue;
+            auto other = showNode.getChild(j);
+            const double sB = static_cast<double>(other.getProperty(StateKeys::StartBeat, 1.0));
+            const double eB = sB + juce::jmax(0.25, static_cast<double>(other.getProperty(StateKeys::DurationBeats, 4.0)));
+
+            if (eB > sA + 1e-4 && sB < eA - 1e-4)
+            {
+                bool oDim = false, oCol = false, oMove = false, oStrobe = false;
+                inspectSceneAttributes(other, oDim, oCol, oMove, oStrobe);
+                if (oDim)
+                    return false;
+            }
+        }
+        return true;
     }
 
     juce::ValueTree& appState;
@@ -2359,4 +2845,17 @@ private:
     std::vector<int> sceneLaneByIndex;
     int totalSceneLanes = 1;
     double laneScrollOffsetPx = 0.0;
+
+    const LockFreeTransportBridge* dawTransportBridge = nullptr;
+    DawTransportState lastDawTransport;
+    double lastRawDawPpq = -1.0;
+    double smoothDawPpq = 0.0;
+    double smoothDawSec = 0.0;
+    double dawTimelinePosSec = 0.0;
+    bool wasDawPlaying = false;
+    bool reaperSyncEnabled = false;
+
+    double dawWorkspaceEndSec = 300.0;
+    double lastDawSeekTimeMs = 0.0;
+    double lastDawSeekBeatSent = -1.0;
 };

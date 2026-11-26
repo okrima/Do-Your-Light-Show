@@ -30,6 +30,19 @@ public:
         }
     };
 
+    struct ProjectMarker
+    {
+        double beat = 1.0;        // Posizione in Quarti (1-based)
+        double endBeat = 1.0;     // > beat se e' una Region
+        double timeSec = 0.0;
+        bool isRegion = false;
+        int indexNumber = 1;
+        juce::String name;
+        juce::Colour colour{ 0xff10b981 };
+    };
+
+    static inline const juce::Identifier kProjectMarkerNode{ "PROJECT_MARKER" };
+
     struct MusicalPosition
     {
         double totalQuarters = 1.0;    // Posizione assoluta in Quarti (1-based)
@@ -99,6 +112,8 @@ public:
 
         anchors.clear();
         meterAnchors.clear();
+        projectMarkers.clear();
+
         if (!beatMapNode.isValid()) return;
 
         baseBpm = static_cast<double>(beatMapNode.getProperty(StateKeys::BpmBase, 120.0));
@@ -136,10 +151,27 @@ public:
                 m.den = sanitizeDenominator(static_cast<int>(child.getProperty(StateKeys::TimeSigDen, baseTimeSigDen)));
                 meterAnchors.push_back(m);
             }
+            else if (child.hasType(kProjectMarkerNode))
+            {
+                ProjectMarker pm;
+                pm.beat = juce::jmax(1.0, static_cast<double>(child.getProperty("pointBeat", 1.0)));
+                pm.endBeat = juce::jmax(pm.beat, static_cast<double>(child.getProperty("endBeat", pm.beat)));
+                pm.timeSec = juce::jmax(0.0, static_cast<double>(child.getProperty("pointTimeSec", 0.0)));
+                pm.isRegion = static_cast<bool>(child.getProperty("isRegion", false));
+                pm.indexNumber = static_cast<int>(child.getProperty("markerIndex", 1));
+                pm.name = child.getProperty("markerName", "").toString();
+                pm.colour = juce::Colour::fromString(child.getProperty("markerColour", "ff10b981").toString());
+                projectMarkers.push_back(std::move(pm));
+            }
         }
 
         std::sort(anchors.begin(), anchors.end(), [](const BeatAnchor& a, const BeatAnchor& b) {
             return a.beat < b.beat;
+            });
+
+        std::sort(projectMarkers.begin(), projectMarkers.end(), [](const ProjectMarker& a, const ProjectMarker& b) {
+            if (std::abs(a.beat - b.beat) > 1e-4) return a.beat < b.beat;
+            return a.isRegion < b.isRegion;
             });
 
         finalizeMeterAnchors();
@@ -627,6 +659,122 @@ public:
     int getBaseTimeSigDen() const { return baseTimeSigDen; }
     const std::vector<MeterAnchor>& getMeterAnchors() const { return meterAnchors; }
     const std::vector<BeatAnchor>& getBeatAnchors() const { return anchors; }
+
+    const std::vector<ProjectMarker>& getProjectMarkers() const { return projectMarkers; }
+
+    // Applica Tempo Map, cambi di metrica e Marker/Region ricevuti da Reaper.
+    // Restituisce true solo se i dati sono effettivamente cambiati (evita scritture e repaint inutili).
+    bool applyExternalDawMap(std::vector<BeatAnchor> newTempos,
+        std::vector<MeterAnchor> newMeters,
+        std::vector<ProjectMarker> newMarkers,
+        double projectEndBeat)
+    {
+        if (newTempos.empty())
+            newTempos.push_back({ 1.0, 0.0, baseBpm });
+        if (newMeters.empty())
+            newMeters.push_back({ 1.0, baseTimeSigNum, baseTimeSigDen, 1 });
+
+        std::sort(newTempos.begin(), newTempos.end(), [](const BeatAnchor& a, const BeatAnchor& b) {
+            return a.beat < b.beat;
+            });
+        std::sort(newMeters.begin(), newMeters.end(), [](const MeterAnchor& a, const MeterAnchor& b) {
+            return a.startBeat < b.startBeat;
+            });
+        std::sort(newMarkers.begin(), newMarkers.end(), [](const ProjectMarker& a, const ProjectMarker& b) {
+            if (std::abs(a.beat - b.beat) > 1e-4) return a.beat < b.beat;
+            return a.isRegion < b.isRegion;
+            });
+
+        const double targetEndBeat = juce::jmax(1.0, projectEndBeat);
+
+        // Confronto diff veloce sotto lock
+        bool changed = false;
+        {
+            const juce::SpinLock::ScopedLockType sl(cacheLock);
+            if (std::abs(midiEndBeatCache - targetEndBeat) > 0.25
+                || anchors.size() != newTempos.size()
+                || meterAnchors.size() != newMeters.size()
+                || projectMarkers.size() != newMarkers.size())
+            {
+                changed = true;
+            }
+            else
+            {
+                for (size_t i = 0; i < anchors.size() && !changed; ++i)
+                {
+                    if (std::abs(anchors[i].beat - newTempos[i].beat) > 1e-3
+                        || std::abs(anchors[i].timeSec - newTempos[i].timeSec) > 1e-3
+                        || std::abs(anchors[i].localBpm - newTempos[i].localBpm) > 1e-2)
+                        changed = true;
+                }
+                for (size_t i = 0; i < meterAnchors.size() && !changed; ++i)
+                {
+                    if (std::abs(meterAnchors[i].startBeat - newMeters[i].startBeat) > 1e-3
+                        || meterAnchors[i].num != newMeters[i].num
+                        || meterAnchors[i].den != newMeters[i].den)
+                        changed = true;
+                }
+                for (size_t i = 0; i < projectMarkers.size() && !changed; ++i)
+                {
+                    if (std::abs(projectMarkers[i].beat - newMarkers[i].beat) > 1e-3
+                        || std::abs(projectMarkers[i].endBeat - newMarkers[i].endBeat) > 1e-3
+                        || projectMarkers[i].isRegion != newMarkers[i].isRegion
+                        || projectMarkers[i].indexNumber != newMarkers[i].indexNumber
+                        || projectMarkers[i].name != newMarkers[i].name
+                        || projectMarkers[i].colour != newMarkers[i].colour)
+                        changed = true;
+                }
+            }
+        }
+
+        if (!changed)
+            return false;
+
+        if (beatMapNode.isValid())
+        {
+            beatMapNode.removeAllChildren(nullptr);
+            beatMapNode.setProperty(StateKeys::BpmBase, juce::jlimit(20.0, 300.0, newTempos.front().localBpm), nullptr);
+            beatMapNode.setProperty(StateKeys::FirstDownbeatSec, 0.0, nullptr);
+            beatMapNode.setProperty(StateKeys::TimeSigNum, juce::jlimit(1, 32, newMeters.front().num), nullptr);
+            beatMapNode.setProperty(StateKeys::TimeSigDen, sanitizeDenominator(newMeters.front().den), nullptr);
+            beatMapNode.setProperty(juce::Identifier("midiEndBeat"), targetEndBeat, nullptr);
+
+            for (const auto& a : newTempos)
+            {
+                juce::ValueTree bp(StateKeys::BeatPointNode);
+                bp.setProperty(StateKeys::PointBeat, juce::jmax(1.0, a.beat), nullptr);
+                bp.setProperty(StateKeys::PointTimeSec, juce::jmax(0.0, a.timeSec), nullptr);
+                bp.setProperty(StateKeys::PointBpm, juce::jlimit(20.0, 300.0, a.localBpm), nullptr);
+                beatMapNode.addChild(bp, -1, nullptr);
+            }
+
+            for (const auto& m : newMeters)
+            {
+                juce::ValueTree mp(StateKeys::MeterPointNode);
+                mp.setProperty(StateKeys::PointBeat, juce::jmax(1.0, m.startBeat), nullptr);
+                mp.setProperty(StateKeys::TimeSigNum, juce::jlimit(1, 32, m.num), nullptr);
+                mp.setProperty(StateKeys::TimeSigDen, sanitizeDenominator(m.den), nullptr);
+                beatMapNode.addChild(mp, -1, nullptr);
+            }
+
+            for (const auto& pm : newMarkers)
+            {
+                juce::ValueTree mk(kProjectMarkerNode);
+                mk.setProperty("pointBeat", juce::jmax(1.0, pm.beat), nullptr);
+                mk.setProperty("endBeat", juce::jmax(pm.beat, pm.endBeat), nullptr);
+                mk.setProperty("pointTimeSec", juce::jmax(0.0, pm.timeSec), nullptr);
+                mk.setProperty("isRegion", pm.isRegion, nullptr);
+                mk.setProperty("markerIndex", pm.indexNumber, nullptr);
+                mk.setProperty("markerName", pm.name, nullptr);
+                mk.setProperty("markerColour", pm.colour.toString(), nullptr);
+                beatMapNode.addChild(mk, -1, nullptr);
+            }
+        }
+
+        rebuildCacheFromState();
+        return true;
+    }
+
     bool hasVariableTempoMap() const noexcept { return anchors.size() > 1; }
     bool hasImportedMidiMap() const noexcept { return !anchors.empty() || midiEndBeatCache > 1.1; }
 
@@ -940,4 +1088,6 @@ private:
     double midiEndBeatCache = 1.0;
     std::vector<BeatAnchor> anchors;
     std::vector<MeterAnchor> meterAnchors;
+
+    std::vector<ProjectMarker> projectMarkers;
 };

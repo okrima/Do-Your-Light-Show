@@ -57,24 +57,34 @@ public:
         }
     }
 
-    StemAudioEngine()
-        : masterSource(*this)
+    explicit StemAudioEngine(bool openAudioDevice = true)
+        : masterSource(*this),
+        audioDeviceEnabled(openAudioDevice)
     {
         for (auto& v : stemVolumes)
             v.store(1.0f);
 
         formatManager.registerBasicFormats(); // WAV, AIFF, MP3, FLAC, OGG
-        deviceManager.initialiseWithDefaultDevices(0, 2); // 0 input, 2 output stereo
-        sourcePlayer.setSource(&masterSource);
-        deviceManager.addAudioCallback(&sourcePlayer);
+
+        if (audioDeviceEnabled)
+        {
+            deviceManager.initialiseWithDefaultDevices(0, 2); // 0 input, 2 output stereo
+            sourcePlayer.setSource(&masterSource);
+            deviceManager.addAudioCallback(&sourcePlayer);
+        }
     }
 
     ~StemAudioEngine()
     {
         masterPlaying.store(false);
         beatTimeMapPtr.store(nullptr);
-        sourcePlayer.setSource(nullptr);
-        deviceManager.removeAudioCallback(&sourcePlayer);
+
+        if (audioDeviceEnabled)
+        {
+            sourcePlayer.setSource(nullptr);
+            deviceManager.removeAudioCallback(&sourcePlayer);
+            deviceManager.closeAudioDevice();
+        }
     }
 
     void setBeatTimeMap(const BeatTimeMap* mapPtr) noexcept
@@ -84,7 +94,7 @@ public:
 
     bool hasActiveAudioDevice() const
     {
-        return deviceManager.getCurrentAudioDevice() != nullptr;
+        return audioDeviceEnabled && deviceManager.getCurrentAudioDevice() != nullptr;
     }
 
     // Carica e decodifica in RAM uno qualsiasi dei 5 slot (FullMix, Click, Drums, Bass, Guitars)
@@ -455,6 +465,9 @@ public:
     // --- Controlli di trasporto master ---
     void play()
     {
+        if (!audioDeviceEnabled)
+            return;
+
         if (!masterPlaying.load())
         {
             justStarted.store(true);
@@ -795,4 +808,6 @@ private:
     std::atomic<double> fullMixOffsetSec{ 0.0 };
     std::atomic<bool> metronomeEnabled{ false };
     std::atomic<float> metronomeGain{ 0.65f };
+
+    bool audioDeviceEnabled = true;
 };

@@ -7,6 +7,7 @@
 #include "../../Model/CurveEvaluator.h"
 #include "../../Engine/DmxLiveEngine.h"
 #include "StageArtworkHelper.h"
+#include "../../Engine/DawTransportSync.h"
 #include <vector>
 #include <map>
 #include <cmath>
@@ -20,6 +21,11 @@ public:
     std::function<void(bool)> onPreviewPlaybackChanged;
 
     void setDmxLiveEngine(DmxLiveEngine* engine) noexcept { dmxLiveEngine = engine; }
+
+    void setDawTransportBridge(const LockFreeTransportBridge* bridge) noexcept
+    {
+        dawTransportBridge = bridge;
+    }
 
     void stopFixtureTestIfActive()
     {
@@ -162,7 +168,7 @@ public:
         const float trussY = stageRect.getY() + stageRect.getHeight() * 0.14f;
         const float floorY = stageRect.getY() + stageRect.getHeight() * 0.84f;
 
-        drawTrussAndFloorStructure(g, stageRect, trussY, floorY);
+        drawCachedStageBackground(g, stageRect, trussY, floorY);
 
         drawDragZoneGuide(g, stageRect);
 
@@ -199,6 +205,9 @@ public:
         int targetedCount = 0;
         int blockedStrobeCount = 0;
         int blockedMoveCount = 0;
+        int missingDimmerCount = 0;
+        int missingColorCount = 0;
+        bool missDimHasCol = false, missDimHasMove = false, missDimHasStr = false;
 
         for (const auto& vf : fixtures)
         {
@@ -206,43 +215,78 @@ public:
             bool isDragged = allowStageDrag && vf.unitNode.isValid() && (vf.unitNode == draggedUnitNode);
             drawFixtureHardwareBody(g, vf, isHovered, isDragged, trussY);
 
-            if (vf.state.hasAnyCommand)            ++targetedCount;
-            if (vf.state.blockedByStrobePolicy)    ++blockedStrobeCount;
-            if (vf.state.blockedByMovePolicy)      ++blockedMoveCount;
+            if (vf.state.hasAnyCommand)         ++targetedCount;
+            if (vf.state.blockedByStrobePolicy) ++blockedStrobeCount;
+            if (vf.state.blockedByMovePolicy)   ++blockedMoveCount;
+            if (vf.state.missingDimmerWarning)
+            {
+                ++missingDimmerCount;
+                if (vf.state.hasExplicitColor())                      missDimHasCol = true;
+                if (vf.state.hasPanCmd || vf.state.hasTiltCmd)        missDimHasMove = true;
+                if (vf.state.hasStrobeCmd)                            missDimHasStr = true;
+            }
+            if (vf.state.missingColorWarning)   ++missingColorCount;
         }
 
-        const int blockedCount = juce::jmax(blockedStrobeCount, blockedMoveCount);
-        if (blockedCount > 0)
+        juce::String warningMsg;
+        bool centerBanner = false;
+
+        if (blockedMoveCount > 0 || blockedStrobeCount > 0)
         {
             const bool isMoveBanner = (blockedMoveCount >= blockedStrobeCount);
-            const bool allBlocked = (targetedCount > 0 && blockedCount == targetedCount);
-            const float boxW = juce::jmin(490.0f, stageRect.getWidth() - 24.0f);
-            const float boxH = 30.0f;
+            const int cnt = isMoveBanner ? blockedMoveCount : blockedStrobeCount;
+            centerBanner = (targetedCount > 0 && cnt == targetedCount);
 
-            juce::Rectangle<float> bannerRect = allBlocked
+            if (isMoveBanner)
+            {
+                warningMsg = centerBanner
+                    ? "Pan/Tilt non mappati (Ch = 0 in Tab 1) su tutti i fari del preset"
+                    : ("Movimento ignorato su " + juce::String(cnt) + "/" + juce::String(targetedCount)
+                        + " fari (Pan/Tilt Ch = 0 in Tab 1)");
+            }
+            else
+            {
+                warningMsg = centerBanner
+                    ? "Strobo disabilitato in Tab 1 su tutti i fari del preset"
+                    : ("Strobo ignorato su " + juce::String(cnt) + "/" + juce::String(targetedCount)
+                        + " fari (disabilitato in Tab 1)");
+            }
+        }
+        else if (missingDimmerCount > 0)
+        {
+            centerBanner = (targetedCount > 0 && missingDimmerCount == targetedCount);
+
+            juce::StringArray activeAttrs;
+            if (missDimHasCol)  activeAttrs.add("Colore");
+            if (missDimHasMove) activeAttrs.add("Movimento");
+            if (missDimHasStr)  activeAttrs.add("Strobo");
+
+            const juce::String missingLabel = (missingColorCount > 0 && !missDimHasCol)
+                ? "Dimmer e Colore mancanti"
+                : "Dimmer mancante";
+
+            warningMsg = missingLabel + " su " + juce::String(missingDimmerCount) + "/" + juce::String(targetedCount)
+                + " fari (" + activeAttrs.joinIntoString("/") + " attivo ma spento: sovrapponi/attiva Dimmer)";
+        }
+        else if (missingColorCount > 0)
+        {
+            centerBanner = false;
+            warningMsg = "Colore non impostato su " + juce::String(missingColorCount) + "/" + juce::String(targetedCount)
+                + " fari (fascio neutro: sovrapponi/attiva Colore)";
+        }
+
+        if (warningMsg.isNotEmpty())
+        {
+            const float boxW = juce::jmin(560.0f, stageRect.getWidth() - 24.0f);
+            const float boxH = 30.0f;
+            juce::Rectangle<float> bannerRect = centerBanner
                 ? stageRect.withSizeKeepingCentre(boxW, boxH)
                 : juce::Rectangle<float>(stageRect.getCentreX() - boxW * 0.5f,
                     stageRect.getBottom() - boxH - 8.0f,
                     boxW,
                     boxH);
 
-            juce::String msg;
-            if (isMoveBanner)
-            {
-                msg = allBlocked
-                    ? "Pan/Tilt non mappati (Ch = 0 in Tab 1) su tutti i fari del preset"
-                    : ("Movimento ignorato su " + juce::String(blockedMoveCount) + "/" + juce::String(targetedCount)
-                        + " fari (Pan/Tilt Ch = 0 in Tab 1)");
-            }
-            else
-            {
-                msg = allBlocked
-                    ? "Strobo disabilitato in Tab 1 su tutti i fari del preset"
-                    : ("Strobo ignorato su " + juce::String(blockedStrobeCount) + "/" + juce::String(targetedCount)
-                        + " fari (disabilitato in Tab 1)");
-            }
-
-            g.setColour(juce::Colour(0xff14110a).withAlpha(0.88f));
+            g.setColour(juce::Colour(0xff14110a).withAlpha(0.90f));
             g.fillRoundedRectangle(bannerRect, 6.0f);
             g.setColour(juce::Colour(0xfff59e0b).withAlpha(0.22f));
             g.fillRoundedRectangle(bannerRect, 6.0f);
@@ -250,7 +294,7 @@ public:
             g.drawRoundedRectangle(bannerRect, 6.0f, 1.3f);
             g.setColour(juce::Colour(0xfffbbf24));
             g.setFont(juce::FontOptions(12.0f, juce::Font::bold));
-            g.drawText(msg, bannerRect.reduced(8.0f, 0.0f), juce::Justification::centred, true);
+            g.drawText(warningMsg, bannerRect.reduced(8.0f, 0.0f), juce::Justification::centred, true);
         }
 
         g.setColour(juce::Colour(0xff2a2a38));
@@ -487,6 +531,9 @@ private:
         bool hasDimmerCmd = false;
         bool blockedByStrobePolicy = false;
         bool blockedByMovePolicy = false;
+        bool hasStrobeCmd = false;
+        bool missingDimmerWarning = false;
+        bool missingColorWarning = false;
         float dimmer = 0.0f;
         float red = -1.0f;
         float green = -1.0f;
@@ -574,6 +621,9 @@ private:
         if (standalonePreviewMode)
             return previewPlaying && !oneShotFinished && !activeScenes.empty();
 
+        if (dawTransportBridge != nullptr)
+            return wasDawPlaying;
+
         return audioEngine != nullptr && audioEngine->isPlaying();
     }
 
@@ -586,6 +636,63 @@ private:
         if (standalonePreviewMode)
         {
             updateStandalonePreviewClock(dtSec);
+        }
+        else if (dawTransportBridge != nullptr)
+        {
+            const auto dawTs = dawTransportBridge->read();
+            if (dawTs.isHostActive)
+            {
+                const double safeBpm = (dawTs.bpm > 1.0 && dawTs.bpm < 500.0) ? dawTs.bpm : 120.0;
+                const double rawPpq = juce::jmax(0.0, dawTs.ppqPosition);
+                const double rawSec = juce::jmax(0.0, dawTs.timeSeconds);
+
+                if (!dawTs.isPlaying)
+                {
+                    smoothDawPpq = rawPpq;
+                    smoothDawSec = rawSec;
+                    lastRawDawPpq = rawPpq;
+                    wasDawPlaying = false;
+                }
+                else if (!wasDawPlaying || lastRawDawPpq < 0.0)
+                {
+                    smoothDawPpq = rawPpq;
+                    smoothDawSec = rawSec;
+                    lastRawDawPpq = rawPpq;
+                    wasDawPlaying = true;
+                }
+                else
+                {
+                    const double prevPpq = smoothDawPpq;
+                    smoothDawPpq += dtSec * (safeBpm / 60.0);
+                    smoothDawSec += dtSec;
+
+                    if (std::abs(rawPpq - lastRawDawPpq) > 1e-6)
+                    {
+                        lastRawDawPpq = rawPpq;
+                        const double driftQ = rawPpq - smoothDawPpq;
+
+                        if (std::abs(driftQ) > 0.35)
+                        {
+                            // Seek manuale o loop in Reaper
+                            smoothDawPpq = rawPpq;
+                            smoothDawSec = rawSec;
+                        }
+                        else
+                        {
+                            smoothDawPpq = juce::jmax(prevPpq, smoothDawPpq + driftQ * 0.25);
+                            smoothDawSec += (rawSec - smoothDawSec) * 0.25;
+                        }
+                    }
+                }
+
+                auto interpTs = dawTs;
+                interpTs.ppqPosition = smoothDawPpq;
+                interpTs.timeSeconds = smoothDawSec;
+                currentTimeSec = smoothDawSec;
+                currentMusicalPos = interpTs.toMusicalPosition();
+                currentBeat = currentMusicalPos.totalQuarters;
+                selectActiveTimelineScenes(currentBeat);
+            }
         }
         else if (audioEngine != nullptr && beatTimeMap != nullptr)
         {
@@ -648,7 +755,7 @@ private:
                     dmxLiveEngine->renderLiveFrame(appState, liveInputs, currentBeat, currentMusicalPos, true);
                 }
             }
-            else
+            else if (dawTransportBridge == nullptr)
             {
                 const bool isPlayingShow = (audioEngine != nullptr && audioEngine->isPlaying());
                 dmxLiveEngine->setShowPlaybackActive(isPlayingShow);
@@ -669,7 +776,7 @@ private:
                 }
             }
         }
-        else if (!standalonePreviewMode && dmxLiveEngine != nullptr)
+        else if (!standalonePreviewMode && dawTransportBridge == nullptr && dmxLiveEngine != nullptr)
         {
             dmxLiveEngine->setShowPlaybackActive(false);
         }
@@ -1067,6 +1174,7 @@ private:
                     vf.state.dimmer = locDimmer;
                     vf.state.blockedByStrobePolicy = false;
                 }
+                vf.state.hasStrobeCmd = true;
             }
             else if (localHasDimmer)
             {
@@ -1074,10 +1182,14 @@ private:
                     ? juce::jmax(vf.state.dimmer, locDimmer)
                     : locDimmer;
                 vf.state.hasDimmerCmd = true;
+
             }
 
             if (localHasHwStrobe)
+            {
                 vf.state.strobe = juce::jmax(vf.state.strobe, locHwStrobe);
+                vf.state.hasStrobeCmd = true;
+            }
         }
 
         // Cortesia in Preview Standalone (Tab 2): accende il faro se testi un preset di solo Colore o solo Movimento
@@ -1091,6 +1203,33 @@ private:
                 (pool.equalsIgnoreCase("Color") || pool.equalsIgnoreCase("Movement") || hasCol || hasMove))
             {
                 vf.state.dimmer = (hasMove && !hasCol) ? 0.85f : 1.0f;
+            }
+        }
+
+        // Diagnostica attributi mancanti in Tab 3 (dove la Cortesia Dimmer di Tab 2 e' spenta)
+        if (!standalonePreviewMode && vf.state.hasAnyCommand)
+        {
+            const bool hasCol = vf.state.hasExplicitColor();
+            const bool hasMove = vf.state.hasPanCmd || vf.state.hasTiltCmd;
+            const bool hasStr = vf.state.hasStrobeCmd;
+            const bool hasNonDimmerAttr = hasCol || hasMove || hasStr;
+            const bool mode2SelfDimmer = (hasStr && vf.strobeSpec.mode == 2);
+
+            if (hasNonDimmerAttr && !vf.state.hasDimmerCmd && !mode2SelfDimmer
+                && !vf.state.blockedByStrobePolicy && !vf.state.blockedByMovePolicy)
+            {
+                vf.state.missingDimmerWarning = true;
+            }
+
+            const bool isColorCapableCat = (vf.category != StageRoleCatalog::Category::FxSmokeHazer
+                && vf.category != StageRoleCatalog::Category::ImpactBlinder
+                && vf.category != StageRoleCatalog::Category::ImpactStrobe);
+
+            if (isColorCapableCat && !hasCol
+                && (vf.state.hasDimmerCmd || hasMove || hasStr)
+                && !vf.state.blockedByStrobePolicy && !vf.state.blockedByMovePolicy)
+            {
+                vf.state.missingColorWarning = true;
             }
         }
 
@@ -1290,7 +1429,9 @@ private:
 
         juce::String prefix = standalonePreviewMode
             ? ("ANTEPRIMA (" + juce::String(previewBpm, 0) + " BPM)")
-            : "SIMULATORE PALCO 2D (60 FPS)";
+            : (dawTransportBridge != nullptr
+                ? ("SYNC DAW (" + juce::String(currentMusicalPos.localBpm, 1) + " BPM)")
+                : "SIMULATORE PALCO 2D (60 FPS)");
 
         juce::String status = prefix
             + "  |  " + currentMusicalPos.formatBarString()
@@ -1755,6 +1896,8 @@ private:
     static void drawFixtureHardwareBody(juce::Graphics& g, const VisualFixture& vf, bool isHovered, bool isDragged, float trussY)
     {
         const bool isPolicyBlocked = vf.state.blockedByStrobePolicy || vf.state.blockedByMovePolicy;
+        const bool isMissingDimmer = vf.state.missingDimmerWarning;
+        const bool hasWarning = isPolicyBlocked || isMissingDimmer;
         juce::Rectangle<float> box(vf.pos.x - 8.0f, vf.pos.y - 6.0f, 16.0f, 12.0f);
 
         if (isDragged || isHovered)
@@ -1763,7 +1906,7 @@ private:
             g.setColour(hiCol.withAlpha(isDragged ? 0.35f : 0.22f));
             g.fillRoundedRectangle(box.expanded(4.0f), 5.0f);
         }
-        else if (isPolicyBlocked)
+        else if (hasWarning)
         {
             g.setColour(juce::Colour(0xfff59e0b).withAlpha(0.24f));
             g.fillRoundedRectangle(box.expanded(3.5f), 5.0f);
@@ -1776,18 +1919,24 @@ private:
         float borderThick = 1.0f;
         if (isDragged) { borderCol = juce::Colour(0xfffacc15); borderThick = 2.0f; }
         else if (isHovered) { borderCol = juce::Colour(0xff38bdf8); borderThick = 2.0f; }
-        else if (isPolicyBlocked) { borderCol = juce::Colour(0xfff59e0b); borderThick = 1.6f; }
+        else if (hasWarning) { borderCol = juce::Colour(0xfff59e0b); borderThick = 1.6f; }
 
         g.setColour(borderCol);
         g.drawRoundedRectangle(box, 3.0f, borderThick);
 
-        if (isPolicyBlocked && vf.state.dimmer <= 0.02f)
+        if ((isPolicyBlocked || isMissingDimmer) && vf.state.dimmer <= 0.02f)
         {
             g.setColour(juce::Colour(0xff1a1408));
             g.fillEllipse(vf.pos.x - 4.5f, vf.pos.y - 4.5f, 9.0f, 9.0f);
 
+            // Se il faro ha un colore programmato ma manca il Dimmer, mostra il colore sul bordo interno
+            const juce::Colour ringCol = (isMissingDimmer && vf.state.hasExplicitColor())
+                ? vf.state.getEffectiveColour()
+                : juce::Colour(0xfff59e0b);
+            g.setColour(ringCol);
+            g.drawEllipse(vf.pos.x - 4.2f, vf.pos.y - 4.2f, 8.4f, 8.4f, 1.5f);
+
             g.setColour(juce::Colour(0xfff59e0b));
-            g.drawEllipse(vf.pos.x - 4.2f, vf.pos.y - 4.2f, 8.4f, 8.4f, 1.3f);
             g.drawLine(vf.pos.x - 2.8f, vf.pos.y - 2.8f,
                 vf.pos.x + 2.8f, vf.pos.y + 2.8f, 1.4f);
         }
@@ -1810,11 +1959,12 @@ private:
         }
 
         juce::Colour labelCol = juce::Colour(0xff94a3b8);
-        if (isDragged)            labelCol = juce::Colour(0xfffef08a);
-        else if (isPolicyBlocked) labelCol = juce::Colour(0xfffbbf24);
+        if (isDragged)       labelCol = juce::Colour(0xfffef08a);
+        else if (hasWarning) labelCol = juce::Colour(0xfffbbf24);
 
         g.setColour(labelCol.withAlpha(0.95f));
-        g.setFont(juce::FontOptions(9.5f, (isDragged || isPolicyBlocked) ? juce::Font::bold : juce::Font::plain));
+        g.setFont(juce::FontOptions(9.5f, (isDragged || hasWarning) ? juce::Font::bold : juce::Font::plain));
+
         float textY = (vf.pos.y <= trussY + 4.0f) ? (vf.pos.y - 17.0f) : (vf.pos.y + 7.0f);
         g.drawText(vf.name, static_cast<int>(vf.pos.x - 44.0f), static_cast<int>(textY),
             88, 12, juce::Justification::centred, true);
@@ -1853,4 +2003,10 @@ private:
 
     bool allowBackgroundDmx = false;
     juce::Image cachedBackdrop;
+
+    const LockFreeTransportBridge* dawTransportBridge = nullptr;
+    double lastRawDawPpq = -1.0;
+    double smoothDawPpq = 0.0;
+    double smoothDawSec = 0.0;
+    bool wasDawPlaying = false;
 };

@@ -2,7 +2,7 @@
 
 <PRESET_LIBRARY>
   <SCENE_PRESET sceneName="Blast Beat Red - FLOOR" startBeat="65.0" durationBeats="4.0"
-                presetName="Orange Floor" targetRolesCsv="Terra: Controluce / Sotto-Batteria|Terra: Par / Barre Laterali (Taglio)|Terra: Teste Mobili a Terra"
+                presetName="Orange Floor" targetRolesCsv="Terra: Controluce / Sotto-Batteria"
                 presetPool="Color" layerType="Base" presetColor1="ffdc2626" presetColor2="fff59e0b"
                 presetDimmerMin="0" presetDimmerMax="255" presetCurve="Static"
                 presetStrobeUseHw="1" presetStrobeSubdiv="1/16" presetMoveShape="Fixed"
@@ -14,18 +14,6 @@
                   startValue="158" endValue="158" curve="Static" commandColor="fff59e0b"/>
     <ROLE_COMMAND roleName="Terra: Controluce / Sotto-Batteria" parameter="Blue"
                   startValue="11" endValue="11" curve="Static" commandColor="fff59e0b"/>
-    <ROLE_COMMAND roleName="Terra: Par / Barre Laterali (Taglio)" parameter="Red"
-                  startValue="245" endValue="245" curve="Static" commandColor="fff59e0b"/>
-    <ROLE_COMMAND roleName="Terra: Par / Barre Laterali (Taglio)" parameter="Green"
-                  startValue="158" endValue="158" curve="Static" commandColor="fff59e0b"/>
-    <ROLE_COMMAND roleName="Terra: Par / Barre Laterali (Taglio)" parameter="Blue"
-                  startValue="11" endValue="11" curve="Static" commandColor="fff59e0b"/>
-    <ROLE_COMMAND roleName="Terra: Teste Mobili a Terra" parameter="Red" startValue="245"
-                  endValue="245" curve="Static" commandColor="fff59e0b"/>
-    <ROLE_COMMAND roleName="Terra: Teste Mobili a Terra" parameter="Green" startValue="158"
-                  endValue="158" curve="Static" commandColor="fff59e0b"/>
-    <ROLE_COMMAND roleName="Terra: Teste Mobili a Terra" parameter="Blue" startValue="11"
-                  endValue="11" curve="Static" commandColor="fff59e0b"/>
   </SCENE_PRESET>
   <SCENE_PRESET presetName="[F] Split Blu Notte / Ghiaccio" presetPool="Color"
                 layerType="Base" durationBeats="8.0" isOneShot="0" phaseMode="Sync"
@@ -150,21 +138,23 @@
   </SCENE_PRESET>
   <SCENE_PRESET presetName="[F] Sweep Lento Ventaglio (4 Bars / 16 Q)" presetPool="Movement"
                 layerType="Movement" durationBeats="16.0" isOneShot="0" phaseMode="SymmetricalFan"
-                targetRolesCsv="Aria: Teste Mobili / Beam|Terra: Teste Mobili a Terra"
-                presetColor1="ff38bdf8" presetColor2="ff38bdf8" presetDimmerMin="0"
-                presetDimmerMax="255" presetCurve="Sine_4Bars" presetStrobeUseHw="0"
-                presetStrobeSubdiv="1/8" presetMoveShape="PanSweep" presetMoveSpeed="Sine_4Bars"
-                presetMoveAmpPan="85" presetMoveAmpTilt="40" sceneName="[F] Sweep Lento Ventaglio (4 Bars / 16 Q)"
-                presetUseColor="0" presetUseDimmer="0" presetUseMove="1" presetUseStrobe="0"
+                targetRolesCsv="Terra: Controluce / Sotto-Batteria" presetColor1="ff38bdf8"
+                presetColor2="ff38bdf8" presetDimmerMin="0" presetDimmerMax="255"
+                presetCurve="Sine_4Bars" presetStrobeUseHw="0" presetStrobeSubdiv="1/8"
+                presetMoveShape="PanSweep" presetMoveSpeed="Sine_4Bars" presetMoveAmpPan="85"
+                presetMoveAmpTilt="40" sceneName="[F] Sweep Lento Ventaglio (4 Bars / 16 Q)"
+                presetUseColor="1" presetUseDimmer="0" presetUseMove="1" presetUseStrobe="0"
                 presetId="1c457e1824fe4b9782d784b349bee641">
-    <ROLE_COMMAND roleName="Aria: Teste Mobili / Beam" parameter="Pan" startValue="20"
-                  endValue="236" curve="Sine_4Bars" commandColor="ffffffff"/>
-    <ROLE_COMMAND roleName="Aria: Teste Mobili / Beam" parameter="Tilt" startValue="128"
-                  endValue="128" curve="Static" commandColor="ffffffff"/>
-    <ROLE_COMMAND roleName="Terra: Teste Mobili a Terra" parameter="Pan" startValue="20"
-                  endValue="236" curve="Sine_4Bars" commandColor="ffffffff"/>
-    <ROLE_COMMAND roleName="Terra: Teste Mobili a Terra" parameter="Tilt" startValue="128"
-                  endValue="128" curve="Static" commandColor="ffffffff"/>
+    <ROLE_COMMAND roleName="Terra: Controluce / Sotto-Batteria" parameter="Red"
+                  startValue="56" endValue="56" curve="Static" commandColor="ff38bdf8"/>
+    <ROLE_COMMAND roleName="Terra: Controluce / Sotto-Batteria" parameter="Green"
+                  startValue="189" endValue="189" curve="Static" commandColor="ff38bdf8"/>
+    <ROLE_COMMAND roleName="Terra: Controluce / Sotto-Batteria" parameter="Blue"
+                  startValue="248" endValue="248" curve="Static" commandColor="ff38bdf8"/>
+    <ROLE_COMMAND roleName="Terra: Controluce / Sotto-Batteria" parameter="Pan"
+                  startValue="20" endValue="236" curve="Sine_4Bars" commandColor="ff38bdf8"/>
+    <ROLE_COMMAND roleName="Terra: Controluce / Sotto-Batteria" parameter="Tilt"
+                  startValue="128" endValue="128" curve="Static" commandColor="ff38bdf8"/>
   </SCENE_PRESET>
   <SCENE_PRESET presetName="[F] Cerchio Ipnotico (2 Bars / 8 Q)" presetPool="Movement"
                 layerType="Movement" durationBeats="8.0" isOneShot="0" phaseMode="SymmetricalFan"

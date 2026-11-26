@@ -54,7 +54,7 @@ private:
     juce::TextButton undoBtn, redoBtn;
 
     VenuePatchTab venueTab{ processor.getMainState() };
-    ShowBuilderTab showBuilderTab{ processor.getMainState() };
+    ShowBuilderTab showBuilderTab{ processor.getMainState(), processor.isRunningInDaw() };
     SceneBuilderTab sceneBuilderTab{ processor.getMainState() };
     ExportEngineTab exportTab{ processor.getMainState() };
     TimeMetricManagerComponent timeMetricTab{ processor.getMainState(), processor.getBeatTimeMap() };
