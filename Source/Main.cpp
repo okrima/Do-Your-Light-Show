@@ -1,24 +1,26 @@
 #include <juce_gui_basics/juce_gui_basics.h>
 #include "MainComponent.h"
 
-class DoYourLightShowApplication  : public juce::JUCEApplication
+class DoYourLightShowApplication : public juce::JUCEApplication
 {
 public:
     DoYourLightShowApplication() {}
 
-    const juce::String getApplicationName() override      { return "DoYourLightShow"; }
-    const juce::String getApplicationVersion() override   { return "1.0.0"; }
-    bool moreThanOneInstanceAllowed() override            { return true; }
+    const juce::String getApplicationName() override { return "DoYourLightShow"; }
+    const juce::String getApplicationVersion() override { return "1.0.0"; }
+    bool moreThanOneInstanceAllowed() override { return true; }
 
-    void initialise (const juce::String& commandLine) override
+    void initialise(const juce::String& commandLine) override
     {
         juce::ignoreUnused(commandLine);
-        mainWindow = std::make_unique<MainWindow> (getApplicationName());
+        processor = std::make_unique<LightShowProcessor>(false);
+        mainWindow = std::make_unique<MainWindow>(getApplicationName(), *processor);
     }
 
     void shutdown() override
     {
         mainWindow = nullptr;
+        processor = nullptr;
     }
 
     void systemRequestedQuit() override
@@ -34,33 +36,33 @@ public:
         quit();
     }
 
-    void anotherInstanceStarted (const juce::String& commandLine) override
+    void anotherInstanceStarted(const juce::String& commandLine) override
     {
         juce::ignoreUnused(commandLine);
     }
 
-    class MainWindow    : public juce::DocumentWindow
+    class MainWindow : public juce::DocumentWindow
     {
     public:
-        MainWindow (juce::String name)
-            : DocumentWindow (name,
-                              juce::Desktop::getInstance().getDefaultLookAndFeel()
-                                                          .findColour (juce::ResizableWindow::backgroundColourId),
-                              DocumentWindow::allButtons)
+        MainWindow(juce::String name, LightShowProcessor& proc)
+            : DocumentWindow(name,
+                juce::Desktop::getInstance().getDefaultLookAndFeel()
+                .findColour(juce::ResizableWindow::backgroundColourId),
+                DocumentWindow::allButtons)
         {
-            setUsingNativeTitleBar (true);
-            setContentOwned (new MainComponent(), true);
+            setUsingNativeTitleBar(true);
+            setContentOwned(new MainComponent(proc), true);
 
-           #if JUCE_IOS || JUCE_ANDROID
-            setFullScreen (true);
-           #else
-            setResizable (true, true);
+#if JUCE_IOS || JUCE_ANDROID
+            setFullScreen(true);
+#else
+            setResizable(true, true);
             setResizeLimits(1280, 768, 10000, 10000);
-            centreWithSize (getWidth(), getHeight());
-            setFullScreen(true); // Avvia la finestra massimizzata a tutto schermo su Windows/Mac
-           #endif
+            centreWithSize(getWidth(), getHeight());
+            setFullScreen(true);
+#endif
 
-            setVisible (true);
+            setVisible(true);
         }
 
         void closeButtonPressed() override
@@ -69,11 +71,12 @@ public:
         }
 
     private:
-        JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (MainWindow)
+        JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(MainWindow)
     };
 
 private:
+    std::unique_ptr<LightShowProcessor> processor;
     std::unique_ptr<MainWindow> mainWindow;
 };
 
-START_JUCE_APPLICATION (DoYourLightShowApplication)
+START_JUCE_APPLICATION(DoYourLightShowApplication)

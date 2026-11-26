@@ -1,13 +1,12 @@
 #pragma once
 #include <juce_gui_basics/juce_gui_basics.h>
+#include "Plugin/LightShowProcessor.h"
 #include "UI/Tabs/VenuePatchTab.h"
 #include "UI/Tabs/ShowBuilderTab.h"
 #include "UI/Tabs/ExportEngineTab.h"
 #include "UI/Tabs/SceneBuilderTab.h"
 #include "UI/Components/TimeMetricManager.h"
-#include "Engine/DmxLiveEngine.h"
 #include "UI/Components/DmxOutputControlPanel.h"
-#include "Utils/StateUndoManager.h"
 
 class LiveTabbedComponent : public juce::TabbedComponent
 {
@@ -29,11 +28,10 @@ private:
     int lastTabIndex = -1;
 };
 
-class MainComponent : public juce::Component,
-                        private juce::ValueTree::Listener
+class MainComponent : public juce::Component
 {
 public:
-    MainComponent();
+    explicit MainComponent(LightShowProcessor& processorRef);
     ~MainComponent() override;
 
     void paint(juce::Graphics&) override;
@@ -44,46 +42,24 @@ public:
     bool keyPressed(const juce::KeyPress& key) override;
 
 private:
-    void markTabDirty(int tabIndex, bool isDirty);
     void refreshTabTitles();
-    void handleStateTreeModified(const juce::ValueTree& tree);
+    void updateUndoRedoButtons();
+    void refreshAllTabsFromProcessorState();
     void saveSelectedTabsAndQuit(bool saveT1, bool saveT2, bool saveT3, bool saveT6,
         std::function<void()> onReadyToQuit);
 
-    void valueTreePropertyChanged(juce::ValueTree& tree, const juce::Identifier&) override { handleStateTreeModified(tree); }
-    void valueTreeChildAdded(juce::ValueTree& parent, juce::ValueTree& child) override { handleStateTreeModified(child); juce::ignoreUnused(parent); }
-    void valueTreeChildRemoved(juce::ValueTree& parent, juce::ValueTree&, int) override { handleStateTreeModified(parent); }
-    void valueTreeChildOrderChanged(juce::ValueTree& parent, int, int) override { handleStateTreeModified(parent); }
-
-    void updateUndoRedoButtons();
-    void captureCleanSnapshotForTab(int tabIndex);
-    juce::ValueTree makeShowSubtreeSnapshot() const;
-
-    void valueTreeParentChanged(juce::ValueTree&) override {}
-
-    DmxLiveEngine dmxLiveEngine;
+    LightShowProcessor& processor;
     LiveTabbedComponent tabbedComponent;
 
-    juce::ValueTree mainState{ "DO_YOUR_LIGHT_SHOW_STATE" };
-    BeatTimeMap timeMetricBeatMap;
-
-    StateUndoManager undoManager{ mainState };
     juce::TextButton undoBtn, redoBtn;
-    juce::ValueTree cleanVenueSnap;
-    juce::ValueTree cleanPresetLibSnap;
-    juce::ValueTree cleanShowSnap;
 
-    VenuePatchTab venueTab{ mainState };
-    ShowBuilderTab showBuilderTab{ mainState };
-    SceneBuilderTab sceneBuilderTab{ mainState };
-    ExportEngineTab exportTab{ mainState };
-    TimeMetricManagerComponent timeMetricTab{ mainState, timeMetricBeatMap };
-    DmxOutputControlPanel dmxControlPanel{ dmxLiveEngine };
+    VenuePatchTab venueTab{ processor.getMainState() };
+    ShowBuilderTab showBuilderTab{ processor.getMainState() };
+    SceneBuilderTab sceneBuilderTab{ processor.getMainState() };
+    ExportEngineTab exportTab{ processor.getMainState() };
+    TimeMetricManagerComponent timeMetricTab{ processor.getMainState(), processor.getBeatTimeMap() };
+    DmxOutputControlPanel dmxControlPanel{ processor.getDmxLiveEngine() };
 
-    bool dirtyTab1 = false;
-    bool dirtyTab2 = false;
-    bool dirtyTab3 = false;
-    bool dirtyTab6 = false;
     bool isQuitPromptOpen = false;
     std::unique_ptr<juce::Component> quitOverlay;
 

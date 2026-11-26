@@ -53,6 +53,10 @@ target_sources(DoYourLightShow
         Source/Engine/DmxOutputManager.h
         Source/Engine/DmxLiveEngine.h
 
+        # Plugin / Processor Core
+        Source/Plugin/LightShowProcessor.h
+        Source/Plugin/LightShowProcessor.cpp
+
         # UI Tabs & Components
         Source/UI/Tabs/VenuePatchTab.h
         Source/UI/Tabs/SceneBuilderTab.h
@@ -70,7 +74,7 @@ target_sources(DoYourLightShow
 
         # Utils
         Source/Utils/PresetManager.h
- "Source/Utils/StateUndoManager.h")
+ "Source/Utils/StateUndoManager.h" "Source/Plugin/LightShowProcessor.cpp")
 
 # 4. Include directory
 target_include_directories(DoYourLightShow

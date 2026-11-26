@@ -226,6 +226,49 @@
           "posY": 0.849127173423767
         }
       ]
+    },
+    {
+      "nodeType": "FIXTURE",
+      "name": "Geyser",
+      "quantity": 2,
+      "startAddress": 61,
+      "channelCount": 7,
+      "role": "FX: Geyser Verticale (Fumo + LED)",
+      "map_Dimmer": 0,
+      "map_Red": 2,
+      "map_Green": 3,
+      "map_Blue": 4,
+      "strobeMode": 3,
+      "dimmerMaxVal": 255,
+      "strobeOpenVal": 0,
+      "strobeMinVal": 20,
+      "strobeMinHz": 1.0,
+      "strobeMaxVal": 245,
+      "strobeMaxHz": 20.0,
+      "panMin": 85,
+      "panMax": 170,
+      "tiltMin": 128,
+      "tiltMax": 195,
+      "swapPanTilt": false,
+      "invertPan": false,
+      "invertTilt": false,
+      "map_GeyserBlast": 1,
+      "children": [
+        {
+          "nodeType": "FIXTURE_UNIT",
+          "unitIndex": 1,
+          "isPlaced": true,
+          "posX": 0.414974629878998,
+          "posY": 0.834164559841156
+        },
+        {
+          "nodeType": "FIXTURE_UNIT",
+          "unitIndex": 2,
+          "isPlaced": true,
+          "posX": 0.590101540088654,
+          "posY": 0.834164559841156
+        }
+      ]
     }
   ]
 }

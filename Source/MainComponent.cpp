@@ -1,11 +1,12 @@
 #include "MainComponent.h"
 
-MainComponent::MainComponent()
-    : tabbedComponent(juce::TabbedButtonBar::TabsAtTop)
+MainComponent::MainComponent(LightShowProcessor& processorRef)
+    : processor(processorRef),
+    tabbedComponent(juce::TabbedButtonBar::TabsAtTop)
 {
     tabbedComponent.setTabBarDepth(40);
 
-    timeMetricBeatMap.bindToAppState(mainState);
+    processor.getBeatTimeMap().bindToAppState(processor.getMainState());
     timeMetricTab.refreshTables();
 
     tabbedComponent.addTab("1. Venue Patch",
@@ -38,109 +39,100 @@ MainComponent::MainComponent()
         &dmxControlPanel,
         false);
 
-    venueTab.setDmxLiveEngine(&dmxLiveEngine);
-    sceneBuilderTab.setDmxLiveEngine(&dmxLiveEngine);
-    showBuilderTab.setDmxLiveEngine(&dmxLiveEngine);
+    auto& dmxEngine = processor.getDmxLiveEngine();
+    venueTab.setDmxLiveEngine(&dmxEngine);
+    sceneBuilderTab.setDmxLiveEngine(&dmxEngine);
+    showBuilderTab.setDmxLiveEngine(&dmxEngine);
 
     tabbedComponent.onTabChanged = [this](int prevTab, int newTab)
         {
-            // Indici tab: 0 = Venue Patch, 1 = Scene Builder, 2 = Pattern Creator, 3 = Time, 4 = MIDI, 5 = DMX Live
+            processor.setActiveTabIndex(newTab);
+
             const bool allowsFixtureTest = (newTab == 0 || newTab == 5);
             if (!allowsFixtureTest)
                 venueTab.forceStopFixtureTest();
 
-
-            // Consente all'anteprima della Tab 2 di restare attiva in Tab 6 SOLO se arrivi dalla Tab 2
             const bool allowTab2Dmx = (newTab == 1) || (newTab == 5 && prevTab == 1);
             sceneBuilderTab.setAllowBackgroundDmx(allowTab2Dmx);
 
             if (prevTab == 1 && !allowTab2Dmx)
-                dmxLiveEngine.clearAllOutput();
+                processor.getDmxLiveEngine().clearAllOutput();
         };
 
     addAndMakeVisible(tabbedComponent);
-
     setWantsKeyboardFocus(true);
 
     undoBtn.setButtonText("< Undo");
     undoBtn.setColour(juce::TextButton::buttonColourId, juce::Colour(0xff262936));
     undoBtn.setColour(juce::TextButton::textColourOffId, juce::Colours::white);
     undoBtn.setWantsKeyboardFocus(false);
-    undoBtn.onClick = [this]() { undoManager.undo(); };
+    undoBtn.onClick = [this]() { processor.getUndoManager().undo(); };
     addAndMakeVisible(undoBtn);
 
     redoBtn.setButtonText("Redo >");
     redoBtn.setColour(juce::TextButton::buttonColourId, juce::Colour(0xff262936));
     redoBtn.setColour(juce::TextButton::textColourOffId, juce::Colours::white);
     redoBtn.setWantsKeyboardFocus(false);
-    redoBtn.onClick = [this]() { undoManager.redo(); };
+    redoBtn.onClick = [this]() { processor.getUndoManager().redo(); };
     addAndMakeVisible(redoBtn);
 
     setSize(1600, 950);
 
     venueTab.onVenueClean = [this]() {
-        captureCleanSnapshotForTab(0);
-        markTabDirty(0, false);
-        undoManager.commitPendingNow("Tab 1 - Venue Patch");
+        processor.captureCleanSnapshotForTab(0);
+        processor.markTabDirty(0, false);
+        processor.getUndoManager().commitPendingNow("Tab 1 - Venue Patch");
         };
     sceneBuilderTab.onPresetLibraryClean = [this]() {
-        captureCleanSnapshotForTab(1);
-        markTabDirty(1, false);
-        undoManager.commitPendingNow("Tab 2 - Scene Builder");
+        processor.captureCleanSnapshotForTab(1);
+        processor.markTabDirty(1, false);
+        processor.getUndoManager().commitPendingNow("Tab 2 - Scene Builder");
         };
     showBuilderTab.onShowClean = [this]() {
-        captureCleanSnapshotForTab(2);
-        markTabDirty(2, false);
-        undoManager.commitPendingNow("Tab 3 - Pattern Creator");
+        processor.captureCleanSnapshotForTab(2);
+        processor.markTabDirty(2, false);
+        processor.getUndoManager().commitPendingNow("Tab 3 - Pattern Creator");
         };
-    dmxControlPanel.onDirtyStateChanged = [this](bool d) { markTabDirty(5, d); };
+    dmxControlPanel.onDirtyStateChanged = [this](bool d) {
+        processor.markTabDirty(5, d);
+        };
 
-    undoManager.onHistoryChanged = [this]() { updateUndoRedoButtons(); };
-    undoManager.onStateRestored = [this](const StateUndoManager::RestoreResult& res)
+    processor.setEditorCallbacks(
+        [this]() { refreshTabTitles(); },
+        [this]() { updateUndoRedoButtons(); },
+        [this](const StateUndoManager::RestoreResult& res)
         {
             if (res.venueChanged)
-            {
                 venueTab.refreshAfterUndoRedo();
-                auto v = mainState.getChildWithName(StateKeys::VenueNode);
-                markTabDirty(0, !v.isEquivalentTo(cleanVenueSnap));
-            }
             if (res.presetLibChanged)
-            {
                 sceneBuilderTab.refreshAfterUndoRedo();
-                auto p = mainState.getChildWithName(StateKeys::PresetLibNode);
-                markTabDirty(1, !p.isEquivalentTo(cleanPresetLibSnap));
-            }
             if (res.showChanged || res.otherChanged)
             {
                 showBuilderTab.refreshAfterUndoRedo(res.otherChanged);
                 if (res.otherChanged)
                 {
-                    timeMetricBeatMap.bindToAppState(mainState);
+                    processor.getBeatTimeMap().bindToAppState(processor.getMainState());
                     timeMetricTab.refreshTables();
                 }
-                markTabDirty(2, !makeShowSubtreeSnapshot().isEquivalentTo(cleanShowSnap));
             }
-        };
+        },
+        [this]() { refreshAllTabsFromProcessorState(); }
+    );
 
-    captureCleanSnapshotForTab(0);
-    captureCleanSnapshotForTab(1);
-    captureCleanSnapshotForTab(2);
-    undoManager.resetHistory();
-    updateUndoRedoButtons();
+    processor.markTabDirty(5, dmxControlPanel.hasUnsavedChanges());
+    processor.finalizeInitialSessionIfNeeded();
 
-    dirtyTab1 = false;
-    dirtyTab2 = false;
-    dirtyTab3 = false;
-    dirtyTab6 = dmxControlPanel.hasUnsavedChanges();
+    const int restoredTab = juce::jlimit(0, tabbedComponent.getNumTabs() - 1, processor.getActiveTabIndex());
+    tabbedComponent.setCurrentTabIndex(restoredTab, false);
+
     refreshTabTitles();
-
-    mainState.addListener(this);
+    updateUndoRedoButtons();
 }
 
 MainComponent::~MainComponent()
 {
     quitOverlay.reset();
-    mainState.removeListener(this);
+    processor.setEditorCallbacks(nullptr, nullptr, nullptr, nullptr);
     tabbedComponent.clearTabs();
 }
 
@@ -439,67 +431,24 @@ namespace
     };
 }
 
-void MainComponent::markTabDirty(int tabIndex, bool isDirty)
-{
-    bool* flag = nullptr;
-    if (tabIndex == 0) flag = &dirtyTab1;
-    else if (tabIndex == 1) flag = &dirtyTab2;
-    else if (tabIndex == 2) flag = &dirtyTab3;
-    else if (tabIndex == 5) flag = &dirtyTab6;
-
-    if (flag != nullptr && *flag != isDirty)
-    {
-        *flag = isDirty;
-        refreshTabTitles();
-    }
-}
-
 void MainComponent::refreshTabTitles()
 {
-    tabbedComponent.setTabName(0, dirtyTab1 ? "1. Venue Patch *" : "1. Venue Patch");
-    tabbedComponent.setTabName(1, dirtyTab2 ? "2. Scene Builder *" : "2. Scene Builder");
-    tabbedComponent.setTabName(2, dirtyTab3 ? "3. Pattern Creator *" : "3. Pattern Creator");
-    tabbedComponent.setTabName(5, dirtyTab6 ? "6. DMX Live *" : "6. DMX Live");
+    tabbedComponent.setTabName(0, processor.isTabDirty(0) ? "1. Venue Patch *" : "1. Venue Patch");
+    tabbedComponent.setTabName(1, processor.isTabDirty(1) ? "2. Scene Builder *" : "2. Scene Builder");
+    tabbedComponent.setTabName(2, processor.isTabDirty(2) ? "3. Pattern Creator *" : "3. Pattern Creator");
+    tabbedComponent.setTabName(5, processor.isTabDirty(5) ? "6. DMX Live *" : "6. DMX Live");
     tabbedComponent.getTabbedButtonBar().repaint();
 }
 
-void MainComponent::handleStateTreeModified(const juce::ValueTree& tree)
+void MainComponent::refreshAllTabsFromProcessorState()
 {
-    if (!tree.isValid() || undoManager.isRestoring())
-        return;
-
-    juce::ValueTree top = tree;
-    while (top.getParent().isValid() && top.getParent() != mainState)
-        top = top.getParent();
-
-    if (top == mainState)
-        return;
-
-    const int activeTab = tabbedComponent.getCurrentTabIndex();
-
-    if (top.hasType(StateKeys::VenueNode))
-    {
-        markTabDirty(0, true);
-        undoManager.notifyStateChanged("Tab 1 - Venue Patch");
-    }
-    else if (top.hasType(StateKeys::PresetLibNode))
-    {
-        markTabDirty(1, true);
-        undoManager.notifyStateChanged("Tab 2 - Scene Builder");
-    }
-    else if (top.hasType(StateKeys::ShowNode))
-    {
-        if (top.getNumChildren() > 0 || activeTab == 2)
-        {
-            markTabDirty(2, true);
-            undoManager.notifyStateChanged("Tab 3 - Pattern Creator");
-        }
-    }
-    else if (activeTab == 2 || activeTab == 3)
-    {
-        markTabDirty(2, true);
-        undoManager.notifyStateChanged(activeTab == 3 ? "Tab 4 - Time & Metric" : "Tab 3 - Pattern Creator");
-    }
+    venueTab.refreshAfterUndoRedo();
+    sceneBuilderTab.refreshAfterUndoRedo();
+    showBuilderTab.refreshAfterUndoRedo(true);
+    processor.getBeatTimeMap().bindToAppState(processor.getMainState());
+    timeMetricTab.refreshTables();
+    refreshTabTitles();
+    updateUndoRedoButtons();
 }
 
 bool MainComponent::keyPressed(const juce::KeyPress& key)
@@ -516,12 +465,12 @@ bool MainComponent::keyPressed(const juce::KeyPress& key)
         const int code = key.getKeyCode();
         if ((code == 'z' || code == 'Z') && !mods.isShiftDown())
         {
-            undoManager.undo();
+            processor.getUndoManager().undo();
             return true;
         }
         if (code == 'y' || code == 'Y' || ((code == 'z' || code == 'Z') && mods.isShiftDown()))
         {
-            undoManager.redo();
+            processor.getUndoManager().redo();
             return true;
         }
     }
@@ -531,59 +480,34 @@ bool MainComponent::keyPressed(const juce::KeyPress& key)
 
 void MainComponent::updateUndoRedoButtons()
 {
-    const bool canU = !isQuitPromptOpen && undoManager.canUndo();
-    const bool canR = !isQuitPromptOpen && undoManager.canRedo();
+    auto& um = processor.getUndoManager();
+    const bool canU = !isQuitPromptOpen && um.canUndo();
+    const bool canR = !isQuitPromptOpen && um.canRedo();
 
     undoBtn.setEnabled(canU);
     undoBtn.setAlpha(canU ? 1.0f : 0.40f);
     undoBtn.setTooltip(canU
-        ? ("Annulla: " + undoManager.getUndoDescription() + " (Ctrl+Z)")
+        ? ("Annulla: " + um.getUndoDescription() + " (Ctrl+Z)")
         : "Nessuna azione da annullare (Ctrl+Z)");
 
     redoBtn.setEnabled(canR);
     redoBtn.setAlpha(canR ? 1.0f : 0.40f);
     redoBtn.setTooltip(canR
-        ? ("Ripristina: " + undoManager.getRedoDescription() + " (Ctrl+Y / Ctrl+Shift+Z)")
+        ? ("Ripristina: " + um.getRedoDescription() + " (Ctrl+Y / Ctrl+Shift+Z)")
         : "Nessuna azione da ripristinare (Ctrl+Y)");
-}
-
-void MainComponent::captureCleanSnapshotForTab(int tabIndex)
-{
-    if (tabIndex == 0)
-    {
-        auto v = mainState.getChildWithName(StateKeys::VenueNode);
-        cleanVenueSnap = v.isValid() ? v.createCopy() : juce::ValueTree(StateKeys::VenueNode);
-    }
-    else if (tabIndex == 1)
-    {
-        auto p = mainState.getChildWithName(StateKeys::PresetLibNode);
-        cleanPresetLibSnap = p.isValid() ? p.createCopy() : juce::ValueTree(StateKeys::PresetLibNode);
-    }
-    else if (tabIndex == 2)
-    {
-        cleanShowSnap = makeShowSubtreeSnapshot();
-    }
-}
-
-juce::ValueTree MainComponent::makeShowSubtreeSnapshot() const
-{
-    juce::ValueTree snap("SHOW_SUBTREE_SNAP");
-    for (int i = 0; i < mainState.getNumChildren(); ++i)
-    {
-        auto ch = mainState.getChild(i);
-        if (!ch.hasType(StateKeys::VenueNode) && !ch.hasType(StateKeys::PresetLibNode))
-            snap.addChild(ch.createCopy(), -1, nullptr);
-    }
-    return snap;
 }
 
 void MainComponent::requestApplicationQuit(std::function<void()> onReadyToQuit)
 {
-    dirtyTab6 = dirtyTab6 || dmxControlPanel.hasUnsavedChanges();
+    const bool d1 = processor.isTabDirty(0);
+    const bool d2 = processor.isTabDirty(1);
+    const bool d3 = processor.isTabDirty(2);
+    const bool d6 = processor.isTabDirty(5) || dmxControlPanel.hasUnsavedChanges();
+    processor.markTabDirty(5, d6);
 
-    if (!dirtyTab1 && !dirtyTab2 && !dirtyTab3 && !dirtyTab6)
+    if (!d1 && !d2 && !d3 && !d6)
     {
-        dmxLiveEngine.stopOutput(true);
+        processor.getDmxLiveEngine().stopOutput(true);
         if (onReadyToQuit) onReadyToQuit();
         return;
     }
@@ -614,11 +538,9 @@ void MainComponent::requestApplicationQuit(std::function<void()> onReadyToQuit)
             });
         };
 
-    // Cattura lo snapshot PRIMA di disabilitare tabbedComponent, poi blocca l'UI sottostante
     quitOverlay = std::make_unique<UnsavedChangesOverlay>(
         tabbedComponent,
-        dirtyTab1, dirtyTab2, dirtyTab3, dirtyTab6,
-        // 1. Salva e chiudi
+        d1, d2, d3, d6,
         [safeThis, hideOverlayNow, onReadyToQuit](bool s1, bool s2, bool s3, bool s6) {
             hideOverlayNow();
             juce::MessageManager::callAsync([safeThis, onReadyToQuit, s1, s2, s3, s6]() {
@@ -627,25 +549,21 @@ void MainComponent::requestApplicationQuit(std::function<void()> onReadyToQuit)
                 safeThis->saveSelectedTabsAndQuit(s1, s2, s3, s6, onReadyToQuit);
                 });
         },
-        // 2. Chiudi senza salvare
         [safeThis, hideOverlayNow, onReadyToQuit]() {
             hideOverlayNow();
             juce::MessageManager::callAsync([safeThis, onReadyToQuit]() {
                 if (safeThis == nullptr) return;
                 safeThis->quitOverlay.reset();
                 safeThis->isQuitPromptOpen = false;
-                safeThis->dmxLiveEngine.stopOutput(true);
+                safeThis->processor.getDmxLiveEngine().stopOutput(true);
                 if (onReadyToQuit) onReadyToQuit();
                 });
         },
-        // 3. Annulla (o X / ESC)
         cancelOverlayAsync
     );
 
     tabbedComponent.setEnabled(false);
-
     updateUndoRedoButtons();
-
     addAndMakeVisible(*quitOverlay);
     quitOverlay->setBounds(getLocalBounds());
     quitOverlay->toFront(true);
@@ -673,7 +591,7 @@ void MainComponent::saveSelectedTabsAndQuit(bool saveT1, bool saveT2, bool saveT
     auto finalizeQuit = [safeThis, onReadyToQuit]() {
         if (safeThis == nullptr) return;
         safeThis->isQuitPromptOpen = false;
-        safeThis->dmxLiveEngine.stopOutput(true);
+        safeThis->processor.getDmxLiveEngine().stopOutput(true);
         if (onReadyToQuit) onReadyToQuit();
         };
 
