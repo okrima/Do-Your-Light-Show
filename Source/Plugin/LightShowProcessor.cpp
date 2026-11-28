@@ -71,6 +71,12 @@ struct LightShowProcessor::ReaperApiBridge
     FnSetEditCurPos  setEditCurPos = nullptr;
     FnTimeMap2_QNToT qnToTime = nullptr;
 
+    using FnGetPlayPosition = double(*)();
+    using FnGetCursorPosition = double(*)();
+
+    FnGetPlayPosition   getPlayPosition = nullptr;
+    FnGetCursorPosition getCursorPosition = nullptr;
+
 #if DOYOURLIGHTSHOW_HAS_REAPER_API
     void setIHostApplication(Steinberg::FUnknown* ptr) override
     {
@@ -102,6 +108,9 @@ struct LightShowProcessor::ReaperApiBridge
             loadFn(csurfOnStop, "CSurf_OnStop");
             loadFn(setEditCurPos, "SetEditCurPos");
             loadFn(qnToTime, "TimeMap2_QNToTime");
+            loadFn(getPlayPosition, "GetPlayPosition");
+            loadFn(getCursorPosition, "GetCursorPosition");
+
 
             host->release();
 
@@ -122,7 +131,8 @@ struct LightShowProcessor::ReaperApiBridge
 
 namespace
 {
-    class LightShowPluginEditor : public juce::AudioProcessorEditor
+    class LightShowPluginEditor : public juce::AudioProcessorEditor,
+        private juce::Timer
     {
     public:
         explicit LightShowPluginEditor(LightShowProcessor& proc)
@@ -131,17 +141,136 @@ namespace
         {
             addAndMakeVisible(mainComponent);
             setResizable(true, true);
-            setResizeLimits(1200, 720, 4096, 2160);
-            setSize(1440, 860);
+            setResizeLimits(640, 420, 4096, 2160);
+
+            juce::Rectangle<int> workArea(0, 0, 1440, 960);
+            if (const auto* disp = juce::Desktop::getInstance().getDisplays().getPrimaryDisplay())
+                workArea = disp->userArea;
+
+            // Lascia margine per barra del titolo Windows, barra FX di Reaper e taskbar
+            const int maxInitW = juce::jmax(640, workArea.getWidth() - 40);
+            const int maxInitH = juce::jmax(420, workArea.getHeight() - 100);
+            setSize(juce::jmin(1440, maxInitW), juce::jmin(860, maxInitH));
+
+            startTimerHz(4);
+        }
+
+        ~LightShowPluginEditor() override
+        {
+            stopTimer();
+        }
+
+        void paint(juce::Graphics& g) override
+        {
+            g.fillAll(juce::Colour(0xff141417));
         }
 
         void resized() override
         {
-            mainComponent.setBounds(getLocalBounds());
+            updateLayoutForVisibleArea(true);
+        }
+
+        void moved() override
+        {
+            updateLayoutForVisibleArea(false);
+        }
+
+        void parentHierarchyChanged() override
+        {
+            updateLayoutForVisibleArea(true);
         }
 
     private:
+        static constexpr float kMinDesignW = 1240.0f;
+        static constexpr float kMinDesignH = 740.0f;
+
+        void timerCallback() override
+        {
+            updateLayoutForVisibleArea(false);
+        }
+
+        void updateLayoutForVisibleArea(bool force)
+        {
+            const auto local = getLocalBounds();
+            if (local.isEmpty())
+                return;
+
+            const auto screen = getScreenBounds();
+            juce::Rectangle<int> workArea;
+            juce::Rectangle<int> totalArea;
+
+            if (const auto* disp = juce::Desktop::getInstance().getDisplays().getDisplayForRect(screen))
+            {
+                workArea = disp->userArea;
+                totalArea = disp->totalArea;
+            }
+            else if (const auto* primary = juce::Desktop::getInstance().getDisplays().getPrimaryDisplay())
+            {
+                workArea = primary->userArea;
+                totalArea = primary->totalArea;
+            }
+
+            if (!force
+                && local == lastLocalBounds
+                && screen == lastScreenBounds
+                && workArea == lastWorkArea)
+            {
+                return;
+            }
+
+            lastLocalBounds = local;
+            lastScreenBounds = screen;
+            lastWorkArea = workArea;
+
+            auto visibleLocal = local;
+
+            // Ritaglia solo i bordi dove esiste realmente la barra di Windows (workArea != totalArea)
+            if (!workArea.isEmpty() && !totalArea.isEmpty() && !screen.isEmpty())
+            {
+                const bool nearFullHeight = (screen.getY() <= workArea.getY() + 160);
+                const bool nearFullWidth = (screen.getX() <= workArea.getX() + 60);
+
+                if (workArea.getBottom() < totalArea.getBottom() && nearFullHeight && screen.getBottom() > workArea.getBottom())
+                    visibleLocal.removeFromBottom(juce::jmin(visibleLocal.getHeight() / 3, screen.getBottom() - workArea.getBottom()));
+
+                if (workArea.getY() > totalArea.getY() && screen.getY() < workArea.getY())
+                    visibleLocal.removeFromTop(juce::jmin(visibleLocal.getHeight() / 3, workArea.getY() - screen.getY()));
+
+                if (workArea.getRight() < totalArea.getRight() && nearFullWidth && screen.getRight() > workArea.getRight())
+                    visibleLocal.removeFromRight(juce::jmin(visibleLocal.getWidth() / 3, screen.getRight() - workArea.getRight()));
+
+                if (workArea.getX() > totalArea.getX() && screen.getX() < workArea.getX())
+                    visibleLocal.removeFromLeft(juce::jmin(visibleLocal.getWidth() / 3, workArea.getX() - screen.getX()));
+            }
+
+            const int visW = juce::jmax(1, visibleLocal.getWidth());
+            const int visH = juce::jmax(1, visibleLocal.getHeight());
+
+            const float scaleX = static_cast<float>(visW) / kMinDesignW;
+            const float scaleY = static_cast<float>(visH) / kMinDesignH;
+            const float scale = juce::jmin(1.0f, juce::jmin(scaleX, scaleY));
+
+            if (scale < 0.999f)
+            {
+                const int logicalW = juce::jmax(1, juce::roundToInt(static_cast<float>(visW) / scale));
+                const int logicalH = juce::jmax(1, juce::roundToInt(static_cast<float>(visH) / scale));
+
+                mainComponent.setTransform(juce::AffineTransform::scale(scale)
+                    .translated(static_cast<float>(visibleLocal.getX()),
+                        static_cast<float>(visibleLocal.getY())));
+                mainComponent.setBounds(0, 0, logicalW, logicalH);
+            }
+            else
+            {
+                mainComponent.setTransform(juce::AffineTransform());
+                mainComponent.setBounds(visibleLocal);
+            }
+        }
+
         MainComponent mainComponent;
+        juce::Rectangle<int> lastLocalBounds;
+        juce::Rectangle<int> lastScreenBounds;
+        juce::Rectangle<int> lastWorkArea;
 
         JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(LightShowPluginEditor)
     };
@@ -189,10 +318,10 @@ LightShowProcessor::LightShowProcessor(bool runningInsideDaw)
 
     mainState.addListener(this);
 
+    reaperBridge = std::make_unique<ReaperApiBridge>(*this);
+
     if (hostedInDaw)
         startTimerHz(60);
-
-    reaperBridge = std::make_unique<ReaperApiBridge>(*this);
 
     tryAutoConnectDmxFromSettings();
 }
@@ -482,8 +611,76 @@ void LightShowProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::Mi
             }
 
             transportBridge.writeFromAudioThread(ts);
+            audioBlockCounter.fetch_add(1, std::memory_order_relaxed);
         }
     }
+}
+
+DawTransportState LightShowProcessor::updateResolvedTransportState()
+{
+    auto effective = transportBridge.read();
+
+    const uint64_t curBlocks = audioBlockCounter.load(std::memory_order_relaxed);
+    const double nowMs = juce::Time::getMillisecondCounterHiRes();
+    if (curBlocks != lastSeenAudioBlocks)
+    {
+        lastSeenAudioBlocks = curBlocks;
+        lastAudioBlockSeenMs = nowMs;
+    }
+
+    // Fallback universale: se la DAW ferma processBlock (Pausa/Stop), non lasciare isPlaying bloccato su true
+    if (lastAudioBlockSeenMs > 0.0 && (nowMs - lastAudioBlockSeenMs) > 180.0)
+        effective.isPlaying = false;
+
+    // Su Reaper legge direttamente GetPlayState() (bit 0 = Play, bit 1 = Pausa) e posizione reale
+    if (reaperBridge != nullptr && reaperBridge->available.load())
+    {
+        auto& api = *reaperBridge;
+        if (api.getPlayState != nullptr)
+        {
+            const int st = api.getPlayState();
+            const bool reaperPlaying = (st & 1) != 0;
+            const bool reaperPaused = (st & 2) != 0;
+
+            effective.isHostActive = true;
+            effective.isPlaying = reaperPlaying;
+
+            const bool audioStale = (lastAudioBlockSeenMs <= 0.0 || (nowMs - lastAudioBlockSeenMs) > 120.0);
+            if (!reaperPlaying || audioStale)
+            {
+                double posSec = effective.timeSeconds;
+                if ((reaperPlaying || reaperPaused) && api.getPlayPosition != nullptr)
+                    posSec = juce::jmax(0.0, api.getPlayPosition());
+                else if (!reaperPlaying && !reaperPaused && api.getCursorPosition != nullptr)
+                    posSec = juce::jmax(0.0, api.getCursorPosition());
+
+                effective.timeSeconds = posSec;
+
+                if (api.timeToQN != nullptr)
+                    effective.ppqPosition = juce::jmax(0.0, api.timeToQN(nullptr, posSec));
+                else
+                    effective.ppqPosition = juce::jmax(0.0, beatTimeMap.secondsToBeat(posSec) - 1.0);
+
+                if (api.getTimeSigAtTime != nullptr)
+                {
+                    int tsNum = 4, tsDen = 4;
+                    double bpm = 120.0;
+                    api.getTimeSigAtTime(nullptr, posSec, &tsNum, &tsDen, &bpm);
+                    effective.timeSigNum = tsNum;
+                    effective.timeSigDen = tsDen;
+                    effective.bpm = bpm;
+                }
+
+                const auto mp = beatTimeMap.beatToMusicalPosition(1.0 + effective.ppqPosition);
+                effective.barCount = static_cast<int64_t>(juce::jmax(0, mp.barIndex - 1));
+                effective.hasBarCount = true;
+                effective.ppqBarStart = juce::jmax(0.0, effective.ppqPosition - mp.beatInBarQ);
+            }
+        }
+    }
+
+    resolvedTransportBridge.writeFromAudioThread(effective);
+    return effective;
 }
 
 juce::AudioProcessorEditor* LightShowProcessor::createEditor()
@@ -541,7 +738,10 @@ int LightShowProcessor::getLayerPriority(const juce::ValueTree& node)
 
 void LightShowProcessor::timerCallback()
 {
-    if (hostedInDaw && reaperBridge != nullptr && reaperBridge->available.load())
+    if (!hostedInDaw)
+        return;
+
+    if (reaperBridge != nullptr && reaperBridge->available.load())
     {
         if (++reaperPollDivider >= 30)
         {
@@ -550,7 +750,9 @@ void LightShowProcessor::timerCallback()
         }
     }
 
-    if (!hostedInDaw || !dmxLiveEngine.isOutputActive())
+    const auto transport = updateResolvedTransportState();
+
+    if (!dmxLiveEngine.isOutputActive())
     {
         if (wasDawPlayingDmx)
         {
@@ -560,7 +762,6 @@ void LightShowProcessor::timerCallback()
         return;
     }
 
-    const auto transport = transportBridge.read();
     if (!transport.isHostActive)
         return;
 
@@ -574,7 +775,8 @@ void LightShowProcessor::timerCallback()
     {
         wasDawPlayingDmx = false;
         dmxLiveEngine.setShowPlaybackActive(false);
-        dmxLiveEngine.clearAllOutput();
+        if (!dmxLiveEngine.isFixtureTestActive() && !dmxLiveEngine.isManualOverrideActive())
+            dmxLiveEngine.clearAllOutput();
     }
 }
 
@@ -810,17 +1012,20 @@ bool LightShowProcessor::reaperTogglePlayPause()
         if (api.csurfOnPause != nullptr)
         {
             api.csurfOnPause();
+            updateResolvedTransportState();
             return true;
         }
         if (api.csurfOnStop != nullptr)
         {
             api.csurfOnStop();
+            updateResolvedTransportState();
             return true;
         }
     }
     else if (api.csurfOnPlay != nullptr)
     {
         api.csurfOnPlay();
+        updateResolvedTransportState();
         return true;
     }
 
@@ -839,12 +1044,14 @@ bool LightShowProcessor::reaperStopOrRewind()
     if (isPlayingOrPaused && api.csurfOnStop != nullptr)
     {
         api.csurfOnStop();
+        updateResolvedTransportState();
         return true;
     }
 
     if (api.setEditCurPos != nullptr)
     {
         api.setEditCurPos(0.0, true, false);
+        updateResolvedTransportState();
         return true;
     }
 
@@ -865,6 +1072,11 @@ bool LightShowProcessor::reaperSeekToBeat(double beat1Based)
         ? juce::jmax(0.0, api.qnToTime(nullptr, qn0Based))
         : beatTimeMap.beatToSeconds(juce::jmax(1.0, beat1Based));
 
+    const int st = (api.getPlayState != nullptr) ? api.getPlayState() : 0;
+    if ((st & 2) != 0 && (st & 1) == 0 && api.csurfOnStop != nullptr)
+        api.csurfOnStop();
+
     api.setEditCurPos(targetSec, true, true);
+    updateResolvedTransportState();
     return true;
 }

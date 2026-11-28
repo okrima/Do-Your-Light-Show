@@ -683,6 +683,14 @@ private:
                             smoothDawSec += (rawSec - smoothDawSec) * 0.25;
                         }
                     }
+                    else
+                    {
+                        const double maxLeadQ = juce::jmax(0.08, (safeBpm / 60.0) * 0.12);
+                        if (smoothDawPpq - rawPpq > maxLeadQ)
+                            smoothDawPpq = rawPpq + maxLeadQ;
+                        if (smoothDawSec - rawSec > 0.12)
+                            smoothDawSec = rawSec + 0.12;
+                    }
                 }
 
                 auto interpTs = dawTs;

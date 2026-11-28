@@ -15,6 +15,8 @@ public:
 
     // Hook pronto per lo Step 3 (Driver ENTTEC Pro / Open DMX / Art-Net)
     std::function<void(const DmxUniverse&)> onDmxFrameOut;
+    std::function<bool()> isDmxOutputActive;
+    std::function<void()> onWizardClosed;
     std::function<void()> onCalibrationSaved;
 
     explicit PanTiltCalibrationWizard(juce::ValueTree fixtureNode)
@@ -34,8 +36,11 @@ public:
     ~PanTiltCalibrationWizard() override
     {
         stopTimer();
-        // Blackout pulito del faro alla chiusura della finestra
-        if (onDmxFrameOut)
+        if (onWizardClosed)
+        {
+            onWizardClosed();
+        }
+        else if (onDmxFrameOut)
         {
             DmxUniverse blackout{};
             blackout.fill(0);
@@ -333,6 +338,7 @@ private:
         greenCh = static_cast<int>(fixture.getProperty(StateKeys::getMappingKey("Green"), 0));
         blueCh = static_cast<int>(fixture.getProperty(StateKeys::getMappingKey("Blue"), 0));
         whiteCh = static_cast<int>(fixture.getProperty(StateKeys::getMappingKey("White"), 0));
+        uvCh = static_cast<int>(fixture.getProperty(StateKeys::getMappingKey("UV"), 0));
         strobeCh = static_cast<int>(fixture.getProperty(StateKeys::getMappingKey("Strobe"), 0));
 
         baseSpec = StageRoleCatalog::PanTiltHardwareSpec::fromFixtureNode(fixture);
@@ -552,9 +558,16 @@ private:
         locateDimSlider.setSliderStyle(juce::Slider::LinearHorizontal);
         locateDimSlider.setTextBoxStyle(juce::Slider::TextBoxRight, false, 40, 22);
         locateDimSlider.setRange(0.0, 255.0, 1.0);
+
+        const bool isSharedDimStrobe = (strobeSpec.mode == 2);
+        const bool hasEffectiveDimmer = (dimmerCh > 0) || (isSharedDimStrobe && strobeCh > 0);
+        const double defaultLocateDim = isSharedDimStrobe
+            ? static_cast<double>(strobeSpec.getSafeDimmerMax())
+            : 255.0;
+
         // Se il canale dimmer e' condiviso con lo strobo (mode 1), parte a 128 per restare fuori fascia strobo
-        locateDimSlider.setValue(strobeSpec.mode == 1 ? 128.0 : 255.0, juce::dontSendNotification);
-        locateDimSlider.setEnabled(dimmerCh > 0);
+        locateDimSlider.setValue(defaultLocateDim, juce::dontSendNotification);
+        locateDimSlider.setEnabled(hasEffectiveDimmer);
         locateDimSlider.onValueChange = [this]() { emitCurrentDmxFrame(); };
         addAndMakeVisible(locateDimSlider);
 
@@ -566,8 +579,8 @@ private:
         locateShutterSlider.setSliderStyle(juce::Slider::LinearHorizontal);
         locateShutterSlider.setTextBoxStyle(juce::Slider::TextBoxRight, false, 40, 22);
         locateShutterSlider.setRange(0.0, 255.0, 1.0);
-        locateShutterSlider.setValue(255.0, juce::dontSendNotification);
-        const bool hasDedicatedShutter = (strobeCh > 0 && strobeSpec.mode == 2);
+        locateShutterSlider.setValue(static_cast<double>(juce::jlimit(0, 255, strobeSpec.openVal)), juce::dontSendNotification);
+        const bool hasDedicatedShutter = (strobeCh > 0 && strobeSpec.mode == 1);
         locateShutterLabel.setEnabled(hasDedicatedShutter);
         locateShutterSlider.setEnabled(hasDedicatedShutter);
         locateShutterSlider.onValueChange = [this]() { emitCurrentDmxFrame(); };
@@ -874,9 +887,12 @@ private:
 
         const bool locateOn = locateToggle.getToggleState();
         const int dimOut = locateOn ? static_cast<int>(locateDimSlider.getValue()) : 0;
-        if (dimmerCh > 0) writeRelCh(dimmerCh, dimOut);
+        const int effectiveDimCh = (dimmerCh > 0) ? dimmerCh : (strobeSpec.mode == 2 ? strobeCh : 0);
+        if (effectiveDimCh > 0)
+            writeRelCh(effectiveDimCh, dimOut);
 
-        if (strobeCh > 0 && strobeSpec.mode == 2)
+        const bool hasDedicatedShutter = (strobeCh > 0 && strobeSpec.mode == 1);
+        if (hasDedicatedShutter)
             writeRelCh(strobeCh, locateOn ? static_cast<int>(locateShutterSlider.getValue()) : 0);
 
         if (locateOn)
@@ -885,25 +901,34 @@ private:
             {
                 writeRelCh(whiteCh, 255);
             }
-            else
+            else if (redCh > 0 || greenCh > 0 || blueCh > 0)
             {
                 if (redCh > 0)   writeRelCh(redCh, 255);
                 if (greenCh > 0) writeRelCh(greenCh, 255);
                 if (blueCh > 0)  writeRelCh(blueCh, 255);
             }
+            else if (uvCh > 0)
+            {
+                writeRelCh(uvCh, 255);
+            }
         }
 
-        if (onDmxFrameOut)
+        const bool dmxRunning = (isDmxOutputActive ? isDmxOutputActive() : static_cast<bool>(onDmxFrameOut));
+        if (onDmxFrameOut && dmxRunning)
             onDmxFrameOut(uni);
 
-        // Aggiorna la barra monitor DMX
-        juce::String mon = onDmxFrameOut ? "  DMX OUT LIVE  |  " : "  DMX MONITOR (Driver in Step 3)  |  ";
-        if (panCh > 0)    mon << "CH" << (startAddr + panCh - 1) << "(Pan):" << curPanRaw << "  ";
-        if (tiltCh > 0)   mon << "CH" << (startAddr + tiltCh - 1) << "(Tilt):" << curTiltRaw << "  ";
-        if (dimmerCh > 0) mon << "CH" << (startAddr + dimmerCh - 1) << "(Dim):" << dimOut << "  ";
-        if (strobeCh > 0 && strobeSpec.mode == 2)
+        juce::String mon = dmxRunning
+            ? "  DMX OUT LIVE  |  "
+            : "  DMX SPENTO (Avvia uscita in Tab 6)  |  ";
+
+        if (panCh > 0)          mon << "CH" << (startAddr + panCh - 1) << "(Pan):" << curPanRaw << "  ";
+        if (tiltCh > 0)         mon << "CH" << (startAddr + tiltCh - 1) << "(Tilt):" << curTiltRaw << "  ";
+        if (effectiveDimCh > 0) mon << "CH" << (startAddr + effectiveDimCh - 1) << "(Dim):" << dimOut << "  ";
+        if (hasDedicatedShutter)
             mon << "CH" << (startAddr + strobeCh - 1) << "(Sht):" << (locateOn ? static_cast<int>(locateShutterSlider.getValue()) : 0);
 
+        dmxMonitorLabel.setColour(juce::Label::textColourId,
+            dmxRunning ? juce::Colour(0xff34d399) : juce::Colour(0xfffbbf24));
         dmxMonitorLabel.setText(mon, juce::dontSendNotification);
     }
 
@@ -951,7 +976,7 @@ private:
     juce::String fixtureName;
     int startAddr = 1;
     int panCh = 0, tiltCh = 0, dimmerCh = 0;
-    int redCh = 0, greenCh = 0, blueCh = 0, whiteCh = 0, strobeCh = 0;
+    int redCh = 0, greenCh = 0, blueCh = 0, whiteCh = 0, uvCh = 0, strobeCh = 0;
 
     StageRoleCatalog::PanTiltHardwareSpec baseSpec;
     StageRoleCatalog::StrobeHardwareSpec strobeSpec;

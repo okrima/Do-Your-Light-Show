@@ -437,8 +437,6 @@ public:
 
         updateScrollBarRange();
         updateVerticalLaneScrollBar();
-
-        updateScrollBarRange();
     }
 
     void paint(juce::Graphics& g) override
@@ -635,8 +633,7 @@ public:
 
         grabKeyboardFocus();
 
-        // Click o Doppio-Click su un marker del righello (Metrica o BPM)
-        // Click o Doppio-Click su un marker del righello (solo in Standalone)
+        // Click o Doppio-Click su un marker del righello
         if (dawTransportBridge == nullptr)
         {
             if (const auto* hit = hitTestRulerMarker(e.getPosition()))
@@ -1419,7 +1416,16 @@ private:
                             smoothDawSec += (rawSec - smoothDawSec) * 0.25;
                         }
                     }
+                    else
+                    {
+                        const double maxLeadQ = juce::jmax(0.08, (safeBpm / 60.0) * 0.12);
+                        if (smoothDawPpq - rawPpq > maxLeadQ)
+                            smoothDawPpq = rawPpq + maxLeadQ;
+                        if (smoothDawSec - rawSec > 0.12)
+                            smoothDawSec = rawSec + 0.12;
+                    }
                 }
+                const bool playStateChanged = (dawTs.isPlaying != lastDawTransport.isPlaying);
 
                 lastDawTransport = dawTs;
                 lastDawTransport.ppqPosition = smoothDawPpq;
@@ -1434,7 +1440,7 @@ private:
 
                 updatePlayButtonLabel();
 
-                if (dawTs.isPlaying || std::abs(dawTimelinePosSec - lastReportedSec) > 0.001)
+                if (dawTs.isPlaying || playStateChanged || std::abs(dawTimelinePosSec - lastReportedSec) > 0.001)
                 {
                     lastReportedSec = dawTimelinePosSec;
 

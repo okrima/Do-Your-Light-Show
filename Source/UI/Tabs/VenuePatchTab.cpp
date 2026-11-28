@@ -661,7 +661,25 @@ void FixtureEditorPanel::openCalibrationWizard()
     if (!currentFixtureNode.isValid())
         return;
 
+    if (onCalibrationWizardOpened)
+        onCalibrationWizardOpened();
+
     auto* wizard = new PanTiltCalibrationWizard(currentFixtureNode);
+    auto* enginePtr = dmxLiveEngine;
+
+    if (enginePtr != nullptr)
+    {
+        wizard->isDmxOutputActive = [enginePtr]() {
+            return enginePtr->isOutputActive();
+            };
+        wizard->onDmxFrameOut = [enginePtr](const PanTiltCalibrationWizard::DmxUniverse& uni) {
+            enginePtr->setManualUniverseOverride(uni);
+            };
+        wizard->onWizardClosed = [enginePtr]() {
+            enginePtr->clearManualUniverseOverride();
+            };
+    }
+
     juce::Component::SafePointer<FixtureEditorPanel> safeThis(this);
     wizard->onCalibrationSaved = [safeThis]() {
         if (safeThis != nullptr)
@@ -1462,6 +1480,10 @@ VenuePatchTab::VenuePatchTab(juce::ValueTree& state)
     stageDesignerPanel.onFixtureSelectedFromMap = [this](int fixIdx) {
         if (fixIdx >= 0 && fixIdx < venueNode.getNumChildren())
             fixtureList.selectRow(fixIdx);
+        };
+    
+    editorPanel.onCalibrationWizardOpened = [this]() {
+        forceStopFixtureTest();
         };
 
     venueNode = appState.getChildWithName(StateKeys::VenueNode);

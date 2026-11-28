@@ -592,6 +592,21 @@ public:
         pushProcessedFrameLocked();
     }
 
+    void setManualUniverseOverride(const std::array<uint8_t, 512>& universeFrame)
+    {
+        const juce::ScopedLock sl(stateLock);
+        manualTestActive.store(true);
+        rawFrame = universeFrame;
+        channelRole.fill(ChannelRole::Other);
+        channelParam.fill(0);
+        pushProcessedFrameLocked();
+    }
+
+    void clearManualUniverseOverride()
+    {
+        clearManualChannelOverride();
+    }
+
     bool isManualOverrideActive() const noexcept { return manualTestActive.load(); }
 
     void setTab2LivePreviewEnabled(bool enabled) noexcept

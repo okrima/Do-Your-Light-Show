@@ -20,7 +20,7 @@ public:
     BeatTimeMap& getBeatTimeMap() noexcept { return beatTimeMap; }
     DmxLiveEngine& getDmxLiveEngine() noexcept { return dmxLiveEngine; }
     StateUndoManager& getUndoManager() noexcept { return undoManager; }
-    const LockFreeTransportBridge& getTransportBridge() const noexcept { return transportBridge; }
+    const LockFreeTransportBridge& getTransportBridge() const noexcept { return resolvedTransportBridge; }
 
     bool isRunningInDaw() const noexcept { return hostedInDaw; }
 
@@ -101,6 +101,12 @@ private:
     DmxLiveEngine dmxLiveEngine;
     StateUndoManager undoManager{ mainState };
     LockFreeTransportBridge transportBridge;
+    DawTransportState updateResolvedTransportState();
+
+    LockFreeTransportBridge resolvedTransportBridge;
+    std::atomic<uint64_t> audioBlockCounter{ 0 };
+    uint64_t lastSeenAudioBlocks = 0;
+    double lastAudioBlockSeenMs = 0.0;
 
     juce::ValueTree cleanVenueSnap;
     juce::ValueTree cleanPresetLibSnap;

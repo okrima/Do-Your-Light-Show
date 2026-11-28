@@ -83,6 +83,9 @@ public:
     void resized() override;
     void paint(juce::Graphics& g) override;
 
+    void setDmxLiveEngine(DmxLiveEngine* engine) noexcept { dmxLiveEngine = engine; }
+    std::function<void()> onCalibrationWizardOpened;
+
 private:
     void updateUIFromNode();
     void applyQuickSpreadPreset(int presetId);
@@ -153,6 +156,8 @@ private:
     juce::ToggleButton swapPanTiltToggle;
 
     juce::Label ptReadoutLabel;
+
+    DmxLiveEngine* dmxLiveEngine = nullptr;
 };
 
 // =============================================================================
@@ -292,7 +297,12 @@ public:
     void paint(juce::Graphics& g) override;
     void resized() override;
 
-    void setDmxLiveEngine(DmxLiveEngine* engine) noexcept { dmxLiveEngine = engine; }
+    void setDmxLiveEngine(DmxLiveEngine* engine) noexcept
+    {
+        dmxLiveEngine = engine;
+        editorPanel.setDmxLiveEngine(engine);
+    }
+
     void forceStopFixtureTest();
     void visibilityChanged() override;
 
